@@ -11,11 +11,7 @@ Este arquivo serve como o manual de bordo e base de conhecimento para agentes de
 ## 🛠️ Stack Tecnológica (Preliminar)
 - **Metodologia:** Agentic Workflow (Fluxo Agêntico).
 - **Linguagens/Frameworks:** A definir conforme o tema.
-- **Ambiente:** Linux (Ubuntu/Debian via Gemini CLI).
-- **Ferramentas LaTeX Recomendadas:**
-  - `latexindent.pl`: Formatador de código LaTeX (requer Perl/cpanm).
-  - `ChkTeX`: Linter semântico para LaTeX.
-  - `texlive-full` ou `texlive-latex-extra`: Para as classes e pacotes básicos.
+- **Ambiente:** Linux (Fedora via Gemini CLI).
 
 ## 🧩 Habilidades Ativas (Skills)
 - **resumir-documentacao:** Skill de leitura e síntese. Analisa a documentação em `docs/` e `AGENT.md` para fornecer uma visão consolidada do projeto e requisitos sem criar novos arquivos.
@@ -36,7 +32,7 @@ tcc-ciencia-computacao-ucb/
 ├── AGENT.md          # Documentação central do projeto para IAs
 ├── docs/             # Documentação acadêmica e técnica
 │   ├── templates/    # Modelos originais
-│   └── documento_visao.tex # Estrutura base LaTeX
+│   └── documento_visao.md # Estrutura base em Markdown
 ├── src/              # Código fonte do projeto
 └── tests/            # Testes automatizados
 ```
