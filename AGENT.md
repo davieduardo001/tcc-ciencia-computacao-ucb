@@ -30,7 +30,9 @@ Este arquivo serve como o manual de bordo e base de conhecimento para agentes de
 tcc-ciencia-computacao-ucb/
 ├── .gemini           # Instruções base para o agente
 ├── AGENT.md          # Documentação central do projeto para IAs
-├── docs/             # Documentação acadêmica e técnica (LaTeX/Markdown)
+├── docs/             # Documentação acadêmica e técnica
+│   ├── templates/    # Modelos originais
+│   └── documento_visao.tex # Estrutura base LaTeX
 ├── src/              # Código fonte do projeto
 └── tests/            # Testes automatizados
 ```
