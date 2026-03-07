@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "github": {
+      "httpUrl": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer COLE_SEU_TOKEN_AQUI!!"
+      }
+    }
+  }
+}
