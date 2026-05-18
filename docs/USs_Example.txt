@@ -1,0 +1,37 @@
+Exemplo de história de usuário completa
+US01. Cadastrar usuário
+Descrição:
+Como um novo usuário do aplicativo de entrega,
+Quero cadastrar minha conta com meu nome, e-mail, telefone,
+CPF e endereço,
+Para que eu possa fazer pedidos de entrega de forma rápida e
+eficiente.
+Critérios de aceite (ou cenários)
+Critério 1: Cadastro sem dados obrigatórios
+DADO que o usuário está na tela de cadastro,
+QUANDO ele tenta clicar em "Cadastrar" sem preencher os
+campos obrigatórios,
+ENTÃO o sistema deve exibir mensagens de erro indicando
+quais campos precisam ser preenchidos.
+Critério 2: E-mail já cadastrado
+DADO que o usuário tenta cadastrar um e-mail já registrado,
+QUANDO ele preencher o formulário e clicar em "Cadastrar",
+ENTÃO o sistema deve exibir uma mensagem de erro
+informando que o e-mail já está em uso.
+Critério 3: CPF Já cadastrado
+DADO que o usuário tenta cadastrar um CPF já registrado,
+QUANDO ele preencher o formulário e clicar em "Cadastrar",
+ENTÃO o sistema deve exibir uma mensagem de erro
+informando que o CPF já está em uso.
+Critério 4: Formato de E-mail inválido
+DADO que o usuário preenche o campo de e-mail com um
+formato inválido,
+QUANDO ele tenta se cadastrar,
+ENTÃO o sistema deve exibir uma mensagem de erro
+informando que o formato do e-mail é inválido.
+Critério 5: Formato de CPF inválido
+DADO que o usuário preenche o campo de CPF com um formato
+inválido,
+QUANDO ele tenta se cadastrar,
+ENTÃO o sistema deve exibir uma mensagem de erro
+informando que o formato do CPF é inválido.

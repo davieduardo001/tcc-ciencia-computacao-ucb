@@ -1,43 +1,78 @@
-# Documento de Visão
+# Documento de Visão - Movecity
 
 ## 1. Introdução
-[Apresente aqui o propósito deste documento, qual o grupo e seus respectivos membros. Explique também se este é o projeto de construção de um novo software, qual a versão que será construída e se há um cliente externo, se é um software multicliente para mercado ou sem fins lucrativos. Destaque a motivação e importância do desenvolvimento da solução proposta.]
+O presente documento formaliza a visão estratégica do projeto **Movecity**, desenvolvido como Trabalho de Conclusão de Curso. O objetivo é apresentar a viabilidade técnica e social desta solução a possíveis stakeholders, sendo estes gestores públicos, empresas de transporte que operam no Distrito Federal ou investidores. O projeto é conduzido pelo grupo Segurança no Transporte, integrado pelos acadêmicos: Breno Santana Silva, Davi Eduardo Costa Miranda, Kelvin Rodrigues de Sousa, Luis Fernando Monteiro de Assis Lourenço, Nathalia Gualberto Lopes e Vitória Cordeiro Albuquerque.
+
+O Movecity será um novo software, desenvolvido como um aplicativo web. Diferente de soluções globais, o Movecity nasce com foco regionalizado, operando inicialmente como um projeto-piloto em uma cidade satélite estratégica do Distrito Federal. A escolha por regiões de alta densidade demográfica, como Ceilândia e Taguatinga — identificadas pela Pesquisa Distrital por Amostra de Domicílios (IPEDF, 2022) como áreas de grande concentração populacional e intensa demanda por transporte público —, é fundamental para a validação da solução em um cenário de alta complexidade. A motivação do projeto é mitigar as falhas críticas de comunicação do sistema de transporte local, promovendo segurança e previsibilidade para o passageiro brasiliense por meio de uma plataforma colaborativa e transparente.
 
 ## 2. Contexto de negócio
-[Descreva detalhadamente o cenário atual do negócio ou domínio de aplicação, sem abordar a solução proposta. Identifique e analise as principais deficiências e lacunas enfrentadas no contexto, destacando problemas, ineficiências ou necessidades não atendidas. Apresente as ferramentas ou métodos atualmente utilizados, indicando suas limitações.
-Descreva os principais usuários e/ou clientes impactados por esse contexto, bem como o mercado-alvo. Inclua, sempre que possível, indicadores quantitativos ou qualitativos que evidenciem a relevância e urgência do problema (exemplos: dados de mercado, métricas de desempenho, taxas de insatisfação, custos operacionais, etc.).
-Realize um benchmarking com soluções ou softwares existentes que, de alguma forma, atendam esse mercado ou domínio, comparando suas funcionalidades, pontos fortes e fracos, e identificando oportunidades de melhoria.]
+### 2.1 Cenário Atual do Domínio e Deficiências
+O domínio de aplicação deste projeto concentra-se na gestão e consumo de informações sobre a mobilidade urbana no Distrito Federal. O sistema de transporte público do DF é caracterizado por um fluxo pendular intenso, onde milhares de cidadãos se deslocam diariamente das Regiões Administrativas (como Ceilândia e Taguatinga) para o Plano Piloto e outros centros econômicos.
+
+Atualmente, este cenário é marcado por uma profunda assimetria de informação. Embora existam frotas monitoradas, o dado real sobre a localização dos veículos raramente é transmitido de forma fidedigna ao cidadão. As principais lacunas enfrentadas são:
+- **O fenômeno do "Ônibus Fantasma":** Veículos que constam no sistema oficial mas não realizam o percurso, ou que passam fora do horário previsto sem aviso prévio.
+- **Insegurança Física e Psicológica:** A espera prolongada em paradas de ônibus, muitas vezes em locais isolados e com iluminação precária nas cidades-satélites, expõe o usuário a riscos de assaltos e violência.
+- **Ineficiência Operacional e Econômica:** A falta de previsibilidade impede que o usuário otimize seu tempo, impactando sua pontualidade no trabalho e compromissos.
+
+### 2.2 Usuários, Mercado-Alvo e Indicadores de Relevância
+O mercado-alvo compreende os usuários dependentes do STPC/DF. O projeto-piloto será em Taguatinga e Ceilândia devido à alta densidade demográfica. Segundo o IPEDF (2022), 33,3% da população do DF utiliza o ônibus como principal meio de transporte.
+
+**Principais usuários:**
+- Trabalhadores de Turnos Críticos.
+- Estudantes Universitários e de Ensino Técnico.
+- Profissionais Corporativos e Autônomos.
+
+### 2.3 Benchmarking
+| Ferramenta | Pontos Fortes | Limitações | Oportunidade Movecity |
+| :--- | :--- | :--- | :--- |
+| **DF no Ponto** | Dados diretos do GDF. | Baixa usabilidade e bugs. | UX superior e validação ágil. |
+| **Moovit/Maps** | Grande alcance. | Dependência de feeds lentos. | Precisão regional cirúrgica. |
+| **Redes Sociais** | Colaboração real. | Informação desorganizada. | Colaboração georreferenciada. |
 
 ## 3. Posicionamento
 ### 3.1 Declaração do problema
-| O problema de | [descreva o problema] |
+| O problema de | A ausência de informações confiáveis e em tempo real sobre o transporte público no DF |
 | :--- | :--- |
-| **afeta** | [as partes interessadas afetadas pelo problema] |
-| **cujo impacto é** | [qual é o impacto do problema?] |
-| **uma solução de sucesso deveria** | [liste alguns benefícios chave de uma solução de sucesso] |
+| **afeta** | Trabalhadores e estudantes de Ceilândia e Taguatinga |
+| **cujo impacto é** | Insegurança física, perda de produtividade e ansiedade |
+| **uma solução de sucesso deveria** | Fornecer rastreamento real, alertas de atrasos e permitir reportes colaborativos |
 
 ### 3.2 Declaração da visão do software
-| Para | [clientes e usuários alvo] |
+| Para | Usuários do transporte público do DF |
 | :--- | :--- |
-| **Que** | [declaração da necessidade ou oportunidade] |
-| **O** | [Nome do Produto] |
-| **É um** | [categoria do produto] |
-| **Que** | [objetivo principal do software; do ponto de vista do usuário] |
-| **Diferente de** | [alternativa do mercado, principal concorrente ou solução atual] |
-| **Nosso produto** | [principais diferenciais] |
+| **Que** | Necessitam de informações precisas para planejar deslocamentos com segurança |
+| **O** | Movecity |
+| **É um** | Aplicativo web de mobilidade urbana colaborativa |
+| **Que** | Combina dados de GPS com informações colaborativas dos passageiros |
+| **Diferente de** | DF no Ponto, Moovit e Google Maps |
+| **Nosso produto** | Entrega maior precisão e foco regional nas cidades-satélite |
 
 ## 4. Descrição das partes interessadas
 | Nome | Descrição | Responsabilidades |
 | :--- | :--- | :--- |
-| [Nome] | [Descrição] | [Responsabilidades] |
+| Usuário Trabalhador | Depende do transporte em horários críticos | Reportar ocorrências e validar dados |
+| Equipe de Desenvolvimento | Grupo Segurança no Transporte (UCB) | Desenvolver e manter a plataforma |
+| Gestores Públicos | SEMOB/GDF | Consumir dados para tomada de decisão |
 
 ## 5. Visão geral do produto
 ### 5.1 Necessidades e funcionalidades
-| Necessidade | Funcionalidade | Prioridade | Responsável |
-| :--- | :--- | :--- | :--- |
-| | | | |
+| Funcionalidade | Descrição | Prioridade |
+| :--- | :--- | :--- |
+| Consultar Horários/GPS | Rastreamento em tempo real da linha | Alta |
+| Notificações de Atraso | Alertas baseados em rotas preferidas | Alta |
+| Reporte Colaborativo | Usuário informa problemas na linha (estilo Waze) | Média |
+| Mapa em Tempo Real | Visualização do ônibus e paradas | Alta |
+| Autenticação | Login via Google ou E-mail/Senha | Alta |
 
 ### 5.2 Requisitos não funcionais preliminares
-| Requisito não funcional | Prioridade |
-| :--- | :--- |
-| | |
+| Requisito | Descrição | Prioridade |
+| :--- | :--- | :--- |
+| **Desempenho** | Carregamento em até 3s em conexões 4G | Alta |
+| **Disponibilidade** | 99% nos horários de pico (5h-9h, 17h-20h) | Alta |
+| **LGPD** | Proteção rigorosa de dados de geolocalização | Alta |
+| **Validação Cruzada** | Alerta colaborativo precisa de >1 reporte para ser confirmado | Média |
+
+## 6. Referências
+- IPEDF (2022). Pesquisa Distrital por Amostra de Domicílios.
+- CGDF (2026). Painel de Ouvidoria do Distrito Federal.
+- CAROLI, P. (2018). Lean Inception.

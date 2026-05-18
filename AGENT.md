@@ -1,22 +1,24 @@
-# AGENT.md - TCC Ciência da Computação UCB
+# AGENT.md - TCC Ciência da Computação UCB (Movecity)
 
 Este arquivo é a fonte única de verdade (Single Source of Truth) para agentes de IA que colaboram neste projeto. Ele consolida as diretrizes de desenvolvimento, regras acadêmicas e o fluxo de trabalho agêntico.
 
 ## 📋 Resumo do Projeto
-- **Título:** TCC Ciência da Computação UCB (Tema a definir)
-- **Objetivo:** Desenvolvimento de um Trabalho de Conclusão de Curso utilizando fluxos de trabalho agênticos (Agentic Workflow).
-- **Autor:** @doritos
-- **Status:** Fase inicial - Planejamento e estruturação de ambiente.
+- **Título:** Movecity - Mobilidade Urbana Colaborativa no DF
+- **Objetivo:** Mitigar falhas de comunicação no transporte público do DF através de uma plataforma web colaborativa (GPS + Reporte Humano).
+- **Autor:** @doritos (Grupo Segurança no Transporte)
+- **Status:** Fase de Planejamento e Especificação.
 
 ## 🛠️ Stack Tecnológica (Preliminar)
-- **Metodologia:** Agentic Workflow (Fluxo Agêntico).
-- **Linguagens/Frameworks:** A definir conforme o tema de pesquisa.
+- **Metodologia:** Agentic Workflow & Lean Inception.
+- **Frontend:** Aplicativo Web (Tecnologias a definir: React/Angular).
+- **Dados:** Integração GPS (GDF) + Crowdsourcing.
 - **Ambiente:** Linux (Fedora via Gemini CLI).
 
 ## 🧩 Habilidades Ativas (Skills)
 - **resumir-documentacao:** Lê e sintetiza a documentação em `docs/` e `AGENT.md`. **Sempre use esta skill ao iniciar tarefas complexas.**
 - **gerenciar-branches:** Garante o uso organizado de branches. **Obrigatório:** Listar branches e perguntar ao usuário antes de qualquer commit.
 - **gerenciar-commits:** Executa commits atômicos (Conventional Commits) integrados à verificação de branch.
+- **gh-create-issue:** Cria issues no GitHub com formato completo (User Story, SPEC e PRD) utilizando a ferramenta de linha de comando `gh`.
 
 ## 📏 Diretrizes Gerais e Regras de Atuação
 1. **Idioma:** O idioma oficial é **Português (PT-BR)** para documentação, comentários e interações.
