@@ -64,7 +64,24 @@ O mercado-alvo compreende os usuários dependentes do STPC/DF. O projeto-piloto 
 | Mapa em Tempo Real | Visualização do ônibus e paradas | Alta |
 | Autenticação | Login via Google ou E-mail/Senha | Alta |
 
-### 5.2 Requisitos não funcionais preliminares
+### 5.2 Arquitetura Técnica
+
+| Camada | Tecnologia | Justificativa |
+| :--- | :--- | :--- |
+| **Frontend** | Next.js (React) | SSR/SSG, App Router, deploy na Vercel ou Fly.io |
+| **Mapa/GPS** | Leaflet JS + OpenStreetMap | Gratuito, open source, alta customização, sem risco de custo em produção |
+| **Backend** | FastAPI (Python) + Fly.io | Framework assíncrono, alta performance, documentação automática via OpenAPI, deploy via Docker |
+| **Banco de Dados** | PostgreSQL (Neon) | Serverless, free tier generoso, suporte a dados geoespaciais via PostGIS |
+| **CI/CD** | GitHub Actions | Integração nativa com o repositório, pipelines de teste e deploy automatizados |
+| **Fonte GPS** | API do GDF (SEMOB) | Dados oficiais das frotas do STPC/DF em formato GeoJSON |
+
+**Fluxo de dados:**
+1. API do GDF fornece posições GPS dos ônibus em tempo real.
+2. Backend consolida dados oficiais com reportes dos usuários.
+3. Frontend renderiza as informações no mapa via Leaflet JS.
+4. Reportes colaborativos são validados por cruzamento (mínimo 2 reportes para confirmação).
+
+### 5.3 Requisitos não funcionais preliminares
 | Requisito | Descrição | Prioridade |
 | :--- | :--- | :--- |
 | **Desempenho** | Carregamento em até 3s em conexões 4G | Alta |

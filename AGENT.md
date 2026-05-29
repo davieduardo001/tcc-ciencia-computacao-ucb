@@ -8,11 +8,16 @@ Este arquivo é a fonte única de verdade (Single Source of Truth) para agentes 
 - **Autor:** @doritos (Grupo Segurança no Transporte)
 - **Status:** Fase de Planejamento e Especificação.
 
-## 🛠️ Stack Tecnológica (Preliminar)
+## 🛠️ Stack Tecnológica
+
 - **Metodologia:** Agentic Workflow & Lean Inception.
-- **Frontend:** Aplicativo Web (Tecnologias a definir: React/Angular).
-- **Dados:** Integração GPS (GDF) + Crowdsourcing.
-- **Ambiente:** Linux (Fedora via Gemini CLI).
+- **Frontend:** Next.js (React framework — App Router).
+- **Mapa/GPS:** Leaflet JS + OpenStreetMap tiles (gratuito, open source). Integração com API GPS do GDF via GeoJSON.
+- **Backend:** FastAPI (Python) — deploy no Fly.io.
+- **Banco de Dados:** PostgreSQL gerenciado no Neon (serverless).
+- **CI/CD:** GitHub Actions.
+- **Dados:** Integração GPS (GDF) + Crowdsourcing colaborativo.
+- **Ambiente:** Linux.
 
 ## 🧩 Habilidades Ativas (Skills)
 - **resumir-documentacao:** Lê e sintetiza a documentação em `docs/` e `AGENT.md`. **Sempre use esta skill ao iniciar tarefas complexas.**
@@ -25,6 +30,7 @@ Este arquivo é a fonte única de verdade (Single Source of Truth) para agentes 
 2. **Proatividade Agêntica:** O agente deve atuar como um colaborador sênior, sugerindo arquiteturas, temas de pesquisa e metodologias alinhadas ao estado da arte.
 3. **Sincronização de Contexto:** Sempre utilize os modelos em `docs/templates/` para manter a consistência acadêmica exigida pela UCB.
 4. **Confirmação de Branch:** NUNCA faça um commit direto sem antes validar a estratégia de branch com o usuário.
+5. **Identidade nos Commits:** SEMPRE use o usuário autenticado no `gh` CLI (`davieduardo001`) para qualquer operação git/GitHub. NUNCA inclua co-autoria ou referência a ferramentas de IA (Claude, Gemini, etc.) nas mensagens de commit ou PRs.
 5. **Rigor Acadêmico:** As sugestões e o código devem seguir padrões científicos e de engenharia de software de alto nível.
 6. **Documentação Contínua:** Este arquivo deve ser atualizado periodicamente para refletir o estado real do projeto.
 
@@ -39,10 +45,36 @@ tcc-ciencia-computacao-ucb/
 └── src/              # Código fonte (em breve)
 ```
 
+## 🏗️ Arquitetura da Aplicação
+
+```
+[Usuário - Browser]
+      │
+      ▼
+[Frontend Web - React ou Angular]
+      │  Leaflet JS + OSM tiles
+      │  Dados GPS em tempo real (GeoJSON)
+      ▼
+[Backend - Fly.io]
+      │
+      ├──► API GPS GDF (integração externa)
+      │
+      └──► [PostgreSQL - Neon]
+              └── Usuários, reportes colaborativos, rotas preferidas
+```
+
+**Decisões arquiteturais registradas:**
+- Mapa via **Leaflet JS** (gratuito, sem risco de estourar free tier em apresentações)
+- Tiles via **OpenStreetMap** (gratuito)
+- Backend hospedado no **Fly.io** (deploy simples via Docker)
+- Banco **PostgreSQL no Neon** (serverless, free tier generoso para TCC)
+- **GitHub Actions** para pipeline CI/CD (testes, build, deploy automático)
+
 ## 🚀 Próximos Passos
-1. Realizar brainstorming de temas potenciais para o TCC.
-2. Definir a stack tecnológica final.
-3. Iniciar a estrutura de documentação acadêmica baseada nos templates.
+1. Definir framework frontend (React ou Angular).
+2. Modelar banco de dados (entidades: Usuário, Linha, Parada, Reporte).
+3. Iniciar User Stories e issues no GitHub.
+4. Configurar pipeline CI/CD no GitHub Actions.
 
 ---
 *Atualizado conforme as novas diretrizes de consolidação de contexto.*
