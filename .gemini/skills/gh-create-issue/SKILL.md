@@ -1,46 +1,37 @@
 ---
 name: gh-create-issue
-description: Creates a GitHub issue using the 'gh' CLI containing a User Story, Technical Specification (SPEC), and Product Requirements Document (PRD). Use when asked to create an issue, translate a User Story into an issue, or formalize a feature request into a GitHub Issue.
+description: Creates a GitHub issue using the 'gh' CLI. The main body contains ONLY the User Story (US). PRD and SPEC details are added as separate comments within the same issue. Use when formalizing specific features into GitHub.
 ---
 
 # GH Create Issue Skill
 
-This skill guides you through formalizing a User Story (US) into a complete, actionable GitHub Issue using the `gh` CLI. It ensures that every issue contains not just the user-centric requirements (US), but also the business expectations (PRD) and technical implementation details (SPEC).
+This skill formalizes a User Story (US) into a GitHub Issue, keeping the main description focused on the user value and placing technical/product details in comments.
 
 ## <instructions>
 
-When tasked with creating an issue based on a User Story or feature request, follow these steps:
+1. **Granularity Check:**
+   Ensure the User Story is atomic. For example, instead of one "Authentication" US, use separate stories for "Login", "Account Creation", and "Social Login".
 
-1. **Analyze the Request:**
-   Understand the base User Story provided by the user. If the user only provides an idea, draft a User Story following standard BDD (Given/When/Then) format first.
+2. **Draft the Content:**
+   - **Main Body (US):** Use the standard format (As a... I want... So that...) and BDD scenarios.
+   - **PRD Comment:** Focus on business goals, UI changes, and business rules.
+   - **SPEC Comment:** Focus on architecture, data models, APIs, and performance.
 
-2. **Draft the PRD (Product Requirements Document):**
-   Determine the business and product requirements for this feature.
-   - What UI/UX changes are needed?
-   - What is the business logic?
-   - What are the success metrics or core value additions?
+3. **Execution Steps:**
+   - Create the issue with the US body:
+     ```bash
+     ISSUE_URL=$(gh issue create --title "[US] Title" --body "USER_STORY_CONTENT")
+     ```
+   - Add the PRD comment:
+     ```bash
+     gh issue comment "$ISSUE_URL" --body "PRD_CONTENT"
+     ```
+   - Add the SPEC comment:
+     ```bash
+     gh issue comment "$ISSUE_URL" --body "SPEC_CONTENT"
+     ```
 
-3. **Draft the SPEC (Technical Specification):**
-   Determine how this feature will be built technically.
-   - What new APIs, endpoints, or data models are needed?
-   - Are there any architectural constraints or performance requirements?
-   - What components need to be altered or created?
-
-4. **Prepare the Issue Content:**
-   Read the template at `assets/issue_template.md`. Fill it in completely using the US, PRD, and SPEC you drafted. Save this content to a temporary markdown file (e.g., `.gemini/tmp_issue.md`).
-
-5. **Create the GitHub Issue:**
-   Use the `run_shell_command` tool to execute the `gh` CLI command:
-   ```bash
-   gh issue create --title "[Feature/US] Your Concise Title" --body-file .gemini/tmp_issue.md
-   ```
-   *Note: Ensure the repository has GitHub Issues enabled and the user is authenticated with `gh`. If `gh` is not installed or authenticated, inform the user.*
-
-6. **Cleanup:**
-   Delete the temporary markdown file after the issue is successfully created.
+4. **Consistency:**
+   Always use Portuguese (PT-BR) and follow the project's Markdown templates.
 
 </instructions>
-
-## <available_resources>
-- `assets/issue_template.md`: The markdown template structure that MUST be used for the issue body.
-</available_resources>
