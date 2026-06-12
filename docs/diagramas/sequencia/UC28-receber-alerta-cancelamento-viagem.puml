@@ -1,0 +1,127 @@
+@startuml UC28_ReceberAlertaCancelamentoViagem
+hide footbox
+title Diagrama de Sequencia - Receber Alerta de Cancelamento de Viagem (US #28)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaNotificacao" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoMonitoramento" as Service <<servico monitoramento>>
+participant ":ModeloViagem" as Model <<modelo>>
+participant ":ServicoRotas" as Rotas <<servico rotas>>
+
+== Deteccao de Cancelamento em Segundo Plano ==
+
+loop a cada ciclo de monitoramento de viagens
+  Service -> Model : consultarViagensPrevistas()
+  activate Service
+  activate Model
+  Model --> Service : viagensPrevistas(lista)
+  deactivate Model
+
+  Service -> Model : verificarAusenciaDeVeiculos(viagensPrevistas)
+  activate Model
+
+  alt cancelamento confirmado pelo operador
+    Model --> Service : viagem(status: cancelada, linhaId, horario)
+    deactivate Model
+
+    Service -> Rotas : buscarLinhaAlternativa(linhaId)
+    activate Rotas
+
+    alt linha alternativa disponivel
+      Rotas --> Service : linhaAlternativa(numero, similaridade)
+      deactivate Rotas
+      Service -> Passageiro : enviarAlertaCancelamento(linhaId, horario, alternativa)
+      deactivate Service
+
+    else sem alternativa disponivel
+      Rotas --> Service : semAlternativa()
+      deactivate Rotas
+      Service -> Passageiro : enviarAlertaCancelamento(linhaId, horario)
+      deactivate Service
+    end
+
+  else veiculo ausente apos 15 minutos do horario previsto
+    Model --> Service : viagem(status: ausente, linhaId, horario)
+    deactivate Model
+    Service -> Model : registrarPossevelCancelamento(linhaId, horario)
+    activate Model
+    Model --> Service : possevelCancelamentoRegistrado()
+    deactivate Model
+    Service -> Passageiro : enviarAlertaCancelamento(linhaId, horario, aviso: possivel)
+    deactivate Service
+
+  else veiculo dentro do prazo tolerado
+    Model --> Service : viagem(status: normal)
+    deactivate Model
+    Service -> Service : continuarMonitoramento()
+    deactivate Service
+  end
+end
+
+== Interacao do Passageiro com o Alerta ==
+
+Passageiro -> View : tocarAlertaCancelamento(linhaId)
+activate View
+
+View -> Gateway : requisicao(token, linhaId)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : obterDetalhesCancelamento(linhaId)
+  activate Model
+  Model --> Service : detalhes(linhaId, horarioCancelado, alternativaId)
+  deactivate Model
+
+  Service -> Rotas : obterDetalhesLinhaAlternativa(alternativaId)
+  activate Rotas
+  Rotas --> Service : linhaAlternativa(numero, proxima saida)
+  deactivate Rotas
+
+  Service --> Gateway : resposta(detalhes, linhaAlternativa)
+  deactivate Service
+  Gateway --> View : retornarResposta(detalhes, linhaAlternativa)
+  View -> View : exibirDetalhesCancelamento(horarioCancelado)
+  View -> View : exibirSugestaoAlternativa(linhaAlternativa)
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : obterDetalhesCancelamento(linhaId)
+  activate Model
+  Model --> Service : detalhes(linhaId, horarioCancelado)
+  deactivate Model
+  Service --> Gateway : resposta(detalhes)
+  deactivate Service
+  Gateway --> View : retornarResposta(detalhes)
+  View -> View : exibirDetalhesCancelamento(horarioCancelado)
+
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+deactivate View
+@enduml

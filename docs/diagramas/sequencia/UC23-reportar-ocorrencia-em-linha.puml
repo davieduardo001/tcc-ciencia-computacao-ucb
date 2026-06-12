@@ -1,0 +1,86 @@
+@startuml UC23_ReportarOcorrenciaEmLinha
+hide footbox
+title Diagrama de Sequencia - Reportar Ocorrencia em uma Linha (US #23)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaReporte" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoOcorrencias" as Service <<servico ocorrencias>>
+participant ":ModeloOcorrencia" as Model <<modelo>>
+
+Passageiro -> View : selecionarTipoOcorrencia(tipo, linhaId)
+activate View
+
+View -> Gateway : requisicao(token, ocorrencia)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : verificarLimiteReportes(usuarioId)
+  activate Model
+
+  alt dentro do limite de reportes
+    Model --> Service : limiteOk()
+    deactivate Model
+
+    Service -> Model : registrarOcorrencia(usuarioId, tipo, linhaId, timestamp)
+    activate Model
+    Model --> Service : ocorrenciaRegistrada(ocorrenciaId)
+    deactivate Model
+
+    Service --> Gateway : resposta(ocorrenciaId, status: pendente)
+    deactivate Service
+    Gateway --> View : retornarResposta(ocorrenciaRegistrada)
+    View -> View : exibirConfirmacaoReporte()
+    View -> View : exibirOcorrenciaNoMapa(ocorrenciaId, status: pendente)
+
+  else limite de reportes atingido
+    Model --> Service : erroLimiteExcedido()
+    deactivate Model
+    Service --> Gateway : respostaErro(limiteExcedido)
+    deactivate Service
+    Gateway --> View : retornarResposta(limiteExcedido)
+    View -> View : exibirAvisoLimiteReportes("Voce atingiu o limite de reportes.")
+  end
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : registrarOcorrencia(usuarioId, tipo, linhaId, timestamp)
+  activate Model
+  Model --> Service : ocorrenciaRegistrada(ocorrenciaId)
+  deactivate Model
+  Service --> Gateway : resposta(ocorrenciaId, status: pendente)
+  deactivate Service
+  Gateway --> View : retornarResposta(ocorrenciaRegistrada)
+  View -> View : exibirConfirmacaoReporte()
+  View -> View : exibirOcorrenciaNoMapa(ocorrenciaId, status: pendente)
+
+else token invalido ou ausente
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Faca login para reportar uma ocorrencia.")
+end
+
+deactivate Gateway
+deactivate View
+@enduml

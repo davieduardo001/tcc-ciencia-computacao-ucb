@@ -1,0 +1,110 @@
+@startuml UC26_ConfirmarOcorrenciaReportada
+hide footbox
+title Diagrama de Sequencia - Confirmar Ocorrencia Reportada por Outro Passageiro (US #26)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaOcorrencias" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoOcorrencias" as Service <<servico ocorrencias>>
+participant ":ModeloOcorrencia" as Model <<modelo>>
+
+Passageiro -> View : selecionarConfirmarOcorrencia(ocorrenciaId)
+activate View
+
+View -> Gateway : requisicao(token, ocorrenciaId)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : verificarStatusOcorrencia(ocorrenciaId)
+  activate Model
+
+  alt ocorrencia ativa e usuario nao e o autor
+    Model --> Service : ocorrencia(ativa: sim, autorId: outro)
+    deactivate Model
+
+    Service -> Model : registrarConfirmacao(usuarioId, ocorrenciaId)
+    activate Model
+    Model --> Service : confirmacaoRegistrada(totalConfirmacoes)
+    deactivate Model
+
+    alt total de confirmacoes >= minimo exigido
+      Service -> Model : atualizarStatusOcorrencia(ocorrenciaId, status: confirmado)
+      activate Model
+      Model --> Service : statusAtualizado(confirmado)
+      deactivate Model
+      Service --> Gateway : resposta(ocorrenciaConfirmada)
+      deactivate Service
+      Gateway --> View : retornarResposta(ocorrenciaConfirmada)
+      View -> View : atualizarExibicaoOcorrencia(status: confirmado)
+      View -> View : exibirMensagem("Obrigado! O alerta foi confirmado.")
+
+    else ainda abaixo do minimo
+      Service --> Gateway : resposta(confirmacaoRegistrada, status: pendente)
+      deactivate Service
+      Gateway --> View : retornarResposta(confirmacaoRegistrada)
+      View -> View : atualizarContadorConfirmacoes()
+      View -> View : exibirMensagem("Confirmacao registrada.")
+    end
+
+  else usuario e o autor do reporte
+    Model --> Service : ocorrencia(ativa: sim, autorId: mesmousuario)
+    deactivate Model
+    Service --> Gateway : respostaErro(autoConfirmacaoNegada)
+    deactivate Service
+    Gateway --> View : retornarResposta(autoConfirmacaoNegada)
+    View -> View : ocultarBotaoConfirmar()
+
+  else ocorrencia expirada ou inexistente
+    Model --> Service : ocorrencia(ativa: nao)
+    deactivate Model
+    Service --> Gateway : respostaErro(ocorrenciaInativa)
+    deactivate Service
+    Gateway --> View : retornarResposta(ocorrenciaInativa)
+    View -> View : exibirMensagem("Este alerta nao esta mais ativo.")
+  end
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : verificarStatusOcorrencia(ocorrenciaId)
+  activate Model
+  Model --> Service : ocorrencia(ativa: sim, autorId: outro)
+  deactivate Model
+  Service -> Model : registrarConfirmacao(usuarioId, ocorrenciaId)
+  activate Model
+  Model --> Service : confirmacaoRegistrada(totalConfirmacoes)
+  deactivate Model
+  Service --> Gateway : resposta(confirmacaoRegistrada)
+  deactivate Service
+  Gateway --> View : retornarResposta(confirmacaoRegistrada)
+  View -> View : atualizarContadorConfirmacoes()
+
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+deactivate View
+@enduml

@@ -1,0 +1,148 @@
+@startuml UC29_GerenciarPreferenciasNotificacao
+hide footbox
+title Diagrama de Sequencia - Gerenciar Preferencias de Notificacao (US #29)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaPreferencias" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoPreferencias" as Service <<servico preferencias>>
+participant ":ModeloPreferencias" as Model <<modelo>>
+
+Passageiro -> View : acessarTelaPreferencias()
+activate View
+
+View -> Gateway : requisicao(token)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : carregarPreferenciasUsuario(usuarioId)
+  activate Model
+  Model --> Service : preferenciasAtuais(configuracoes)
+  deactivate Model
+  Service --> Gateway : resposta(preferenciasAtuais)
+  deactivate Service
+  Gateway --> View : retornarResposta(preferenciasAtuais)
+  View -> View : exibirFormularioPreferencias(configuracoes)
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : carregarPreferenciasUsuario(usuarioId)
+  activate Model
+  Model --> Service : preferenciasAtuais(configuracoes)
+  deactivate Model
+  Service --> Gateway : resposta(preferenciasAtuais)
+  deactivate Service
+  Gateway --> View : retornarResposta(preferenciasAtuais)
+  View -> View : exibirFormularioPreferencias(configuracoes)
+
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+
+== Configurar Antecedencia dos Alertas ==
+
+Passageiro -> View : selecionarAntecedencia(opcao: 30min)
+
+View -> Gateway : requisicao(token, antecedencia: 30min)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : salvarAntecedenciaAlerta(usuarioId, antecedencia: 30min)
+  activate Model
+  Model --> Service : preferenciaSalva()
+  deactivate Model
+  Service --> Gateway : resposta(preferenciaSalva)
+  deactivate Service
+  Gateway --> View : retornarResposta(preferenciaSalva)
+  View -> View : exibirConfirmacao("Alertas serao enviados com 30 minutos de antecedencia.")
+
+else token invalido ou expirado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+
+== Desativar Tipo Especifico de Notificacao ==
+
+Passageiro -> View : alternarNotificacao(tipo: cancelamento, ativo: nao)
+
+View -> Gateway : requisicao(token, tipo: cancelamento, ativo: nao)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : atualizarTipoNotificacao(usuarioId, tipo: cancelamento, ativo: nao)
+  activate Model
+  Model --> Service : configuracaoAtualizada()
+  deactivate Model
+  Service --> Gateway : resposta(configuracaoAtualizada)
+  deactivate Service
+  Gateway --> View : retornarResposta(configuracaoAtualizada)
+  View -> View : exibirEstadoAtualizado(tipo: cancelamento, ativo: nao)
+  View -> View : exibirConfirmacao("Notificacoes de cancelamento desativadas.")
+
+else token invalido ou expirado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+
+== Desativar Todas as Notificacoes ==
+
+Passageiro -> View : desativarTodasNotificacoes()
+
+View -> Gateway : requisicao(token, todasNotificacoes: desativar)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : desativarTodasNotificacoes(usuarioId)
+  activate Model
+  Model --> Service : todasDesativadas()
+  deactivate Model
+  Service --> Gateway : resposta(todasDesativadas)
+  deactivate Service
+  Gateway --> View : retornarResposta(todasDesativadas)
+  View -> View : exibirConfirmacao("Todas as notificacoes foram desativadas.")
+
+else token invalido ou expirado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+deactivate View
+@enduml
