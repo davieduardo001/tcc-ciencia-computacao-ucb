@@ -1,0 +1,137 @@
+@startuml UC30_VisualizarTutorialPrimeiroAcesso
+hide footbox
+title Diagrama de Sequencia - Visualizar Tutorial no Primeiro Acesso (US #30)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaPrincipal" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoUsuario" as Service <<servico usuario>>
+participant ":ModeloPerfil" as Model <<modelo>>
+
+== Verificacao de Primeiro Acesso ==
+
+Passageiro -> View : acessarTelaPrincipal()
+activate View
+
+View -> Gateway : requisicao(token)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : verificarFlagPrimeiroAcesso(usuarioId)
+  activate Model
+
+  alt firstAccess == true
+    Model --> Service : perfil(firstAccess: true)
+    deactivate Model
+    Service --> Gateway : resposta(firstAccess: true)
+    deactivate Service
+    Gateway --> View : retornarResposta(firstAccess: true)
+    View -> View : exibirTutorialOnboarding()
+    View -> View : destacarEtapas(buscarLinha, mapa, reporte, rotaFavorita)
+
+  else firstAccess == false
+    Model --> Service : perfil(firstAccess: false)
+    deactivate Model
+    Service --> Gateway : resposta(firstAccess: false)
+    deactivate Service
+    Gateway --> View : retornarResposta(firstAccess: false)
+    View -> View : exibirTelaPrincipalNormal()
+  end
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : verificarFlagPrimeiroAcesso(usuarioId)
+  activate Model
+  Model --> Service : perfil(firstAccess: true)
+  deactivate Model
+  Service --> Gateway : resposta(firstAccess: true)
+  deactivate Service
+  Gateway --> View : retornarResposta(firstAccess: true)
+  View -> View : exibirTutorialOnboarding()
+
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+
+== Pular ou Concluir Tutorial ==
+
+Passageiro -> View : selecionarPularOuConcluir()
+
+View -> Gateway : requisicao(token, firstAccess: false)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : atualizarFlagPrimeiroAcesso(usuarioId, firstAccess: false)
+  activate Model
+  Model --> Service : flagAtualizada()
+  deactivate Model
+  Service --> Gateway : resposta(flagAtualizada)
+  deactivate Service
+  Gateway --> View : retornarResposta(flagAtualizada)
+  View -> View : fecharTutorial()
+  View -> View : exibirTelaPrincipalNormal()
+
+else token invalido ou expirado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+
+== Rever Tutorial pelas Configuracoes ==
+
+Passageiro -> View : selecionarVerTutorialNovamente()
+
+View -> Gateway : requisicao(token, firstAccess: true)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : atualizarFlagPrimeiroAcesso(usuarioId, firstAccess: true)
+  activate Model
+  Model --> Service : flagAtualizada()
+  deactivate Model
+  Service --> Gateway : resposta(flagAtualizada)
+  deactivate Service
+  Gateway --> View : retornarResposta(flagAtualizada)
+  View -> View : exibirTutorialOnboarding()
+  View -> View : destacarEtapas(buscarLinha, mapa, reporte, rotaFavorita)
+
+else token invalido ou expirado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+deactivate View
+@enduml
