@@ -1,66 +1,76 @@
-@startuml
+@startuml UC17_VisualizarTrajeto
 hide footbox
-title UC17 - Visualizar Trajeto e Paradas da Linha no Mapa
+title Diagrama de Sequencia - Visualizar Trajeto e Paradas da Linha no Mapa (US #17)
 
-actor "Passageiro" as passageiro
+actor "Passageiro" as Passageiro
 
-participant ":MapaLinhaView" as view <<view>>
-participant ":LinhaController" as ctrl <<controller>>
-participant ":SessaoModel" as sessao <<model>>
-participant ":LinhaModel" as model <<model>>
+participant ":TelaMapa" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoLinhas" as Service <<servico linhas>>
+participant ":ModeloLinha" as Model <<modelo>>
 
-passageiro -> view : selecionarLinha(linha)
-activate view
+Passageiro -> View : selecionarLinha(linha)
+activate View
 
-  view -> ctrl : carregarTrajetoLinha(linha)
-  activate ctrl
+View -> Gateway : requisicao(token, linha)
+activate Gateway
 
-    ctrl -> sessao : validarSessao(token)
-    activate sessao
+Gateway -> Gateway : verificarAssinaturaToken(token)
 
-    alt sessão válida
-      sessao --> ctrl : sessaoValida()
-      deactivate sessao
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
 
-    else token de acesso expirado
-      sessao --> ctrl : tokenExpirado()
-      deactivate sessao
+  Service -> Model : obterTrajetoCompleto(linha)
+  activate Model
+  Model --> Service : dadosTrajeto(pontos, paradas, sentido)
+  deactivate Model
 
-      ctrl -> sessao : renovarSessao(refreshToken)
-      activate sessao
+  Service --> Gateway : resposta(dadosTrajeto)
+  deactivate Service
+  Gateway --> View : retornarResposta(dadosTrajeto)
+  View -> View : desenharPolilinhaColoridaNoMapa(pontos)
+  View -> View : exibirSetaDirecional(sentido)
+  View -> View : marcarParadasNoTrajeto(paradas)
 
-      alt renovação bem-sucedida
-        sessao --> ctrl : novoToken()
-        deactivate sessao
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
 
-      else refresh token inválido ou revogado
-        sessao --> ctrl : sessaoInvalida()
-        deactivate sessao
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : obterTrajetoCompleto(linha)
+  activate Model
+  Model --> Service : dadosTrajeto(pontos, paradas, sentido)
+  deactivate Model
+  Service --> Gateway : resposta(dadosTrajeto)
+  deactivate Service
+  Gateway --> View : retornarResposta(dadosTrajeto)
+  View -> View : desenharPolilinhaColoridaNoMapa(pontos)
+  View -> View : exibirSetaDirecional(sentido)
+  View -> View : marcarParadasNoTrajeto(paradas)
 
-        ctrl --> view : redirecionarParaLogin()
-        deactivate ctrl
-        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
-        deactivate view
-        stop
-      end
-    end
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
 
-    ctrl -> model : obterTrajetoCompleto(linha)
-    activate model
-    model --> ctrl : dadosTrajeto(pontos, paradas, sentido)
-    deactivate model
+deactivate Gateway
 
-  ctrl --> view : trajetoCarregado(pontos, paradas, sentido)
-  deactivate ctrl
+Passageiro -> View : tocarParadaNoMapa(parada)
+View -> View : exibirNomeParada(parada)
 
-  view -> view : desenharPolilinhaColoridaNoMapa(pontos)
-  view -> view : exibirSetaDirecional(sentido)
-  view -> view : marcarParadasNoTrajeto(paradas)
-
-deactivate view
-
-passageiro -> view : tocarParadaNoMapa(parada)
-activate view
-  view -> view : exibirNomeParada(parada)
-deactivate view
+deactivate View
 @enduml

@@ -1,6 +1,6 @@
 ---
 name: gerar-diagrama-sequencia
-description: Gera diagramas de sequência UML em PlantUML seguindo padrão MVC, nível de análise, com estereótipos, activate/deactivate, ator e validação de sessão (US #31). Usar sempre que o usuário solicitar um diagrama de sequência.
+description: Gera diagramas de sequência UML em PlantUML seguindo a arquitetura real do Movecity — microserviços com API Gateway (US #31) entre frontend e backend. Usar sempre que o usuário solicitar um diagrama de sequência.
 ---
 
 # Skill: Gerar Diagrama de Sequência UML (PlantUML)
@@ -9,120 +9,138 @@ description: Gera diagramas de sequência UML em PlantUML seguindo padrão MVC, 
 
 ### Passo 1 — Coletar o caso de uso
 
-Se o usuário ainda não forneceu um caso de uso completo, solicite as seguintes informações:
+Se o usuário ainda não forneceu um caso de uso completo, solicite:
 
 - **Nome do caso de uso**
-- **Ator principal** (ex: Professor, Aluno, Passageiro)
+- **Ator principal** (ex: Passageiro, Motorista)
 - **Pré-condição** (estado do sistema antes da interação)
 - **Fluxo principal** (lista numerada de passos)
 - **Fluxos alternativos ou de exceção** (opcional)
 
-### Passo 2 — Aplicar os critérios padrão obrigatórios
+### Passo 2 — Aplicar os critérios arquiteturais obrigatórios
 
 Gere o **código completo em PlantUML** seguindo rigorosamente:
 
-1. **Arquitetura MVC** — toda interação passa por View → Controller → Model
-2. **Participantes como objetos UML** no formato `:Classe`, com estereótipos:
-   - `:NomeView <<view>>`
-   - `:NomeController <<controller>>`
-   - `:NomeModel <<model>>`
-3. **Ator** inicia a sequência (fora das lifelines MVC)
-4. **Nível de análise** — sem detalhes de implementação, framework ou tecnologia
-5. **`activate` / `deactivate`** em toda lifeline que recebe foco de execução
-6. **Responsabilidades por camada:**
-   - View → envia ação do usuário ao Controller; executa `exibir...()` e `solicitar...()` internamente; se atualiza via `notificarAtualizacao()` observando o Model
-   - Controller → valida, coordena, chama o Model; devolve dados à View; **nunca comanda a View diretamente**
-   - Model → persiste e recupera dados; notifica observers quando muda de estado
-7. **`hide footbox`** — sempre presente para ocultar o rodapé das lifelines
-8. **Ativações balanceadas** — todo `activate` deve ter seu `deactivate` correspondente
-9. **Validação de sessão obrigatória (US #31)** — todo caso de uso que acessa recurso protegido deve incluir o participante `:SessaoModel <<model>>` e o Controller deve verificar a sessão **antes** de qualquer operação de negócio, seguindo o padrão:
-   - Sessão válida → prosseguir normalmente
-   - Token de acesso expirado → Controller chama `renovarSessao(refreshToken)` de forma transparente → prosseguir
-   - Refresh token inválido/revogado → Controller retorna `redirecionarParaLogin()` à View → View exibe tela de login com aviso `"Sua sessão expirou. Faça login novamente."`
+1. **Arquitetura de microserviços com API Gateway** — toda requisição do frontend passa pelo `:GatewayAPI` antes de chegar a qualquer serviço de backend. O Gateway nunca é ignorado.
 
-### Passo 3 — Estrutura do bloco PlantUML
+2. **Estereótipos obrigatórios por tipo de participante:**
+   - Frontend: `<<interface usuario>>`
+   - Gateway: `<<servico gateway>>`
+   - Serviços de domínio: `<<servico [dominio]>>` (ex: `<<servico localizacao>>`, `<<servico rotas>>`)
+   - Serviço de autenticação: `<<servico autenticacao>>`
+   - Modelos/dados: `<<modelo>>`
+   - Notificação: `<<servico notificacao>>`
+
+3. **Ator** inicia a sequência a partir da View (fora das lifelines de serviço).
+
+4. **Nível de análise** — sem detalhes de implementação, framework ou tecnologia.
+
+5. **`activate` / `deactivate`** em toda lifeline que recebe foco de execução. Ativações balanceadas — todo `activate` tem seu `deactivate` correspondente.
+
+6. **`hide footbox`** — sempre presente.
+
+7. **Validação de sessão pelo Gateway (US #31)** — obrigatória em todo caso de uso com recurso protegido. O Gateway valida o JWT **localmente** (sem round-trip ao Auth Service) e o fluxo `alt` tem três ramificações:
+   - **Token válido** → Gateway encaminha ao serviço de domínio com `identidadeUsuario` no header interno
+   - **Token expirado** → Gateway chama `:ControladorAutenticacao` → renova via `:ModeloSessao` → reencaminha requisição original (transparente para o usuário)
+   - **Token inválido ou refresh revogado** → Gateway retorna `401` à View → View redireciona para login com a mensagem `"Sua sessao expirou. Faca login novamente."`
+
+8. **Controllers de domínio NÃO validam sessão** — isso é responsabilidade exclusiva do Gateway. Os serviços de domínio recebem apenas a requisição já autenticada com a identidade do usuário.
+
+9. **Loops de atualização em tempo real** (quando aplicável) usam o caminho feliz via Gateway, sem repetir o bloco completo de validação de sessão.
+
+### Passo 3 — Estrutura base do bloco PlantUML
 
 ```plantuml
 @startuml
 hide footbox
-title <Título do Caso de Uso>
+title Diagrama de Sequencia - [Titulo do Caso de Uso]
 
-actor "<Ator>" as ator
+actor "[Ator]" as Ator
 
-participant ":<View>" as view <<view>>
-participant ":<Controller>" as ctrl <<controller>>
-participant ":SessaoModel" as sessao <<model>>
-participant ":<Model>" as model <<model>>
+participant ":[TelaDominio]" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":[ServicoDominio]" as Service <<servico [dominio]>>
+participant ":[ModeloDominio]" as Model <<modelo>>
 
-ator -> view : <açãoDoUsuario()>
-activate view
+Ator -> View : acaoDoUsuario()
+activate View
 
-  view -> ctrl : <solicitacao()>
-  activate ctrl
+View -> Gateway : requisicao(token, [params])
+activate Gateway
 
-    ctrl -> sessao : validarSessao(token)
-    activate sessao
+Gateway -> Gateway : verificarAssinaturaToken(token)
 
-    alt sessão válida
-      sessao --> ctrl : sessaoValida()
-      deactivate sessao
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
 
-    else token de acesso expirado
-      sessao --> ctrl : tokenExpirado()
-      deactivate sessao
+  Service -> Model : operacao([params])
+  activate Model
+  Model --> Service : dados
+  deactivate Model
 
-      ctrl -> sessao : renovarSessao(refreshToken)
-      activate sessao
+  Service --> Gateway : resposta(dados)
+  deactivate Service
+  Gateway --> View : retornarResposta(dados)
+  View -> View : exibirConteudo(dados)
 
-      alt renovação bem-sucedida
-        sessao --> ctrl : novoToken()
-        deactivate sessao
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
 
-      else refresh token inválido ou revogado
-        sessao --> ctrl : sessaoInvalida()
-        deactivate sessao
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : operacao([params])
+  activate Model
+  Model --> Service : dados
+  deactivate Model
+  Service --> Gateway : resposta(dados)
+  deactivate Service
+  Gateway --> View : retornarResposta(dados)
+  View -> View : exibirConteudo(dados)
 
-        ctrl --> view : redirecionarParaLogin()
-        deactivate ctrl
-        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
-        deactivate view
-        stop
-      end
-    end
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
 
-    ctrl -> model : <operacao()>
-    activate model
-    model --> ctrl : <retorno>
-    deactivate model
-
-  ctrl --> view : <dados>
-  deactivate ctrl
-
-  view -> view : exibir<Resultado>()
-
-deactivate view
+deactivate Gateway
+deactivate View
 @enduml
 ```
 
 ### Passo 4 — Saída esperada
 
-- Exibir o **bloco PlantUML completo** pronto para renderização
-- Após o código, apresentar uma **descrição textual resumida** do fluxo representado (2–4 linhas, PT-BR)
-- Se houver fluxos alternativos relevantes, perguntar se o usuário quer um diagrama adicional para eles
+1. Bloco PlantUML completo e pronto para renderização
+2. Descrição textual resumida do fluxo (2–4 linhas, PT-BR)
+3. Pergunta sobre fluxos alternativos, se relevante
 
 ### Passo 5 — Persistência do padrão
 
-Manter esses critérios para **todos os diagramas de sequência** solicitados na sessão, até que o usuário diga explicitamente o contrário.
+Manter esses critérios para **todos os diagramas de sequência** da sessão até instrução contrária do usuário.
 
 </instructions>
 
 ## <available_resources>
-- Especificação PlantUML: sintaxe de sequence diagrams
+- `docs/diagramas/sequencia/`: diagramas já gerados para referência de padrão e nomenclatura
 - `docs/documento_visao.md`: contexto do domínio Movecity para nomear participantes corretamente
+- Issues #11 e #31 no GitHub: fonte de verdade da arquitetura com GatewayAPI
 </available_resources>
 
 ## Exemplos de Acionamento
 
-- "Gere o diagrama de sequência para o caso de uso Registrar Frequência."
-- "Crie um diagrama UML MVC para o fluxo de login do passageiro."
-- "Diagrama de sequência: o motorista reporta uma ocorrência no app."
+- "Gere o diagrama de sequência para Registrar Ocorrência."
+- "Crie um diagrama UML para o fluxo de login do passageiro."
+- "Diagrama de sequência: o motorista consulta o histórico de viagens."

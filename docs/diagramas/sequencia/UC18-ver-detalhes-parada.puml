@@ -1,79 +1,87 @@
-@startuml
+@startuml UC18_DetalhesParada
 hide footbox
-title UC18 - Ver Detalhes de uma Parada
+title Diagrama de Sequencia - Ver Detalhes de uma Parada (US #18)
 
-actor "Passageiro" as passageiro
+actor "Passageiro" as Passageiro
 
-participant ":MapaView" as view <<view>>
-participant ":ParadaController" as ctrl <<controller>>
-participant ":SessaoModel" as sessao <<model>>
-participant ":ParadaModel" as model <<model>>
+participant ":TelaMapa" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoParadas" as Service <<servico paradas>>
+participant ":ModeloParada" as Model <<modelo>>
 
-passageiro -> view : selecionarParadaNoMapa(parada)
-activate view
+Passageiro -> View : selecionarParadaNoMapa(parada)
+activate View
 
-  view -> ctrl : carregarDetalhesParada(parada)
-  activate ctrl
+View -> Gateway : requisicao(token, parada)
+activate Gateway
 
-    ctrl -> sessao : validarSessao(token)
-    activate sessao
+Gateway -> Gateway : verificarAssinaturaToken(token)
 
-    alt sessão válida
-      sessao --> ctrl : sessaoValida()
-      deactivate sessao
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
 
-    else token de acesso expirado
-      sessao --> ctrl : tokenExpirado()
-      deactivate sessao
+  Service -> Model : obterInfoParada(parada)
+  activate Model
 
-      ctrl -> sessao : renovarSessao(refreshToken)
-      activate sessao
+  alt parada com dados disponiveis
+    Model --> Service : infoParada(nome, codigo, linhas, proximosHorarios)
+    deactivate Model
+    Service --> Gateway : resposta(infoParada)
+    deactivate Service
+    Gateway --> View : retornarResposta(infoParada)
+    View -> View : exibirPainelDetalheParada()
+    View -> View : listarLinhasQuePassam(linhas)
+    View -> View : exibirProximosTresHorarios(proximosHorarios)
 
-      alt renovação bem-sucedida
-        sessao --> ctrl : novoToken()
-        deactivate sessao
+  else parada sem horarios disponiveis
+    Model --> Service : paradaSemHorarios(nome, codigo, linhas)
+    deactivate Model
+    Service --> Gateway : resposta(paradaSemHorarios)
+    deactivate Service
+    Gateway --> View : retornarResposta(paradaSemHorarios)
+    View -> View : exibirPainelDetalheParada()
+    View -> View : exibirAvisoHorariosIndisponiveis()
+  end
 
-      else refresh token inválido ou revogado
-        sessao --> ctrl : sessaoInvalida()
-        deactivate sessao
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
 
-        ctrl --> view : redirecionarParaLogin()
-        deactivate ctrl
-        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
-        deactivate view
-        stop
-      end
-    end
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : obterInfoParada(parada)
+  activate Model
+  Model --> Service : infoParada(nome, codigo, linhas, proximosHorarios)
+  deactivate Model
+  Service --> Gateway : resposta(infoParada)
+  deactivate Service
+  Gateway --> View : retornarResposta(infoParada)
+  View -> View : exibirPainelDetalheParada()
+  View -> View : listarLinhasQuePassam(linhas)
+  View -> View : exibirProximosTresHorarios(proximosHorarios)
 
-    ctrl -> model : obterInfoParada(parada)
-    activate model
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
 
-    alt parada com dados disponíveis
-      model --> ctrl : infoParada(nome, codigo, linhas, proximosHorarios)
-      deactivate model
+deactivate Gateway
 
-      ctrl --> view : detalhesParada(nome, codigo, linhas, proximosHorarios)
-      deactivate ctrl
+Passageiro -> View : fecharPainelDetalhe()
+View -> View : ocultarPainelERetornarAoMapa()
 
-      view -> view : exibirPainelDetalheParada()
-      view -> view : listarLinhasQuePassam(linhas)
-      view -> view : exibirProximosTresHorarios(proximosHorarios)
-
-    else parada sem horários disponíveis
-      model --> ctrl : paradaSemHorarios(nome, codigo, linhas)
-      deactivate model
-
-      ctrl --> view : detalhesParadaSemHorarios(nome, codigo, linhas)
-      deactivate ctrl
-
-      view -> view : exibirPainelDetalheParada()
-      view -> view : exibirAvisoHorariosIndisponiveis()
-    end
-
-deactivate view
-
-passageiro -> view : fecharPainelDetalhe()
-activate view
-  view -> view : ocultarPainelERetornarAoMapa()
-deactivate view
+deactivate View
 @enduml

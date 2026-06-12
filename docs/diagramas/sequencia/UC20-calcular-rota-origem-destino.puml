@@ -1,99 +1,115 @@
-@startuml
+@startuml UC20_CalcularRota
 hide footbox
-title UC20 - Calcular Rota de Origem até Destino por Ônibus
+title Diagrama de Sequencia - Calcular Rota de Origem ate Destino por Onibus (US #20)
 
-actor "Passageiro" as passageiro
+actor "Passageiro" as Passageiro
 
-participant ":RotaView" as view <<view>>
-participant ":RotaController" as ctrl <<controller>>
-participant ":SessaoModel" as sessao <<model>>
-participant ":RotaModel" as model <<model>>
+participant ":TelaRota" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoRotas" as Service <<servico rotas>>
+participant ":ModeloRota" as Model <<modelo>>
 
-passageiro -> view : informarOrigemEDestino(origem, destino)
-activate view
+Passageiro -> View : informarOrigemEDestino(origem, destino)
+activate View
 
-  view -> ctrl : solicitarCalculoRota(origem, destino)
-  activate ctrl
+View -> Gateway : requisicao(token, origem, destino)
+activate Gateway
 
-    ctrl -> sessao : validarSessao(token)
-    activate sessao
+Gateway -> Gateway : verificarAssinaturaToken(token)
 
-    alt sessão válida
-      sessao --> ctrl : sessaoValida()
-      deactivate sessao
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
 
-    else token de acesso expirado
-      sessao --> ctrl : tokenExpirado()
-      deactivate sessao
+  Service -> Model : geocodificarEnderecos(origem, destino)
+  activate Model
+  Model --> Service : coordenadasOrigemDestino(latOrig, lngOrig, latDest, lngDest)
+  deactivate Model
 
-      ctrl -> sessao : renovarSessao(refreshToken)
-      activate sessao
+  Service -> Model : calcularMelhorRota(coordOrigem, coordDestino)
+  activate Model
 
-      alt renovação bem-sucedida
-        sessao --> ctrl : novoToken()
-        deactivate sessao
+  alt rota simples encontrada
+    Model --> Service : rotaSimples(linha, paradas, horarios)
+    deactivate Model
+    Service --> Gateway : resposta(rotaSimples)
+    deactivate Service
+    Gateway --> View : retornarResposta(rotaSimples)
+    View -> View : exibirTrajetoNoMapa(linha)
+    View -> View : listarParadasEHorarios()
 
-      else refresh token inválido ou revogado
-        sessao --> ctrl : sessaoInvalida()
-        deactivate sessao
+  else rota com baldeacao encontrada
+    Model --> Service : rotaComBaldeacao(trechos, pontosDeBaldeacao)
+    deactivate Model
+    Service --> Gateway : resposta(rotaComBaldeacao)
+    deactivate Service
+    Gateway --> View : retornarResposta(rotaComBaldeacao)
+    View -> View : exibirTrechosNoMapa(trechos)
+    View -> View : destacarPontosDeBaldeacao()
 
-        ctrl --> view : redirecionarParaLogin()
-        deactivate ctrl
-        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
-        deactivate view
-        stop
-      end
-    end
+  else nenhuma rota disponivel
+    Model --> Service : semRotaDisponivel()
+    deactivate Model
+    Service --> Gateway : respostaErro(semRota)
+    deactivate Service
+    Gateway --> View : retornarResposta(semRota)
+    View -> View : exibirMensagemSemRota()
+  end
 
-    ctrl -> model : geocodificarEnderecos(origem, destino)
-    activate model
-    model --> ctrl : coordenadasOrigemDestino(latOrig, lngOrig, latDest, lngDest)
-    deactivate model
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
 
-    ctrl -> model : calcularMelhorRota(coordOrigem, coordDestino)
-    activate model
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : geocodificarEnderecos(origem, destino)
+  activate Model
+  Model --> Service : coordenadasOrigemDestino(latOrig, lngOrig, latDest, lngDest)
+  deactivate Model
+  Service -> Model : calcularMelhorRota(coordOrigem, coordDestino)
+  activate Model
+  Model --> Service : rotaSimples(linha, paradas, horarios)
+  deactivate Model
+  Service --> Gateway : resposta(rotaSimples)
+  deactivate Service
+  Gateway --> View : retornarResposta(rotaSimples)
+  View -> View : exibirTrajetoNoMapa(linha)
+  View -> View : listarParadasEHorarios()
 
-    alt rota simples encontrada (uma linha)
-      model --> ctrl : rotaSimples(linha, paradas, horarios)
-      deactivate model
-
-      ctrl --> view : rotaCalculada(rotaSimples)
-      deactivate ctrl
-
-      view -> view : exibirTrajetoNoMapa(linha)
-      view -> view : listarParadasEHorarios()
-
-    else rota com baldeação encontrada
-      model --> ctrl : rotaComBaldeacao(trechos, pontosDeBaldeacao)
-      deactivate model
-
-      ctrl --> view : rotaCalculada(rotaComBaldeacao)
-      deactivate ctrl
-
-      view -> view : exibirTrechosNoMapa(trechos)
-      view -> view : destacarPontosDeBaldeacao()
-
-    else nenhuma rota disponível
-      model --> ctrl : semRotaDisponivel()
-      deactivate model
-
-      ctrl --> view : erroSemRota()
-      deactivate ctrl
-
-      view -> view : exibirMensagemSemRota()
-    end
-
-deactivate view
-
-opt trecho com ocorrência ativa
-  view -> ctrl : verificarOcorrenciasNaRota(rota)
-  activate ctrl
-    ctrl -> model : consultarOcorrenciasAtivas(rota)
-    activate model
-    model --> ctrl : ocorrencias(lista)
-    deactivate model
-  ctrl --> view : alertasDeOcorrencia(ocorrencias)
-  deactivate ctrl
-  view -> view : exibirAlertasNoTrechoAfetado()
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
 end
+
+deactivate Gateway
+
+opt trecho com ocorrencia ativa
+  View -> Gateway : verificarOcorrenciasNaRota(token, rota)
+  activate Gateway
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Model : consultarOcorrenciasAtivas(rota)
+  activate Model
+  Model --> Service : ocorrencias(lista)
+  deactivate Model
+  Service --> Gateway : resposta(ocorrencias)
+  deactivate Service
+  Gateway --> View : retornarResposta(ocorrencias)
+  deactivate Gateway
+  View -> View : exibirAlertasNoTrechoAfetado()
+end
+
+deactivate View
 @enduml

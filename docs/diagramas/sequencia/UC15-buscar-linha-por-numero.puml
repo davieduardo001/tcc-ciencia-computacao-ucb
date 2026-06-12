@@ -1,73 +1,82 @@
-@startuml
+@startuml UC15_BuscarLinha
 hide footbox
-title UC15 - Buscar Linha por Número
+title Diagrama de Sequencia - Buscar Linha por Numero (US #15)
 
-actor "Passageiro" as passageiro
+actor "Passageiro" as Passageiro
 
-participant ":BuscaView" as view <<view>>
-participant ":BuscaController" as ctrl <<controller>>
-participant ":SessaoModel" as sessao <<model>>
-participant ":LinhaModel" as model <<model>>
+participant ":TelaBusca" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoLinhas" as Service <<servico linhas>>
+participant ":ModeloLinha" as Model <<modelo>>
 
-passageiro -> view : informarNumeroLinha(numero)
-activate view
+Passageiro -> View : informarNumeroLinha(numero)
+activate View
 
-  view -> ctrl : buscarLinha(numero)
-  activate ctrl
+View -> Gateway : requisicao(token, numero)
+activate Gateway
 
-    ctrl -> sessao : validarSessao(token)
-    activate sessao
+Gateway -> Gateway : verificarAssinaturaToken(token)
 
-    alt sessão válida
-      sessao --> ctrl : sessaoValida()
-      deactivate sessao
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
 
-    else token de acesso expirado
-      sessao --> ctrl : tokenExpirado()
-      deactivate sessao
+  Service -> Model : consultarLinhaPorNumero(numero)
+  activate Model
 
-      ctrl -> sessao : renovarSessao(refreshToken)
-      activate sessao
+  alt linha encontrada
+    Model --> Service : dadosLinha(numero, itinerario, sentido, horarios)
+    deactivate Model
+    Service --> Gateway : resposta(dadosLinha)
+    deactivate Service
+    Gateway --> View : retornarResposta(dadosLinha)
+    View -> View : exibirHorariosPrevistos()
+    View -> View : exibirItinerario()
+    View -> View : exibirSentido()
 
-      alt renovação bem-sucedida
-        sessao --> ctrl : novoToken()
-        deactivate sessao
+  else linha nao encontrada
+    Model --> Service : linhaInexistente()
+    deactivate Model
+    Service --> Gateway : respostaErro(linhaInexistente)
+    deactivate Service
+    Gateway --> View : retornarResposta(linhaInexistente)
+    View -> View : exibirMensagemLinhaInexistente()
+  end
 
-      else refresh token inválido ou revogado
-        sessao --> ctrl : sessaoInvalida()
-        deactivate sessao
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
 
-        ctrl --> view : redirecionarParaLogin()
-        deactivate ctrl
-        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
-        deactivate view
-        stop
-      end
-    end
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : consultarLinhaPorNumero(numero)
+  activate Model
+  Model --> Service : dadosLinha(numero, itinerario, sentido, horarios)
+  deactivate Model
+  Service --> Gateway : resposta(dadosLinha)
+  deactivate Service
+  Gateway --> View : retornarResposta(dadosLinha)
+  View -> View : exibirHorariosPrevistos()
+  View -> View : exibirItinerario()
+  View -> View : exibirSentido()
 
-    ctrl -> model : consultarLinhaPorNumero(numero)
-    activate model
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
 
-    alt linha encontrada
-      model --> ctrl : dadosLinha(numero, itinerario, sentido, horarios)
-      deactivate model
-
-      ctrl --> view : resultadoBusca(dadosLinha)
-      deactivate ctrl
-
-      view -> view : exibirHorariosPrevistos()
-      view -> view : exibirItinerario()
-      view -> view : exibirSentido()
-
-    else linha não encontrada
-      model --> ctrl : linhaInexistente()
-      deactivate model
-
-      ctrl --> view : erroBuscaSemResultado()
-      deactivate ctrl
-
-      view -> view : exibirMensagemLinhaInexistente()
-    end
-
-deactivate view
+deactivate Gateway
+deactivate View
 @enduml
