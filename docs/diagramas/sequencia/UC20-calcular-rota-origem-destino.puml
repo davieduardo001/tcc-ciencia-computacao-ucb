@@ -1,0 +1,68 @@
+@startuml
+hide footbox
+title UC20 - Calcular Rota de Origem até Destino por Ônibus
+
+actor "Passageiro" as passageiro
+
+participant ":RotaView" as view <<view>>
+participant ":RotaController" as ctrl <<controller>>
+participant ":RotaModel" as model <<model>>
+
+passageiro -> view : informarOrigemEDestino(origem, destino)
+activate view
+
+  view -> ctrl : solicitarCalculoRota(origem, destino)
+  activate ctrl
+
+    ctrl -> model : geocodificarEnderecos(origem, destino)
+    activate model
+    model --> ctrl : coordenadasOrigemDestino(latOrig, lngOrig, latDest, lngDest)
+    deactivate model
+
+    ctrl -> model : calcularMelhorRota(coordOrigem, coordDestino)
+    activate model
+
+    alt rota simples encontrada (uma linha)
+      model --> ctrl : rotaSimples(linha, paradas, horarios)
+      deactivate model
+
+      ctrl --> view : rotaCalculada(rotaSimples)
+      deactivate ctrl
+
+      view -> view : exibirTrajetoNoMapa(linha)
+      view -> view : listarParadasEHorarios()
+
+    else rota com baldeação encontrada
+      model --> ctrl : rotaComBaldeacao(trechos, pontosDeBaldeacao)
+      deactivate model
+
+      ctrl --> view : rotaCalculada(rotaComBaldeacao)
+      deactivate ctrl
+
+      view -> view : exibirTrechosNoMapa(trechos)
+      view -> view : destacarPontosDeBaldeacao()
+
+    else nenhuma rota disponível
+      model --> ctrl : semRotaDisponivel()
+      deactivate model
+
+      ctrl --> view : erroSemRota()
+      deactivate ctrl
+
+      view -> view : exibirMensagemSemRota()
+    end
+
+deactivate view
+
+opt trecho com ocorrência ativa
+  view -> ctrl : verificarOcorrenciasNaRota(rota)
+  activate ctrl
+    ctrl -> model : consultarOcorrenciasAtivas(rota)
+    activate model
+    model --> ctrl : ocorrencias(lista)
+    deactivate model
+  ctrl --> view : alertasDeOcorrencia(ocorrencias)
+  deactivate ctrl
+  view -> view : exibirAlertasNoTrechoAfetado()
+end
+@enduml

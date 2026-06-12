@@ -1,0 +1,59 @@
+@startuml
+hide footbox
+title UC16 - Rastrear Posição do Ônibus em Tempo Real
+
+actor "Passageiro" as passageiro
+
+participant ":RastreamentoView" as view <<view>>
+participant ":RastreamentoController" as ctrl <<controller>>
+participant ":VeiculoModel" as model <<model>>
+
+passageiro -> view : selecionarLinhaParaRastrear(linha)
+activate view
+
+  view -> ctrl : iniciarRastreamento(linha)
+  activate ctrl
+
+    ctrl -> model : obterPosicoesVeiculos(linha)
+    activate model
+
+    alt veículos em operação
+      model --> ctrl : listaVeiculos(posicoes)
+      deactivate model
+
+      ctrl --> view : veiculosLocalizados(posicoes)
+      deactivate ctrl
+
+      view -> view : exibirIconesVeiculosNoMapa(posicoes)
+
+    else nenhum veículo em operação
+      model --> ctrl : semVeiculosAtivos()
+      deactivate model
+
+      ctrl --> view : avisoSemVeiculos()
+      deactivate ctrl
+
+      view -> view : exibirAvisoSemVeiculosEmOperacao()
+    end
+
+deactivate view
+
+loop atualização contínua
+  model -> view : notificarAtualizacao()
+  activate view
+
+  view -> ctrl : solicitarAtualizacaoPosicoes(linha)
+  activate ctrl
+
+    ctrl -> model : obterPosicoesVeiculos(linha)
+    activate model
+    model --> ctrl : listaVeiculosAtualizada(posicoes)
+    deactivate model
+
+  ctrl --> view : posicoesAtualizadas(posicoes)
+  deactivate ctrl
+
+  view -> view : atualizarIconesVeiculosNoMapa(posicoes)
+  deactivate view
+end
+@enduml

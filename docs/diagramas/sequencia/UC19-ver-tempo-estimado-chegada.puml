@@ -1,0 +1,67 @@
+@startuml
+hide footbox
+title UC19 - Ver Tempo Estimado de Chegada do Ônibus até Minha Parada
+
+actor "Passageiro" as passageiro
+
+participant ":ETAView" as view <<view>>
+participant ":ETAController" as ctrl <<controller>>
+participant ":VeiculoModel" as model <<model>>
+
+passageiro -> view : selecionarLinhaEParada(linha, parada)
+activate view
+
+  view -> ctrl : calcularTempoEstimadoChegada(linha, parada)
+  activate ctrl
+
+    ctrl -> model : obterPosicaoVeiculoMaisProximo(linha, parada)
+    activate model
+
+    alt posição GPS disponível
+      model --> ctrl : posicaoVeiculo(lat, lng, velocidade)
+      deactivate model
+
+      ctrl -> model : calcularETA(posicaoVeiculo, parada)
+      activate model
+      model --> ctrl : etaEmMinutos(valor)
+      deactivate model
+
+      ctrl --> view : etaCalculado(minutos)
+      deactivate ctrl
+
+      view -> view : exibirTempoEstimadoChegada(minutos)
+
+    else dado GPS indisponível
+      model --> ctrl : gpsIndisponivel()
+      deactivate model
+
+      ctrl -> model : obterHorarioTeorico(linha, parada)
+      activate model
+      model --> ctrl : horarioTeorico(horario)
+      deactivate model
+
+      ctrl --> view : etaBaseadoEmHorarioTeorico(horario)
+      deactivate ctrl
+
+      view -> view : exibirHorarioTeoricoComAviso()
+    end
+
+deactivate view
+
+loop atualização contínua do ETA
+  model -> view : notificarAtualizacao()
+  activate view
+
+  view -> ctrl : atualizarETA(linha, parada)
+  activate ctrl
+    ctrl -> model : obterPosicaoVeiculoMaisProximo(linha, parada)
+    activate model
+    model --> ctrl : posicaoAtualizada(lat, lng)
+    deactivate model
+    ctrl --> view : novoETA(minutos)
+  deactivate ctrl
+
+  view -> view : atualizarTempoEstimadoExibido(minutos)
+  deactivate view
+end
+@enduml

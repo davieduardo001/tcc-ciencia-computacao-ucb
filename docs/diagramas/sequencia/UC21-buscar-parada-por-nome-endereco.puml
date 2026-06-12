@@ -1,0 +1,64 @@
+@startuml
+hide footbox
+title UC21 - Buscar Parada por Nome ou Endereço
+
+actor "Passageiro" as passageiro
+
+participant ":BuscaParadaView" as view <<view>>
+participant ":BuscaController" as ctrl <<controller>>
+participant ":ParadaModel" as model <<model>>
+
+passageiro -> view : digitarTermoBusca(termo)
+activate view
+
+  view -> ctrl : buscarParada(termo)
+  activate ctrl
+
+    ctrl -> model : consultarParadaPorNome(termo)
+    activate model
+
+    alt parada encontrada por nome
+      model --> ctrl : resultadosParadas(lista)
+      deactivate model
+
+      ctrl --> view : paradasEncontradas(lista)
+      deactivate ctrl
+
+      view -> view : exibirListaResultados(lista)
+      view -> view : destacarParadasNoMapa(lista)
+
+    else busca por endereço ou ponto de referência
+      model --> ctrl : semResultadoPorNome()
+      deactivate model
+
+      ctrl -> model : geocodificarEndereco(termo)
+      activate model
+      model --> ctrl : coordenadasEndereco(lat, lng)
+      deactivate model
+
+      ctrl -> model : buscarParadasEmRaio(lat, lng, raio500m)
+      activate model
+
+      alt paradas encontradas no raio
+        model --> ctrl : paradasProximas(lista)
+        deactivate model
+
+        ctrl --> view : paradasNoRaio(lista)
+        deactivate ctrl
+
+        view -> view : centralizarMapaNaRegiao(lat, lng)
+        view -> view : exibirParadasEmRaio(lista)
+
+      else nenhum resultado
+        model --> ctrl : semParadasNaRegiao()
+        deactivate model
+
+        ctrl --> view : erroSemResultados()
+        deactivate ctrl
+
+        view -> view : exibirMensagemSemResultados()
+      end
+    end
+
+deactivate view
+@enduml

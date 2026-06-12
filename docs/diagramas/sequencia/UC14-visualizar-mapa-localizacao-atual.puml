@@ -1,0 +1,62 @@
+@startuml
+hide footbox
+title UC14 - Visualizar Mapa com Localização Atual
+
+actor "Passageiro" as passageiro
+
+participant ":MapaView" as view <<view>>
+participant ":MapaController" as ctrl <<controller>>
+participant ":LocalizacaoModel" as model <<model>>
+
+passageiro -> view : acessarTelaprincipal()
+activate view
+
+  view -> ctrl : solicitarLocalizacaoAtual()
+  activate ctrl
+
+    ctrl -> model : obterPosicaoGPS()
+    activate model
+
+    alt permissão concedida
+      model --> ctrl : coordenadas(lat, lng)
+      deactivate model
+
+      ctrl --> view : localizacaoObtida(lat, lng)
+      deactivate ctrl
+
+      view -> view : centralizarMapa(lat, lng)
+      view -> view : exibirMarcadorPosicaoAtual()
+
+    else permissão negada ou GPS desligado
+      model --> ctrl : erroPosicaoIndisponivel()
+      deactivate model
+
+      ctrl --> view : localizacaoIndisponivel()
+      deactivate ctrl
+
+      view -> view : exibirAvisoPosicaoIndisponivel()
+      view -> view : centralizarMapaPontoPadrao()
+    end
+
+deactivate view
+
+passageiro -> view : moverseGeograficamente()
+activate view
+
+  view -> ctrl : atualizarPosicao()
+  activate ctrl
+
+    ctrl -> model : obterPosicaoGPS()
+    activate model
+    model --> ctrl : novasCoordenadas(lat, lng)
+    deactivate model
+
+    model -> view : notificarAtualizacao()
+
+  ctrl --> view : posicaoAtualizada(lat, lng)
+  deactivate ctrl
+
+  view -> view : deslocarMarcadorPosicao(lat, lng)
+
+deactivate view
+@enduml

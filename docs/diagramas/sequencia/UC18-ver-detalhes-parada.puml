@@ -1,0 +1,48 @@
+@startuml
+hide footbox
+title UC18 - Ver Detalhes de uma Parada
+
+actor "Passageiro" as passageiro
+
+participant ":MapaView" as view <<view>>
+participant ":ParadaController" as ctrl <<controller>>
+participant ":ParadaModel" as model <<model>>
+
+passageiro -> view : selecionarParadaNoMapa(parada)
+activate view
+
+  view -> ctrl : carregarDetalhesParada(parada)
+  activate ctrl
+
+    ctrl -> model : obterInfoParada(parada)
+    activate model
+
+    alt parada com dados disponíveis
+      model --> ctrl : infoParada(nome, codigo, linhas, proximosHorarios)
+      deactivate model
+
+      ctrl --> view : detalhesParada(nome, codigo, linhas, proximosHorarios)
+      deactivate ctrl
+
+      view -> view : exibirPainelDetalheParada()
+      view -> view : listarLinhasQuePassam(linhas)
+      view -> view : exibirProximosTresHorarios(proximosHorarios)
+
+    else parada sem horários disponíveis
+      model --> ctrl : paradaSemHorarios(nome, codigo, linhas)
+      deactivate model
+
+      ctrl --> view : detalhesParadaSemHorarios(nome, codigo, linhas)
+      deactivate ctrl
+
+      view -> view : exibirPainelDetalheParada()
+      view -> view : exibirAvisoHorariosIndisponiveis()
+    end
+
+deactivate view
+
+passageiro -> view : fecharPainelDetalhe()
+activate view
+  view -> view : ocultarPainelERetornarAoMapa()
+deactivate view
+@enduml

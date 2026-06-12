@@ -1,0 +1,42 @@
+@startuml
+hide footbox
+title UC15 - Buscar Linha por Número
+
+actor "Passageiro" as passageiro
+
+participant ":BuscaView" as view <<view>>
+participant ":BuscaController" as ctrl <<controller>>
+participant ":LinhaModel" as model <<model>>
+
+passageiro -> view : informarNumeroLinha(numero)
+activate view
+
+  view -> ctrl : buscarLinha(numero)
+  activate ctrl
+
+    ctrl -> model : consultarLinhaPorNumero(numero)
+    activate model
+
+    alt linha encontrada
+      model --> ctrl : dadosLinha(numero, itinerario, sentido, horarios)
+      deactivate model
+
+      ctrl --> view : resultadoBusca(dadosLinha)
+      deactivate ctrl
+
+      view -> view : exibirHorariosPrevistos()
+      view -> view : exibirItinerario()
+      view -> view : exibirSentido()
+
+    else linha não encontrada
+      model --> ctrl : linhaInexistente()
+      deactivate model
+
+      ctrl --> view : erroBuscaSemResultado()
+      deactivate ctrl
+
+      view -> view : exibirMensagemLinhaInexistente()
+    end
+
+deactivate view
+@enduml

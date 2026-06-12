@@ -1,0 +1,37 @@
+@startuml
+hide footbox
+title UC17 - Visualizar Trajeto e Paradas da Linha no Mapa
+
+actor "Passageiro" as passageiro
+
+participant ":MapaLinhaView" as view <<view>>
+participant ":LinhaController" as ctrl <<controller>>
+participant ":LinhaModel" as model <<model>>
+
+passageiro -> view : selecionarLinha(linha)
+activate view
+
+  view -> ctrl : carregarTrajetoLinha(linha)
+  activate ctrl
+
+    ctrl -> model : obterTrajetoCompleto(linha)
+    activate model
+    model --> ctrl : dadosTrajeto(pontos, paradas, sentido)
+    deactivate model
+
+  ctrl --> view : trajetoCarregado(pontos, paradas, sentido)
+  deactivate ctrl
+
+  view -> view : desenharPolilinhaColoridaNoMapa(pontos)
+  view -> view : exibirSetaDirecional(sentido)
+  view -> view : marcarParadasNoTrajeto(paradas)
+
+deactivate view
+
+passageiro -> view : tocarParadaNoMapa(parada)
+activate view
+
+  view -> view : exibirNomeParada(parada)
+
+deactivate view
+@enduml
