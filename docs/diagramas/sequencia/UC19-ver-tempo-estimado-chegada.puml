@@ -6,6 +6,7 @@ actor "Passageiro" as passageiro
 
 participant ":ETAView" as view <<view>>
 participant ":ETAController" as ctrl <<controller>>
+participant ":SessaoModel" as sessao <<model>>
 participant ":VeiculoModel" as model <<model>>
 
 passageiro -> view : selecionarLinhaEParada(linha, parada)
@@ -13,6 +14,36 @@ activate view
 
   view -> ctrl : calcularTempoEstimadoChegada(linha, parada)
   activate ctrl
+
+    ctrl -> sessao : validarSessao(token)
+    activate sessao
+
+    alt sessão válida
+      sessao --> ctrl : sessaoValida()
+      deactivate sessao
+
+    else token de acesso expirado
+      sessao --> ctrl : tokenExpirado()
+      deactivate sessao
+
+      ctrl -> sessao : renovarSessao(refreshToken)
+      activate sessao
+
+      alt renovação bem-sucedida
+        sessao --> ctrl : novoToken()
+        deactivate sessao
+
+      else refresh token inválido ou revogado
+        sessao --> ctrl : sessaoInvalida()
+        deactivate sessao
+
+        ctrl --> view : redirecionarParaLogin()
+        deactivate ctrl
+        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
+        deactivate view
+        stop
+      end
+    end
 
     ctrl -> model : obterPosicaoVeiculoMaisProximo(linha, parada)
     activate model

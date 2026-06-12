@@ -1,6 +1,6 @@
 ---
 name: gerar-diagrama-sequencia
-description: Gera diagramas de sequência UML em PlantUML seguindo padrão MVC, nível de análise, com estereótipos, activate/deactivate e ator. Usar sempre que o usuário solicitar um diagrama de sequência.
+description: Gera diagramas de sequência UML em PlantUML seguindo padrão MVC, nível de análise, com estereótipos, activate/deactivate, ator e validação de sessão (US #31). Usar sempre que o usuário solicitar um diagrama de sequência.
 ---
 
 # Skill: Gerar Diagrama de Sequência UML (PlantUML)
@@ -35,6 +35,10 @@ Gere o **código completo em PlantUML** seguindo rigorosamente:
    - Model → persiste e recupera dados; notifica observers quando muda de estado
 7. **`hide footbox`** — sempre presente para ocultar o rodapé das lifelines
 8. **Ativações balanceadas** — todo `activate` deve ter seu `deactivate` correspondente
+9. **Validação de sessão obrigatória (US #31)** — todo caso de uso que acessa recurso protegido deve incluir o participante `:SessaoModel <<model>>` e o Controller deve verificar a sessão **antes** de qualquer operação de negócio, seguindo o padrão:
+   - Sessão válida → prosseguir normalmente
+   - Token de acesso expirado → Controller chama `renovarSessao(refreshToken)` de forma transparente → prosseguir
+   - Refresh token inválido/revogado → Controller retorna `redirecionarParaLogin()` à View → View exibe tela de login com aviso `"Sua sessão expirou. Faça login novamente."`
 
 ### Passo 3 — Estrutura do bloco PlantUML
 
@@ -47,6 +51,7 @@ actor "<Ator>" as ator
 
 participant ":<View>" as view <<view>>
 participant ":<Controller>" as ctrl <<controller>>
+participant ":SessaoModel" as sessao <<model>>
 participant ":<Model>" as model <<model>>
 
 ator -> view : <açãoDoUsuario()>
@@ -54,6 +59,36 @@ activate view
 
   view -> ctrl : <solicitacao()>
   activate ctrl
+
+    ctrl -> sessao : validarSessao(token)
+    activate sessao
+
+    alt sessão válida
+      sessao --> ctrl : sessaoValida()
+      deactivate sessao
+
+    else token de acesso expirado
+      sessao --> ctrl : tokenExpirado()
+      deactivate sessao
+
+      ctrl -> sessao : renovarSessao(refreshToken)
+      activate sessao
+
+      alt renovação bem-sucedida
+        sessao --> ctrl : novoToken()
+        deactivate sessao
+
+      else refresh token inválido ou revogado
+        sessao --> ctrl : sessaoInvalida()
+        deactivate sessao
+
+        ctrl --> view : redirecionarParaLogin()
+        deactivate ctrl
+        view -> view : exibirTelaLoginComAviso("Sua sessão expirou. Faça login novamente.")
+        deactivate view
+        stop
+      end
+    end
 
     ctrl -> model : <operacao()>
     activate model
