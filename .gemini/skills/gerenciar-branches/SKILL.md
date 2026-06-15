@@ -1,29 +1,48 @@
 ---
 name: gerenciar-branches
-description: Garante que o projeto utilize branches de forma organizada, verificando com o usuário antes de qualquer commit se as mudanças devem ir para uma nova branch ou branch separada.
+description: Garante que o projeto utilize o fluxo correto por tipo de branch — feat/fix passam por homolog antes de main; docs/chore vão direto para main.
 ---
 
 # Skill: Gerenciar Branches do Projeto
 
-Esta skill orienta o agente a garantir que o desenvolvimento siga um fluxo de branches organizado, evitando commits diretos na branch principal sem confirmação.
+## Fluxo obrigatório
+
+```
+feat/nome-da-feature   ──► homolog ──► main
+fix/nome-da-correcao   ──► homolog ──► main
+docs/atualizacao               ──────► main  (direto)
+chore/configuracao             ──────► main  (direto)
+```
+
+- `feat/` e `fix/` passam por `homolog` — risco de quebrar comportamento funcional.
+- `docs/` e `chore/` vão direto para `main` — sem risco funcional.
+- Novas branches `feat/` e `fix/` são criadas a partir de `homolog`.
+- **NUNCA** mergear `feat/` ou `fix/` direto em `main`.
 
 ## <instructions>
-1. **Verificação de Estado:** Antes de realizar qualquer commit, execute `git branch` para listar as branches existentes e identificar a branch atual.
-2. **Consulta ao Usuário:** Apresente ao usuário a lista de branches ativas e pergunte:
-   - "Deseja criar uma nova branch para estas alterações?"
+1. **Verificação de Estado:** Execute `git branch` para listar as branches existentes e identificar a branch atual.
+2. **Consulta ao Usuário:** Apresente a lista de branches ativas e pergunte:
+   - "Deseja criar uma nova branch? Qual o tipo (feat/fix/docs/chore)?"
    - "Deseja commitar em uma das branches existentes? (Liste-as)"
    - "Deseja continuar na branch atual [nome da branch]?"
-3. **Criação de Branch:** Se o usuário optar por uma nova branch, sugira um nome baseado no tipo de alteração (ex: `feat/nome-da-feature`, `fix/correcao-bug`, `docs/atualizacao-doc`) seguindo o padrão Git Flow simplificado.
-4. **Execução:** Só proceda com o commit após a definição da branch de destino. Se uma nova branch for criada, mude para ela antes de commitar.
-5. **Idioma:** Toda a interação com o usuário sobre branches deve ser em **Português (PT-BR)**.
+3. **Criação de Branch:** Sugira nome seguindo o padrão e crie a partir da base correta:
+   - `feat/nome` ou `fix/nome` → base: `homolog`
+   - `docs/nome` ou `chore/nome` → base: `main`
+4. **Execução:** Só proceda com o commit após a definição da branch de destino.
+5. **Orientação de merge:** Ao finalizar, oriente conforme o tipo:
+   - `feat/` ou `fix/`: merge em `homolog`, depois `homolog` → `main`
+   - `docs/` ou `chore/`: merge direto em `main`
+6. **Idioma:** Toda a interação com o usuário deve ser em **Português (PT-BR)**.
 </instructions>
 
 ## <available_resources>
 - `git branch`: Para listar branches locais.
+- `git checkout homolog` / `git checkout main`: Base para criação de novas branches conforme o tipo.
 - `git checkout -b`: Para criar e mudar para uma nova branch.
-- `git checkout`: Para alternar entre branches existentes.
+- `git merge`: Para integrar branches seguindo o fluxo definido.
 </available_resources>
 
 ## Exemplos de Uso
 - "Antes de commitar, verifique a estratégia de branch seguindo a skill."
-- "Organize as branches para este novo desenvolvimento."
+- "Crie uma branch para a feature de mapa em tempo real."
+- "Organize as branches para esta correção de bug."

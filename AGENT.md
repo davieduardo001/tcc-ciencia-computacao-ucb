@@ -24,15 +24,30 @@ Este arquivo é a fonte única de verdade (Single Source of Truth) para agentes 
 - **gerenciar-branches:** Garante o uso organizado de branches. **Obrigatório:** Listar branches e perguntar ao usuário antes de qualquer commit.
 - **gerenciar-commits:** Executa commits atômicos (Conventional Commits) integrados à verificação de branch.
 - **gh-create-issue:** Cria issues no GitHub com formato completo (User Story, SPEC e PRD) utilizando a ferramenta de linha de comando `gh`.
+- **gerar-diagrama-sequencia:** Gera diagramas de sequência UML em PlantUML com arquitetura Gateway + validação de sessão (US #31).
+
+## 🌿 Fluxo de Branches
+
+```
+feat/nome-da-feature   ──► homolog ──► main
+fix/nome-da-correcao   ──► homolog ──► main
+docs/atualizacao               ──────► main  (direto)
+chore/configuracao             ──────► main  (direto)
+```
+
+- Branches `feat/` e `fix/` passam obrigatoriamente por `homolog` — risco de quebrar comportamento funcional.
+- Branches `docs/` e `chore/` vão diretamente para `main` — sem risco funcional.
+- Novas branches `feat/` e `fix/` são criadas a partir de `homolog`.
+- **NUNCA** commitar ou fazer merge de `feat/` ou `fix/` direto em `main`.
 
 ## 📏 Diretrizes Gerais e Regras de Atuação
 1. **Idioma:** O idioma oficial é **Português (PT-BR)** para documentação, comentários e interações.
 2. **Proatividade Agêntica:** O agente deve atuar como um colaborador sênior, sugerindo arquiteturas, temas de pesquisa e metodologias alinhadas ao estado da arte.
 3. **Sincronização de Contexto:** Sempre utilize os modelos em `docs/templates/` para manter a consistência acadêmica exigida pela UCB.
-4. **Confirmação de Branch:** NUNCA faça um commit direto sem antes validar a estratégia de branch com o usuário.
+4. **Confirmação de Branch:** NUNCA faça um commit direto sem antes validar a estratégia de branch com o usuário. Fluxo: `feat/*` e `fix/*` → `homolog` → `main`; `docs/*` e `chore/*` → direto em `main`.
 5. **Identidade nos Commits:** SEMPRE use o usuário autenticado no `gh` CLI (`davieduardo001`) para qualquer operação git/GitHub. NUNCA inclua co-autoria ou referência a ferramentas de IA (Claude, Gemini, etc.) nas mensagens de commit ou PRs.
-5. **Rigor Acadêmico:** As sugestões e o código devem seguir padrões científicos e de engenharia de software de alto nível.
-6. **Documentação Contínua:** Este arquivo deve ser atualizado periodicamente para refletir o estado real do projeto.
+6. **Rigor Acadêmico:** As sugestões e o código devem seguir padrões científicos e de engenharia de software de alto nível.
+7. **Documentação Contínua:** Este arquivo deve ser atualizado periodicamente para refletir o estado real do projeto.
 
 ## 📁 Estrutura do Projeto
 ```text

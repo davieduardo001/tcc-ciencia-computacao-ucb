@@ -1,17 +1,15 @@
 ---
 name: gerenciar-commits
-description: Garante que os commits do projeto sejam atômicos, sigam o padrão Conventional Commits e sejam agrupados logicamente por funcionalidade ou diretório.
+description: Garante que os commits do projeto sejam atômicos, sigam o padrão Conventional Commits e se encaixem no fluxo correto — feat/fix via homolog, docs/chore direto para main.
 ---
 
 # Skill: Gerenciar Commits Estruturados
 
-Esta skill orienta o agente a realizar commits de forma organizada, evitando "commits gigantes" e garantindo que cada mudança tenha um propósito claro e documentado.
-
 ## <instructions>
-1. **Verificação de Branch (Skill: gerenciar-branches):** Antes de qualquer commit, utilize a skill `gerenciar-branches` para confirmar com o usuário em qual branch as alterações devem ser enviadas (nova, existente ou atual). Liste as branches em uso.
-2. **Análise de Alterações:** Uma vez definida a branch, execute `git status` e `git diff` para identificar todas as mudanças pendentes.
-3. **Agrupamento Lógico (Curadoria):** Separe as mudanças em grupos lógicos. 
-   - Exemplo: Mudanças em `/docs` não devem estar no mesmo commit que mudanças em `/src`, a menos que sejam estritamente interdependentes.
+1. **Verificação de Branch (Skill: gerenciar-branches):** Antes de qualquer commit, utilize a skill `gerenciar-branches` para confirmar em qual branch as alterações devem ir e que o fluxo está correto.
+2. **Análise de Alterações:** Execute `git status` e `git diff` para identificar todas as mudanças pendentes.
+3. **Agrupamento Lógico:** Separe as mudanças em grupos lógicos.
+   - Mudanças em `docs/` não devem estar no mesmo commit que mudanças em `src/`, salvo interdependência estrita.
    - Funcionalidades distintas devem ter commits distintos.
 4. **Padrão Conventional Commits:** Utilize obrigatoriamente os prefixos:
    - `feat:` Novas funcionalidades ou adições importantes.
@@ -21,11 +19,14 @@ Esta skill orienta o agente a realizar commits de forma organizada, evitando "co
    - `refactor:` Mudança de código que não corrige bug nem adiciona feature.
    - `chore:` Atualização de tarefas de build, configurações de ferramentas, etc.
    - `perf:` Mudanças de código focadas em performance.
-5. **Verificação de Segurança:** Garanta que arquivos ignorados (como `settings.json`) ou tokens não foram incluídos acidentalmente.
+5. **Verificação de Segurança:** Garanta que arquivos ignorados (`.env`, `settings.local.json`) ou tokens não foram incluídos acidentalmente.
 6. **Proposta de Estrutura:** Antes de executar os commits, apresente ao usuário um plano:
    - "Commit 1 (docs): Descrição..."
    - "Commit 2 (feat): Descrição..."
-7. **Idioma:** Mensagens de commit preferencialmente em inglês ou português (PT-BR), conforme padrão do projeto, mas a descrição da tarefa sempre em **Português (PT-BR)**.
+7. **Fluxo pós-commit:** Após os commits, oriente o merge conforme o tipo de branch:
+   - `feat/` ou `fix/`: merge em `homolog` → depois `homolog` em `main`
+   - `docs/` ou `chore/`: merge direto em `main`
+8. **Idioma:** Mensagens de commit preferencialmente em inglês ou português (PT-BR), mas a interação com o usuário sempre em **Português (PT-BR)**.
 </instructions>
 
 ## <available_resources>
