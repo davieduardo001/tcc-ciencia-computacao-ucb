@@ -4,6 +4,5 @@ node_modules/
 .DS_Store
 .env
 
-# Claude Code
-.claude/
-CLAUDE.md
+# Claude Code — ignorar apenas configurações locais, não os commands do projeto
+.claude/settings.local.json
