@@ -16,8 +16,10 @@ Esta skill permite ao agente de IA ler, analisar e resumir a documentação exis
 </instructions>
 
 ## <available_resources>
-- `docs/`: Repositório de requisitos, templates e decisões arquiteturais.
-- `AGENT.md`: Fonte da verdade sobre o status do projeto e histórico de avanços.
+- `AGENT.md`: Manual de bordo — stack, time, arquitetura e próximos passos.
+- `docs/documento_visao.md`: Visão geral do produto, objetivos e requisitos.
+- `docs/distribuicao_us.md`: Distribuição de USs por membro e GitHub de cada um.
+- `docs/`: Demais documentos de requisitos, templates e decisões arquiteturais.
 </available_resources>
 
 ## Exemplos de Uso

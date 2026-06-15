@@ -3,6 +3,15 @@
 Manual de bordo do projeto. Fonte de verdade para stack, time, arquitetura e próximos passos.
 As regras de workflow (branches, commits, skills) estão em `CLAUDE.md`.
 
+## Leitura Obrigatória no Início de Cada Sessão
+
+Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo do projeto:
+
+- `docs/documento_visao.md` — visão geral do produto, objetivos e requisitos
+- `docs/distribuicao_us.md` — quem é responsável por cada User Story e GitHub de cada membro
+
+---
+
 ---
 
 ## Projeto
