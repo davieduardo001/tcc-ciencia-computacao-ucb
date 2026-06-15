@@ -125,6 +125,10 @@ Todo diagrama de sequência do Movecity segue a arquitetura de microserviços co
 - **Fonte de verdade:** issues #11 (padrão de diagrama com Gateway) e #31 (SPEC do ciclo de sessão)
 - **Referência de implementação:** `docs/diagramas/sequencia/` — UC14 a UC21 seguem este padrão
 
-## Fonte de Verdade
+## Documentação de Contexto
 
-`AGENT.md` é o "manual de bordo" do projeto — status atual, decisões tomadas, próximos passos. Consultar antes de iniciar tarefas que envolvam contexto do projeto. Manter atualizado ao tomar novas decisões arquiteturais ou de escopo.
+Os arquivos abaixo são carregados automaticamente em toda sessão:
+
+@AGENT.md
+@docs/distribuicao_us.md
+@docs/documento_visao.md
