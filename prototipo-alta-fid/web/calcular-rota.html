@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Calcular Rota</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="rotas">
+  <!-- US #20 — Calcular Rota de Origem até Destino por Ônibus -->
+  <main class="content">
+    <div class="map-canvas" data-variant="route">
+      <div class="mk mk-a" style="left:25%;top:31%">
+        <span class="mk-label">Origem</span>
+        <span class="mk-icon">A</span>
+      </div>
+      <div class="mk mk-b" style="left:70%;top:70%">
+        <span class="mk-label">Destino</span>
+        <span class="mk-icon">B</span>
+      </div>
+      <div class="mk mk-bus" style="left:50%;top:55%">
+        <span class="mk-label">46 min</span>
+        <span class="mk-icon"><span class="ico" data-i="bus"></span></span>
+      </div>
+      <span class="map-attrib">Movecity · mapa ilustrativo</span>
+    </div>
+
+    <div class="overlay-panel panel-left">
+      <div class="panel-head"><span class="ico" data-i="navigation"></span><strong>Pesquisar por rota</strong></div>
+      <div class="panel-body">
+        <div class="card card-pad" style="background:var(--surface-2);margin-bottom:14px;border:none">
+          <div class="input-wrap" style="margin-bottom:10px">
+            <span class="lead" style="color:var(--green)"><span class="ico ico-sm" data-i="navigation"></span></span>
+            <input class="input has-lead" placeholder="Onde você está?" value="Praça do Relógio, Taguatinga">
+          </div>
+          <div class="input-wrap">
+            <span class="lead" style="color:var(--red)"><span class="ico ico-sm" data-i="pin"></span></span>
+            <input class="input has-lead" placeholder="Para onde vai?" value="UnB — Campus Darcy Ribeiro">
+          </div>
+        </div>
+        <div class="chips" style="margin-bottom:16px">
+          <span class="chip on"><span class="ico" data-i="zap"></span> Mais rápida</span>
+          <span class="chip"><span class="ico" data-i="repeat"></span> Menos baldeações</span>
+          <span class="chip"><span class="ico" data-i="walk"></span> Menos caminhada</span>
+        </div>
+
+        <div class="section-title mt-0" style="margin-bottom:10px">3 opções de rota</div>
+
+        <div class="route-card">
+          <div class="top">
+            <span class="badge-line" style="background:var(--accent)">875A</span>
+            <span class="ico ico-sm" data-i="arrow-right" style="color:var(--muted)"></span>
+            <span class="badge-line" style="background:var(--primary)">0.110</span>
+            <b style="margin-left:auto;font-size:18px">46 min</b>
+          </div>
+          <div class="route-step"><span class="ico" data-i="walk"></span> 280 m até a parada Praça do Relógio</div>
+          <div class="route-step"><span class="ico" data-i="bus"></span> 875A · Perdizes ↔ Aeroporto · 22 min</div>
+          <div class="route-step"><span class="ico" data-i="repeat"></span> Baldeação na Rodoviária do Plano Piloto</div>
+          <div class="route-step"><span class="ico" data-i="bus"></span> 0.110 · UnB / L2 Norte · 16 min</div>
+          <div class="route-step"><span class="ico" data-i="walk"></span> 150 m até o destino</div>
+          <div style="padding:10px 16px 14px"><a href="favoritos.html" class="btn btn-primary btn-sm btn-block"><span class="ico ico-sm" data-i="star"></span> Salvar como favorita</a></div>
+        </div>
+
+        <div class="route-card">
+          <div class="top">
+            <span class="badge-line" style="background:var(--green)">106.2</span>
+            <b style="margin-left:auto;font-size:18px">57 min</b>
+          </div>
+          <div class="route-step"><span class="ico" data-i="check-circle"></span> Direto, sem baldeação · acessível</div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

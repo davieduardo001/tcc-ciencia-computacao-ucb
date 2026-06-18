@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Mapa Interativo</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="mapa">
+  <!-- US #14 — Visualizar Mapa com Localização Atual -->
+  <main class="content">
+    <div class="map-canvas" data-variant="line">
+      <!-- marcadores distribuídos sobre o mapa vetorial -->
+      <div class="mk mk-bus" style="left:45%;top:37.5%">
+        <span class="mk-label"><span class="dot pulse"></span> 875A-10</span>
+        <span class="mk-icon"><span class="ico" data-i="bus"></span></span>
+      </div>
+      <div class="mk mk-bus-dark" style="left:50%;top:55%">
+        <span class="mk-icon"><span class="ico" data-i="bus"></span></span>
+      </div>
+      <div class="mk mk-stop" style="left:25%;top:55%">
+        <span class="mk-label">Parada W3 Sul</span>
+        <span class="mk-icon"><span class="ico" data-i="pin"></span></span>
+      </div>
+      <div class="mk mk-user" style="left:60%;top:72%"><span class="core"></span></div>
+      <span class="map-attrib">Movecity · mapa ilustrativo</span>
+    </div>
+
+    <div class="map-controls">
+      <button class="icon-btn" title="Centralizar na minha localização"><span class="ico ico-sm" data-i="crosshair"></span></button>
+      <button class="icon-btn" title="Camadas"><span class="ico ico-sm" data-i="layers"></span></button>
+    </div>
+
+    <!-- Painel: linha sendo acompanhada -->
+    <div class="overlay-panel panel-bottom">
+      <div class="panel-head">
+        <span class="ico" data-i="navigation"></span>
+        <strong>Acompanhando linha</strong>
+        <span class="badge badge-live" style="margin-left:auto"><span class="dot pulse"></span> Ao vivo</span>
+      </div>
+      <div class="panel-body">
+        <a href="linha.html" class="line-item" style="margin:0">
+          <div class="av"><span class="ico" data-i="bus"></span></div>
+          <div class="meta">
+            <b>875A-10</b>
+            <div class="muted small">Perdizes ↔ Aeroporto · próximo em 4 min</div>
+          </div>
+          <span class="chev ico ico-sm" data-i="chevron"></span>
+        </a>
+        <div class="flex gap-8" style="margin-top:12px">
+          <a href="linha.html" class="btn btn-primary btn-sm" style="flex:1"><span class="ico ico-sm" data-i="navigation"></span> Tempo real</a>
+          <a href="parada.html" class="btn btn-ghost btn-sm" style="flex:1"><span class="ico ico-sm" data-i="pin"></span> Próximas paradas</a>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

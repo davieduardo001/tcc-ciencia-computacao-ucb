@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Ocorrências</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="ocorrencias">
+  <!-- US #24 (visualizar) + #26 (confirmar) -->
+  <main class="content">
+    <div class="page" data-tabs-scope>
+      <div class="row-between">
+        <div>
+          <h1>Ocorrências da comunidade</h1>
+          <p class="sub mb-0">Reportes de outros passageiros perto de você.</p>
+        </div>
+        <a href="reportar.html" class="btn btn-primary"><span class="ico ico-sm" data-i="plus"></span> Reportar</a>
+      </div>
+
+      <div class="tabs" data-tabs style="margin:20px 0 22px">
+        <button class="active" data-tab="todas">Todas</button>
+        <button data-tab="linha">Minhas linhas</button>
+        <button data-tab="proximas">Próximas a mim</button>
+      </div>
+
+      <div data-panel="todas">
+        <div class="occ">
+          <div class="ic danger"><span class="ico" data-i="ban"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Ônibus não passou — 875A</b><span class="tiny muted">há 6 min</span></div>
+            <div class="small muted">Parada W3 Sul — 502 · Perdizes ↔ Aeroporto</div>
+            <p class="small" style="margin:8px 0 0">Esperando há 25 min e o ônibus das 08:20 não apareceu.</p>
+            <div class="actions">
+              <button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button>
+              <span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>4</b> confirmações · validado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="occ">
+          <div class="ic warn"><span class="ico" data-i="users"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Lotação alta — 0.110</b><span class="tiny muted">há 12 min</span></div>
+            <div class="small muted">UnB / L2 Norte</div>
+            <div class="actions">
+              <button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button>
+              <span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>1</b> confirmação · aguardando</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="occ">
+          <div class="ic info"><span class="ico" data-i="route"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Desvio de rota — 106.2</b><span class="tiny muted">há 22 min</span></div>
+            <div class="small muted">Obras na L2 Sul · Aeroporto / W3 Sul</div>
+            <div class="actions">
+              <button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button>
+              <span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>7</b> confirmações · validado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="occ">
+          <div class="ic danger"><span class="ico" data-i="octagon-alert"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Alerta de segurança</b><span class="tiny muted">há 40 min</span></div>
+            <div class="small muted">Parada EQS 410/411 · iluminação precária à noite</div>
+            <div class="actions">
+              <button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button>
+              <span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>3</b> confirmações · validado</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-panel="linha" style="display:none">
+        <div class="occ">
+          <div class="ic danger"><span class="ico" data-i="ban"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Ônibus não passou — 875A</b><span class="tiny muted">há 6 min</span></div>
+            <div class="small muted">Linha que você acompanha</div>
+            <div class="actions"><button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button><span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>4</b> confirmações</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div data-panel="proximas" style="display:none">
+        <div class="occ">
+          <div class="ic warn"><span class="ico" data-i="users"></span></div>
+          <div class="body">
+            <div class="row-between"><b>Lotação alta — 0.110</b><span class="tiny muted">a 300 m</span></div>
+            <div class="small muted">UnB / L2 Norte</div>
+            <div class="actions"><button class="btn btn-sm btn-primary" data-confirm><span class="ico ico-sm" data-i="check"></span> Confirmar</button><span class="confirm-pill"><span class="ico" data-i="check-circle"></span> <b data-count>1</b> confirmação</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

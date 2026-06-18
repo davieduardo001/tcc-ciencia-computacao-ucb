@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Buscar Parada</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="mapa">
+  <!-- US #21 — Buscar Parada por Nome ou Endereço -->
+  <main class="content">
+    <div class="map-canvas">
+      <div class="mk mk-stop" style="left:38%;top:38%"><span class="mk-icon"><span class="ico" data-i="pin"></span></span></div>
+      <div class="mk mk-stop" style="left:58%;top:52%"><span class="mk-icon"><span class="ico" data-i="pin"></span></span></div>
+      <div class="mk mk-stop" style="left:70%;top:34%"><span class="mk-icon"><span class="ico" data-i="pin"></span></span></div>
+      <div class="mk mk-user" style="left:48%;top:62%"><span class="core"></span></div>
+      <span class="map-attrib">Movecity · mapa ilustrativo</span>
+    </div>
+
+    <div class="overlay-panel panel-left">
+      <div class="panel-head"><span class="ico" data-i="pin"></span><strong>Buscar parada</strong></div>
+      <div class="panel-body">
+        <div class="input-wrap" style="margin-bottom:12px">
+          <span class="lead ico ico-sm" data-i="search"></span>
+          <input class="input has-lead" placeholder="Nome, referência ou endereço" value="W3 Sul">
+        </div>
+        <div class="chips" style="margin-bottom:16px">
+          <span class="chip on"><span class="ico" data-i="crosshair"></span> Perto de mim</span>
+          <span class="chip"><span class="ico" data-i="accessible"></span> Acessíveis</span>
+          <span class="chip">Cobertas</span>
+        </div>
+
+        <div class="section-title mt-0" style="margin-bottom:10px">5 paradas encontradas</div>
+        <a href="parada.html" class="line-item">
+          <div class="av"><span class="ico" data-i="pin"></span></div>
+          <div class="meta"><b>W3 Sul — 502 Sul</b><div class="muted small">120 m · 8 linhas · Acessível</div></div>
+          <span class="chev ico ico-sm" data-i="chevron"></span>
+        </a>
+        <a href="parada.html" class="line-item">
+          <div class="av"><span class="ico" data-i="pin"></span></div>
+          <div class="meta"><b>W3 Sul — 510 Sul</b><div class="muted small">340 m · 5 linhas</div></div>
+          <span class="chev ico ico-sm" data-i="chevron"></span>
+        </a>
+        <a href="parada.html" class="line-item">
+          <div class="av"><span class="ico" data-i="pin"></span></div>
+          <div class="meta"><b>Rodoviária do Plano Piloto</b><div class="muted small">1,2 km · 40+ linhas · Coberta</div></div>
+          <span class="chev ico ico-sm" data-i="chevron"></span>
+        </a>
+        <a href="parada.html" class="line-item">
+          <div class="av"><span class="ico" data-i="pin"></span></div>
+          <div class="meta"><b>EQS 410/411 Sul</b><div class="muted small">800 m · 6 linhas</div></div>
+          <span class="chev ico ico-sm" data-i="chevron"></span>
+        </a>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

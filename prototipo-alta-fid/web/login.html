@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Login</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- US #10 / #12 -->
+  <div class="auth">
+    <aside class="auth-aside">
+      <div class="auth-logo"><span class="mark"><span class="ico" data-i="bus"></span></span> Movecity</div>
+      <div>
+        <h1>Sua mobilidade,<br>mais humana.</h1>
+        <p>Conectando você ao seu destino com previsibilidade, segurança e conforto no transporte público urbano.</p>
+        <div class="auth-feature"><span class="ico" data-i="navigation"></span> Rastreamento em tempo real do GDF</div>
+        <div class="auth-feature"><span class="ico" data-i="users"></span> Ocorrências validadas pela comunidade</div>
+      </div>
+      <div class="auth-dots"><span></span><span class="on"></span><span></span></div>
+      <div class="glow"></div>
+    </aside>
+
+    <main class="auth-main">
+      <form class="auth-form" data-demo="mapa.html">
+        <h2>Bem-vindo de volta</h2>
+        <p class="muted mt-0" style="margin-bottom:26px">Faça login para continuar sua jornada.</p>
+
+        <div class="field">
+          <label>E-mail</label>
+          <div class="input-wrap">
+            <span class="lead ico ico-sm" data-i="mail"></span>
+            <input class="input has-lead" type="email" placeholder="seu@email.com" value="passageiro@movecity.app">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="row-between" style="margin-bottom:7px">
+            <label style="margin:0">Senha</label>
+            <a href="recuperar-senha.html" class="small bold">Esqueci minha senha</a>
+          </div>
+          <div class="input-wrap">
+            <span class="lead ico ico-sm" data-i="lock"></span>
+            <input id="pass" class="input has-lead has-trail" type="password" value="senha1234">
+            <span class="trail ico ico-sm" data-toggle-pass="pass" data-i="eye"></span>
+          </div>
+        </div>
+
+        <label class="checkbox" style="margin-bottom:24px"><input type="checkbox" checked> Lembrar de mim</label>
+
+        <button class="btn btn-primary btn-block btn-lg" type="submit">Entrar</button>
+
+        <div class="divider-or">ou</div>
+
+        <a class="btn btn-google btn-block btn-lg" href="mapa.html"><span class="ico ico-sm" data-i="google"></span> Continuar com o Google</a>
+
+        <p class="center" style="margin-top:24px">Não tem uma conta? <a href="criar-conta.html" class="bold">Criar conta</a></p>
+      </form>
+    </main>
+  </div>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

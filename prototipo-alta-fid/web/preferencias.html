@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Preferências de Notificação</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="alertas">
+  <!-- US #29 — Gerenciar Preferências de Notificação -->
+  <main class="content">
+    <div class="page">
+      <h1>Preferências de notificação</h1>
+      <p class="sub">Escolha o que e como você quer ser avisado.</p>
+
+      <div class="section-title">Tipos de alerta</div>
+      <div class="card card-pad">
+        <div class="pref-row" style="padding-top:0">
+          <div><b>Atrasos na linha</b><div class="small muted">Avisar quando uma linha acompanhada atrasar</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+        <div class="pref-row">
+          <div><b>Cancelamento de viagem</b><div class="small muted">Partidas canceladas pela operadora</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+        <div class="pref-row">
+          <div><b>Rotas preferidas</b><div class="small muted">Melhor horário para sair nas suas rotas salvas</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+        <div class="pref-row">
+          <div><b>Ocorrências da comunidade</b><div class="small muted">Reportes validados perto de você</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+        <div class="pref-row" style="border-bottom:none;padding-bottom:0">
+          <div><b>Alertas de segurança</b><div class="small muted">Avisos em paradas e trajetos</div></div>
+          <label class="switch"><input type="checkbox"><span class="track"></span></label>
+        </div>
+      </div>
+
+      <div class="section-title">Canais</div>
+      <div class="card card-pad">
+        <div class="pref-row" style="padding-top:0">
+          <div><b>Push no navegador</b></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+        <div class="pref-row">
+          <div><b>E-mail</b><div class="small muted">passageiro@movecity.app</div></div>
+          <label class="switch"><input type="checkbox"><span class="track"></span></label>
+        </div>
+        <div class="pref-row" style="border-bottom:none;padding-bottom:0">
+          <div><b>Resumo diário</b><div class="small muted">Um resumo às 7h com o status das suas rotas</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+      </div>
+
+      <div class="section-title">Não perturbe</div>
+      <div class="card card-pad">
+        <div class="pref-row" style="padding-top:0;border-bottom:none;padding-bottom:0">
+          <div><b>Silenciar alertas</b><div class="small muted">Das 22:00 às 06:00</div></div>
+          <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+        </div>
+      </div>
+
+      <div class="flex gap-12" style="margin-top:24px">
+        <a href="alertas.html" class="btn btn-ghost" style="flex:1">Cancelar</a>
+        <a href="alertas.html" class="btn btn-primary" style="flex:2">Salvar preferências</a>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
