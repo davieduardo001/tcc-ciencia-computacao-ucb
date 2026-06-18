@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Detalhes da Parada</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="mapa">
+  <!-- US #18 (detalhes da parada) + #19 (ETA das linhas) -->
+  <main class="content">
+    <div class="map-canvas">
+      <div class="mk mk-stop" style="left:50%;top:48%">
+        <span class="mk-label">W3 Sul — 502</span>
+        <span class="mk-icon"><span class="ico" data-i="pin"></span></span>
+      </div>
+      <div class="mk mk-bus" style="left:35%;top:30%"><span class="mk-icon"><span class="ico" data-i="bus"></span></span></div>
+      <div class="mk mk-bus-dark" style="left:62%;top:60%"><span class="mk-icon"><span class="ico" data-i="bus"></span></span></div>
+      <div class="mk mk-user" style="left:50%;top:72%"><span class="core"></span></div>
+      <span class="map-attrib">Movecity · mapa ilustrativo</span>
+    </div>
+
+    <div class="overlay-panel panel-right">
+      <div class="panel-head" style="align-items:flex-start">
+        <div style="flex:1">
+          <div class="flex gap-8 items-center">
+            <span class="badge badge-soft">ESTAÇÃO</span>
+            <span class="small muted">ID 2405</span>
+          </div>
+          <strong style="font-size:18px;display:block;margin-top:8px">Parada W3 Sul — 502 Sul</strong>
+          <div class="small muted">Rodoviária do Plano Piloto</div>
+        </div>
+        <button class="close-x" onclick="history.back()"><span class="ico ico-sm" data-i="x"></span></button>
+      </div>
+      <div class="panel-body">
+        <div class="flex gap-8" style="margin-bottom:14px">
+          <a href="calcular-rota.html" class="btn btn-primary btn-sm" style="flex:1"><span class="ico ico-sm" data-i="navigation"></span> Como chegar</a>
+          <a href="favoritos.html" class="btn btn-ghost btn-sm" style="flex:1"><span class="ico ico-sm" data-i="star"></span> Favoritar</a>
+        </div>
+
+        <div class="flex gap-12 small muted" style="margin-bottom:6px">
+          <span class="flex items-center gap-8"><span class="ico" data-i="accessible" style="width:15px;height:15px"></span> Acessível</span>
+          <span class="flex items-center gap-8"><span class="ico" data-i="seat" style="width:15px;height:15px"></span> Coberta</span>
+          <span class="flex items-center gap-8"><span class="ico" data-i="bulb" style="width:15px;height:15px"></span> Iluminada</span>
+        </div>
+
+        <div class="section-title" style="margin-top:14px">Próximas linhas · 8 operando</div>
+
+        <a href="linha.html" class="card card-pad" style="display:block;margin-bottom:12px">
+          <div class="flex items-center gap-12">
+            <span class="badge-line" style="background:var(--primary)">0.101</span>
+            <div class="meta" style="flex:1"><b>Rodoviária P. Piloto</b><div class="small flex items-center gap-8" style="color:var(--green)"><span class="dot"></span> Ao vivo</div></div>
+            <span class="chev ico ico-sm" data-i="chevron"></span>
+          </div>
+          <div class="eta-grid">
+            <div><div class="lbl">Próximo</div><div class="val now">3 min</div></div>
+            <div><div class="lbl">Depois</div><div class="val">12 min</div></div>
+            <div><div class="lbl">Estimado</div><div class="val">25 min</div></div>
+          </div>
+        </a>
+
+        <a href="linha.html" class="card card-pad" style="display:block;margin-bottom:12px">
+          <div class="flex items-center gap-12">
+            <span class="badge-line" style="background:var(--green)">106.2</span>
+            <div class="meta" style="flex:1"><b>Aeroporto / W3 Sul</b><div class="small muted">Programado</div></div>
+            <span class="chev ico ico-sm" data-i="chevron"></span>
+          </div>
+          <div class="eta-grid">
+            <div><div class="lbl">Próximo</div><div class="val">09:42</div></div>
+            <div><div class="lbl">Depois</div><div class="val">10:15</div></div>
+            <div><div class="lbl">Estimado</div><div class="val">10:45</div></div>
+          </div>
+        </a>
+
+        <a href="linha.html" class="card card-pad" style="display:block;margin-bottom:14px">
+          <div class="flex items-center gap-12">
+            <span class="badge-line" style="background:var(--blue)">875A</span>
+            <div class="meta" style="flex:1"><b>Taguatinga Sul</b><div class="small flex items-center gap-8" style="color:var(--green)"><span class="dot"></span> Ao vivo</div></div>
+            <span class="chev ico ico-sm" data-i="chevron"></span>
+          </div>
+          <div class="eta-grid">
+            <div><div class="lbl">Próximo</div><div class="val now">18 min</div></div>
+            <div><div class="lbl">Depois</div><div class="val">42 min</div></div>
+            <div><div class="lbl">Estimado</div><div class="val">1h05</div></div>
+          </div>
+        </a>
+
+        <a href="reportar.html" class="btn btn-ghost btn-block"><span class="ico ico-sm" data-i="alert"></span> Reportar problema nesta parada</a>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

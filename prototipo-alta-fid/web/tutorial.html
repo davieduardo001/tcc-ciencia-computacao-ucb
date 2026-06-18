@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Primeiro Acesso</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- US #30 — Visualizar Tutorial no Primeiro Acesso -->
+  <div style="position:fixed;inset:0;background:#e7eef0" class="map-canvas" data-variant="line"></div>
+
+  <div class="tour-back">
+    <div class="tour-card">
+      <div class="tour-illu"><span class="ico" id="tourIcon" data-i="map"></span></div>
+      <div class="tour-body">
+        <div class="auth-dots" style="justify-content:center;margin-bottom:18px">
+          <span class="on" id="d0"></span><span id="d1"></span><span id="d2"></span><span id="d3"></span>
+        </div>
+        <h2 id="tourTitle">Bem-vindo ao Movecity!</h2>
+        <p class="muted" id="tourText" style="margin-top:8px">Acompanhe o transporte público do DF em tempo real, com dados oficiais do GDF e a colaboração de quem usa o ônibus todo dia.</p>
+        <div class="tour-nav">
+          <a href="mapa.html" class="muted small">Pular</a>
+          <button class="btn btn-primary" id="next">Próximo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+  <script>
+    const steps = [
+      { ic:"map", t:"Bem-vindo ao Movecity!", x:"Acompanhe o transporte público do DF em tempo real, com dados oficiais do GDF e a colaboração de quem usa o ônibus todo dia." },
+      { ic:"bus", t:"Rastreie em tempo real", x:"Veja onde seu ônibus está, quanto tempo falta para chegar na sua parada e o trajeto completo da linha." },
+      { ic:"alert", t:"Colabore com a comunidade", x:"Reporte ônibus fantasma, atrasos e problemas de segurança. Cada reporte é validado por outros passageiros." },
+      { ic:"bell", t:"Receba alertas no seu tempo", x:"Salve rotas favoritas e seja avisado sobre atrasos, cancelamentos e o melhor horário para sair." }
+    ];
+    let i = 0;
+    const icon = document.getElementById('tourIcon'), title = document.getElementById('tourTitle'),
+          text = document.getElementById('tourText'), next = document.getElementById('next'),
+          dots = [0,1,2,3].map(n => document.getElementById('d'+n));
+    function render(){
+      setIcon(icon, steps[i].ic); title.textContent = steps[i].t; text.textContent = steps[i].x;
+      dots.forEach((d,n)=> d.classList.toggle('on', n===i));
+      next.textContent = i === steps.length-1 ? "Começar a usar" : "Próximo";
+    }
+    next.addEventListener('click', () => {
+      if (i < steps.length-1) { i++; render(); } else window.location.href = "mapa.html";
+    });
+    render();
+  </script>
+</body>
+</html>

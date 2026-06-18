@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Buscar Linha</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="linhas">
+  <!-- US #15 — Buscar Linha por Número -->
+  <main class="content">
+    <div class="page">
+      <h1>Buscar linha</h1>
+      <p class="sub">Encontre horários e itinerários em tempo real.</p>
+
+      <div class="input-wrap" style="margin-bottom:8px">
+        <span class="lead ico ico-sm" data-i="search"></span>
+        <input class="input has-lead" placeholder="Ex: 116 ou 0.110" style="border-radius:var(--pill);padding:15px 15px 15px 44px">
+      </div>
+
+      <div class="section-title">Buscas recentes</div>
+      <a href="linha.html" class="line-item">
+        <div class="av"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>116</b><div class="muted small">Rodoviária Plano Piloto</div></div>
+        <span class="chev ico ico-sm" data-i="clock"></span>
+      </a>
+      <a href="linha.html" class="line-item">
+        <div class="av"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>0.110</b><div class="muted small">UnB / L2 Norte</div></div>
+        <span class="chev ico ico-sm" data-i="clock"></span>
+      </a>
+
+      <div class="section-title">Linhas operando agora</div>
+      <a href="linha.html" class="line-item">
+        <div class="av" style="background:var(--green-bg);color:var(--green)"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>875A-10 <span class="badge badge-live"><span class="dot"></span> Ao vivo</span></b><div class="muted small">Perdizes ↔ Aeroporto</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+      <a href="linha.html" class="line-item">
+        <div class="av" style="background:var(--green-bg);color:var(--green)"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>106.2 <span class="badge badge-live"><span class="dot"></span> Ao vivo</span></b><div class="muted small">Aeroporto / W3 Sul</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+      <a href="linha.html" class="line-item">
+        <div class="av"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>0.101</b><div class="muted small">UnB (Campus Darcy Ribeiro)</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

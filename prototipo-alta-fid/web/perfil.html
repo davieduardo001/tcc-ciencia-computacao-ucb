@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Perfil</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="perfil">
+  <!-- Perfil / conta (US #31 — logout) -->
+  <main class="content">
+    <div class="page">
+      <h1>Meu perfil</h1>
+      <p class="sub">Gerencie sua conta e preferências.</p>
+
+      <div class="card card-pad" style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
+        <div class="av" style="width:64px;height:64px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:700">AM</div>
+        <div style="flex:1">
+          <h3>Admin Movecity</h3>
+          <div class="muted small">passageiro@movecity.app</div>
+          <span class="badge badge-live" style="margin-top:6px"><span class="ico" data-i="check"></span> Conta verificada</span>
+        </div>
+        <button class="btn btn-ghost btn-sm"><span class="ico ico-sm" data-i="edit"></span> Editar</button>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:22px">
+        <div class="card card-pad center"><b style="font-size:24px;color:var(--primary)">128</b><div class="small muted">viagens acompanhadas</div></div>
+        <div class="card card-pad center"><b style="font-size:24px;color:var(--primary)">37</b><div class="small muted">reportes válidos</div></div>
+      </div>
+
+      <div class="section-title">Conta</div>
+      <div class="card">
+        <a href="preferencias.html" class="line-item" style="margin:0;border:none;border-radius:0;border-bottom:1px solid var(--border-2)"><span class="av"><span class="ico" data-i="bell"></span></span><div class="meta"><b>Preferências de notificação</b></div><span class="chev ico ico-sm" data-i="chevron"></span></a>
+        <a href="favoritos.html" class="line-item" style="margin:0;border:none;border-radius:0;border-bottom:1px solid var(--border-2)"><span class="av"><span class="ico" data-i="star"></span></span><div class="meta"><b>Rotas e linhas salvas</b></div><span class="chev ico ico-sm" data-i="chevron"></span></a>
+        <a href="redefinir-senha.html" class="line-item" style="margin:0;border:none;border-radius:0;border-bottom:1px solid var(--border-2)"><span class="av"><span class="ico" data-i="lock"></span></span><div class="meta"><b>Alterar senha</b></div><span class="chev ico ico-sm" data-i="chevron"></span></a>
+        <a href="termos.html" class="line-item" style="margin:0;border:none;border-radius:0"><span class="av"><span class="ico" data-i="file"></span></span><div class="meta"><b>Termos e privacidade</b></div><span class="chev ico ico-sm" data-i="chevron"></span></a>
+      </div>
+
+      <a href="login.html" class="btn btn-ghost btn-block" style="margin-top:22px;color:var(--red)"><span class="ico ico-sm" data-i="logout"></span> Sair da conta</a>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

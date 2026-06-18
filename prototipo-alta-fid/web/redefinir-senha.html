@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Redefinir Senha</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- US #13 — redefinição -->
+  <div class="auth">
+    <aside class="auth-aside photo">
+      <div class="auth-logo"><span class="mark"><span class="ico" data-i="bus"></span></span> Movecity</div>
+      <div>
+        <h1>Sua mobilidade,<br>sua segurança.</h1>
+        <p>Mantenha sua conta segura para continuar aproveitando uma experiência mais fluida.</p>
+      </div>
+      <div class="auth-dots"><span></span><span></span><span class="on"></span></div>
+      <div class="glow"></div>
+    </aside>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        <div class="icon-tile" style="background:var(--surface-2);color:var(--primary);margin-bottom:16px"><span class="ico" data-i="shield-check"></span></div>
+        <h2>Redefinir senha</h2>
+        <p class="muted" style="margin-top:6px;margin-bottom:24px">Crie uma nova senha forte para sua conta.</p>
+        <form data-demo="login.html">
+          <div class="field">
+            <label>Nova senha</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="lock"></span>
+              <input id="p1" class="input has-lead has-trail" type="password" placeholder="Digite sua nova senha">
+              <span class="trail ico ico-sm" data-toggle-pass="p1" data-i="eye"></span></div>
+            <div class="hint"><span class="ico" data-i="info"></span> Use letras, números e símbolos.</div>
+          </div>
+          <div class="field">
+            <label>Confirmar nova senha</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="lock"></span>
+              <input id="p2" class="input has-lead has-trail" type="password" placeholder="Repita a nova senha">
+              <span class="trail ico ico-sm" data-toggle-pass="p2" data-i="eye"></span></div>
+          </div>
+          <button class="btn btn-primary btn-block btn-lg" type="submit">Salvar nova senha</button>
+          <p class="center" style="margin-top:20px"><a href="login.html" class="bold flex items-center gap-8" style="justify-content:center"><span class="ico ico-sm" data-i="arrow-left"></span> Voltar para o login</a></p>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

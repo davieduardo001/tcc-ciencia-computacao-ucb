@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Protótipo de Alta Fidelidade</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body style="background:var(--bg)">
+  <header class="demo-hero">
+    <div style="max-width:1120px;margin:0 auto">
+      <div class="auth-logo" style="font-size:28px"><span class="mark"><span class="ico" data-i="bus"></span></span> Movecity</div>
+      <h1 style="color:#fff;font-size:34px;margin-top:16px">Protótipo de Alta Fidelidade</h1>
+      <p style="color:rgba(255,255,255,.85);max-width:640px;margin-top:10px">
+        Demonstração navegável das telas principais (web), sem conexão com backend.
+        Mobilidade urbana colaborativa para o DF — issue
+        <a href="https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/33" style="color:#bfeef1">#33</a>.
+      </p>
+      <a href="login.html" class="btn btn-ghost" style="margin-top:22px"><span class="ico ico-sm" data-i="arrow-right"></span> Iniciar fluxo pelo Login</a>
+    </div>
+  </header>
+
+  <div class="demo-grid" id="grid"></div>
+
+  <footer class="center muted small" style="padding:24px">
+    Movecity · TCC Ciência da Computação — UCB · Grupo Segurança no Transporte · Protótipo estático (HTML/CSS/JS)
+  </footer>
+
+  <script src="assets/js/app.js"></script>
+  <script>
+    const cards = [
+      ["#d6603a","Autenticação","Login","E-mail/senha + Google","login.html","#10 #12","user"],
+      ["#d6603a","Autenticação","Criar conta","Cadastro + LGPD","criar-conta.html","#11","edit"],
+      ["#d6603a","Autenticação","Recuperar senha","Link e redefinição","recuperar-senha.html","#13","lock"],
+      ["#d95f03","Mapa & Rastreamento","Mapa / localização","Mapa com sua posição","mapa.html","#14","map"],
+      ["#d95f03","Mapa & Rastreamento","Buscar linha","Por número + recentes","buscar-linha.html","#15","search"],
+      ["#d95f03","Mapa & Rastreamento","Linha em tempo real","Ônibus, trajeto e ETA","linha.html","#16 #17 #19","bus"],
+      ["#d95f03","Mapa & Rastreamento","Detalhes da parada","Próximas linhas e tempos","parada.html","#18 #19","pin"],
+      ["#d95f03","Mapa & Rastreamento","Buscar parada","Por nome ou endereço","buscar-parada.html","#21","pin"],
+      ["#d95f03","Mapa & Rastreamento","Calcular rota","Origem → destino","calcular-rota.html","#20","navigation"],
+      ["#9B3A07","Colaboração","Reportar ocorrência","Fantasma, atraso, segurança","reportar.html","#23","alert"],
+      ["#9B3A07","Colaboração","Ocorrências & confirmar","Feed + validação cruzada","ocorrencias.html","#24 #26","users"],
+      ["#9B3A07","Colaboração","Rotas favoritas","Trajetos e linhas salvas","favoritos.html","#25","star"],
+      ["#9B3A07","Colaboração","Central de alertas","Atraso, cancelamento, rotas","alertas.html","#22 #27 #28","bell"],
+      ["#9B3A07","Colaboração","Preferências","Tipos, canais, não perturbe","preferencias.html","#29","settings"],
+      ["#9B3A07","Colaboração","Tutorial / onboarding","Primeiro acesso","tutorial.html","#30","map"],
+      ["#9B3A07","Colaboração","Termos & privacidade","Termos de uso e LGPD","termos.html","#32","file"],
+    ];
+    document.getElementById("grid").innerHTML = cards.map(c => `
+      <div class="demo-card">
+        <div class="tile" style="background:${c[0]}1a;color:${c[0]}"><span class="ico" data-i="${c[6]}"></span></div>
+        <div class="epic" style="color:${c[0]};margin-top:12px">${c[1]}</div>
+        <h4>${c[2]}</h4>
+        <p class="small muted mb-0">${c[3]}</p>
+        <a class="open" href="${c[4]}">Abrir <span class="ico ico-sm" data-i="arrow-right"></span></a>
+        <span class="tiny muted" style="margin-left:8px">${c[5]}</span>
+      </div>`).join("");
+    hydrateIcons(document.getElementById("grid"));
+  </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Criar Conta</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- US #11 -->
+  <div class="page-auth">
+    <div class="phone">
+      <div class="phone-head">
+        <a href="login.html" class="back ico" data-i="arrow-left"></a>
+        <h2>Crie sua conta</h2>
+        <p>Comece a acompanhar o transporte do DF.</p>
+      </div>
+      <div class="phone-body">
+        <form data-demo="tutorial.html">
+          <div class="field">
+            <label>Nome completo</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="user"></span>
+              <input class="input has-lead" placeholder="Como quer ser chamado?"></div>
+          </div>
+          <div class="field">
+            <label>E-mail</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="mail"></span>
+              <input class="input has-lead" type="email" placeholder="exemplo@email.com"></div>
+          </div>
+          <div class="field">
+            <label>Senha</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="lock"></span>
+              <input id="np" class="input has-lead has-trail" type="password" placeholder="Crie uma senha forte">
+              <span class="trail ico ico-sm" data-toggle-pass="np" data-i="eye"></span></div>
+            <div class="hint"><span class="ico" data-i="info"></span> Mínimo 8 caracteres, com letras e números.</div>
+          </div>
+
+          <label class="checkbox" style="margin:18px 0 22px">
+            <input type="checkbox" required>
+            <span>Estou ciente dos <a href="termos.html">Termos de Uso</a> e da <a href="termos.html">Política de Privacidade</a> do Movecity, e concordo com o tratamento dos meus dados conforme a LGPD (Lei nº 13.709/2018).</span>
+          </label>
+
+          <button class="btn btn-primary btn-block btn-lg" type="submit">Cadastrar <span class="ico ico-sm" data-i="arrow-right"></span></button>
+
+          <div class="divider-or">ou</div>
+
+          <a class="btn btn-google btn-block btn-lg" href="tutorial.html"><span class="ico ico-sm" data-i="google"></span> Continuar com o Google</a>
+
+          <p class="center" style="margin-top:22px">Já tem uma conta? <a href="login.html" class="bold">Entrar</a></p>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

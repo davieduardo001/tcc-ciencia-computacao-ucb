@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Alertas</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="alertas">
+  <!-- US #22 (rotas preferidas) + #27 (atraso) + #28 (cancelamento) -->
+  <main class="content">
+    <div class="page">
+      <div class="row-between">
+        <div><h1>Central de alertas</h1><p class="sub mb-0">Notificações das suas linhas e rotas preferidas.</p></div>
+        <a href="preferencias.html" class="btn btn-ghost"><span class="ico ico-sm" data-i="settings"></span> Preferências</a>
+      </div>
+
+      <div class="section-title">Hoje</div>
+      <div class="alert-item">
+        <div class="ic danger"><span class="ico" data-i="ban"></span></div>
+        <div style="flex:1">
+          <div class="row-between"><b>Viagem cancelada — 875A</b><span class="tiny muted">08:40</span></div>
+          <p class="small muted" style="margin:4px 0 0">A partida das 08:50 (Perdizes ↔ Aeroporto) foi cancelada pela operadora. Próxima viagem: 09:20.</p>
+          <div class="flex gap-8" style="margin-top:8px"><a href="calcular-rota.html" class="btn btn-sm btn-outline">Ver rota alternativa</a></div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="ic warn"><span class="ico" data-i="clock"></span></div>
+        <div style="flex:1">
+          <div class="row-between"><b>Atraso na linha 0.110</b><span class="tiny muted">08:15</span></div>
+          <p class="small muted" style="margin:4px 0 0">A linha que você acompanha está com atraso médio de <b>12 min</b> devido a trânsito na L2 Norte.</p>
+          <div class="flex gap-8" style="margin-top:8px"><a href="linha.html" class="btn btn-sm btn-outline">Ver em tempo real</a></div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="ic teal"><span class="ico" data-i="star"></span></div>
+        <div style="flex:1">
+          <div class="row-between"><b>Sua rota "Casa → Trabalho" está livre</b><span class="tiny muted">07:30</span></div>
+          <p class="small muted" style="margin:4px 0 0">Bom momento para sair: tempo estimado de 41 min, abaixo da média.</p>
+        </div>
+      </div>
+
+      <div class="section-title">Ontem</div>
+      <div class="alert-item">
+        <div class="ic info"><span class="ico" data-i="route"></span></div>
+        <div style="flex:1">
+          <div class="row-between"><b>Desvio confirmado — 106.2</b><span class="tiny muted">18:22</span></div>
+          <p class="small muted" style="margin:4px 0 0">Reporte da comunidade validado: obras na L2 Sul.</p>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="ic ok"><span class="ico" data-i="bell"></span></div>
+        <div style="flex:1">
+          <div class="row-between"><b>Seu ônibus chegou</b><span class="tiny muted">07:48</span></div>
+          <p class="small muted" style="margin:4px 0 0">875A chegou na parada W3 Sul — 502, conforme o alerta que você criou.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

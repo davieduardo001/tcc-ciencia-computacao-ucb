@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Rotas Favoritas</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="favoritos">
+  <!-- US #25 — Salvar e Visualizar Rota Favorita -->
+  <main class="content">
+    <div class="page">
+      <div class="row-between">
+        <div><h1>Rotas salvas</h1><p class="sub mb-0">Acesso rápido aos seus trajetos e linhas preferidas.</p></div>
+        <a href="calcular-rota.html" class="btn btn-primary"><span class="ico ico-sm" data-i="plus"></span> Nova rota</a>
+      </div>
+
+      <div class="section-title">Trajetos favoritos</div>
+      <div class="card card-pad" style="margin-bottom:12px">
+        <div class="row-between">
+          <div class="flex items-center gap-12">
+            <div class="icon-tile" style="background:var(--surface-2);color:var(--primary)"><span class="ico" data-i="home"></span></div>
+            <div><b>Casa → Trabalho</b><div class="small muted">Taguatinga Sul → UnB · 875A + 0.110</div></div>
+          </div>
+          <span class="ico" data-i="star" data-fill style="color:var(--primary)"></span>
+        </div>
+        <div class="flex gap-8" style="margin-top:14px">
+          <a href="calcular-rota.html" class="btn btn-sm btn-primary" style="flex:1">Ver rota agora · ~46 min</a>
+          <a href="preferencias.html" class="btn btn-sm btn-ghost"><span class="ico ico-sm" data-i="bell"></span> Alertas</a>
+        </div>
+      </div>
+
+      <div class="card card-pad" style="margin-bottom:12px">
+        <div class="row-between">
+          <div class="flex items-center gap-12">
+            <div class="icon-tile" style="background:var(--red-bg);color:var(--red)"><span class="ico" data-i="cap"></span></div>
+            <div><b>Trabalho → Faculdade</b><div class="small muted">Plano Piloto → Ceilândia · 0.101</div></div>
+          </div>
+          <span class="ico" data-i="star" data-fill style="color:var(--primary)"></span>
+        </div>
+        <div class="flex gap-8" style="margin-top:14px">
+          <a href="calcular-rota.html" class="btn btn-sm btn-primary" style="flex:1">Ver rota agora · ~38 min</a>
+          <a href="preferencias.html" class="btn btn-sm btn-ghost"><span class="ico ico-sm" data-i="bell"></span> Alertas</a>
+        </div>
+      </div>
+
+      <div class="section-title">Linhas favoritas</div>
+      <a href="linha.html" class="line-item">
+        <div class="av" style="background:var(--green-bg);color:var(--green)"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>875A-10 <span class="badge badge-live"><span class="dot"></span> Ao vivo</span></b><div class="muted small">Perdizes ↔ Aeroporto · próximo em 4 min</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+      <a href="linha.html" class="line-item">
+        <div class="av"><span class="ico" data-i="bus"></span></div>
+        <div class="meta"><b>0.110</b><div class="muted small">UnB / L2 Norte · próximo em 11 min</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+
+      <div class="section-title">Paradas favoritas</div>
+      <a href="parada.html" class="line-item">
+        <div class="av"><span class="ico" data-i="pin"></span></div>
+        <div class="meta"><b>W3 Sul — 502 Sul</b><div class="muted small">8 linhas · Acessível</div></div>
+        <span class="chev ico ico-sm" data-i="chevron"></span>
+      </a>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

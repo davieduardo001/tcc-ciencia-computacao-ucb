@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movecity — Reportar Ocorrência</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="app-shell" data-active="ocorrencias">
+  <!-- US #23 — Reportar Ocorrência em uma Linha -->
+  <main class="content">
+    <div class="page">
+      <h1>Reportar ocorrência</h1>
+      <p class="sub">Ajude outros passageiros. Seu reporte é validado pela comunidade (mínimo 2 confirmações).</p>
+
+      <form data-demo="ocorrencias.html">
+        <div class="field">
+          <label>Linha ou parada</label>
+          <div class="input-wrap"><span class="lead ico ico-sm" data-i="bus"></span>
+            <input class="input has-lead" value="875A — Perdizes ↔ Aeroporto"></div>
+        </div>
+
+        <label class="bold" style="display:block;margin-bottom:11px">Tipo de ocorrência</label>
+        <div class="chips" style="margin-bottom:22px">
+          <span class="chip on"><span class="ico" data-i="ban"></span> Ônibus não passou</span>
+          <span class="chip"><span class="ico" data-i="clock"></span> Atraso</span>
+          <span class="chip"><span class="ico" data-i="users"></span> Lotação</span>
+          <span class="chip"><span class="ico" data-i="octagon-alert"></span> Segurança</span>
+          <span class="chip"><span class="ico" data-i="route"></span> Desvio de rota</span>
+          <span class="chip"><span class="ico" data-i="accessible"></span> Acessibilidade</span>
+        </div>
+
+        <div class="field">
+          <label>Descrição (opcional)</label>
+          <textarea class="input" placeholder="Conte o que aconteceu para ajudar outros passageiros..."></textarea>
+        </div>
+
+        <div class="grid-2">
+          <div class="field"><label>Local</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="pin"></span><input class="input has-lead" value="Parada W3 Sul — 502"></div></div>
+          <div class="field"><label>Horário</label>
+            <div class="input-wrap"><span class="lead ico ico-sm" data-i="clock"></span><input class="input has-lead" value="Agora (08:42)"></div></div>
+        </div>
+
+        <label class="checkbox" style="margin:6px 0 22px"><input type="checkbox"> <span class="flex items-center gap-8"><span class="ico ico-sm" data-i="camera"></span> Anexar foto da situação</span></label>
+
+        <div class="note note-info" style="margin-bottom:22px">
+          <span class="ico" data-i="shield"></span>
+          <span>Reportes são anônimos para outros usuários e validados por cruzamento. Falsos reportes podem ser penalizados.</span>
+        </div>
+
+        <div class="flex gap-12">
+          <a href="ocorrencias.html" class="btn btn-ghost" style="flex:1">Cancelar</a>
+          <button type="submit" class="btn btn-primary" style="flex:2"><span class="ico ico-sm" data-i="send"></span> Enviar reporte</button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
