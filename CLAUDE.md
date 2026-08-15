@@ -8,6 +8,8 @@ Este arquivo fornece orientação ao Claude Code ao trabalhar com este repositó
 
 **Fonte de verdade:** `AGENT.md` — stack, time, arquitetura, próximos passos.
 
+**Manual completo do ciclo (backlog → deploy), explicando o porquê de cada etapa:** `docs/manual-sprint.md`.
+
 ## Idioma
 
 Todo o conteúdo em **Português (PT-BR)**. Commits podem ser em inglês ou PT-BR (Conventional Commits).
