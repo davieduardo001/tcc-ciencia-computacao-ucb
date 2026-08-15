@@ -99,6 +99,9 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 | **Conventional Commits** | `feat:`, `fix:`, `docs:`, `test:`, etc. |
 | **Sem Co-Authored-By** | Commits são apenas do desenvolvedor |
 | **1 US por pessoa** | Cada membro pega 1 US por sprint |
+| **Aprovação = botão Approve** | Comentário no PR não conta — só review formal via "Review changes" |
+
+Regras de como agentes de IA devem operar nesse workflow (bypass, verificação, autoria): `docs/boas-praticas-ia.md`.
 
 ### Critérios DOR (Definitivamente Pronto para Desenvolvimento)
 

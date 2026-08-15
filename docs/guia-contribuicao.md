@@ -182,6 +182,8 @@ commit             →  tipo: descrição curta no imperativo (max 72 chars)
 | **Delete branch** | Branches feature são deletadas após merge |
 | **No force push** | Nunca fazer force push em branches protegidas |
 
+> **Atenção:** um comentário de texto no PR (ex.: "revisado", "ok pra mim") **não é aprovação**. Só conta o que for submetido via botão **"Review changes" → "Approve"**, na aba "Files changed". Verifique com `gh pr view <N> --json reviewDecision` antes de considerar um PR aprovado.
+
 ### Fluxo Completo
 
 ```
