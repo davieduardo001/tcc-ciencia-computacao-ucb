@@ -10,6 +10,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Importar Base dos models para autogenerate
 from models.base import Base
 
+# Importar todos os models para autogenerate
+from gateway.models import TestLog
+from auth.models import TestUser
+from mobilidade.models import TestLinha
+from colaboracao.models import TestReporte
+
 config = context.config
 
 # Usar variável de ambiente DATABASE_URL se disponível
