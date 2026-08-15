@@ -104,25 +104,26 @@ jobs:
             exit 0
           fi
           
-          # Pegar commits do PR
-          COMMITS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/commits --jq '.[].commit.message')
-          
+          # Pegar apenas a primeira linha (subject) de cada commit do PR
+          SUBJECTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/commits --jq '.[].commit.message | split("\n")[0]')
+
           echo "Commits encontrados:"
-          echo "$COMMITS"
+          echo "$SUBJECTS"
           echo ""
-          
-          # Validar cada commit
+
+          # Validar cada commit (ignorando merge commits)
           INVALID=0
-          while IFS= read -r commit; do
-            # Pular linhas vazias
-            [ -z "$commit" ] && continue
-            
+          while IFS= read -r subject; do
+            # Pular linhas vazias e merge commits
+            [ -z "$subject" ] && continue
+            [[ "$subject" == Merge\ * ]] && continue
+
             # Verificar se segue Conventional Commits
-            if ! echo "$commit" | grep -qE '^(feat|fix|docs|style|refactor|chore|test|perf|ci|build|revert)(\(.+\))?: .{1,72}'; then
-              echo "❌ Commit inválido: $commit"
+            if ! echo "$subject" | grep -qE '^(feat|fix|docs|style|refactor|chore|test|perf|ci|build|revert)(\(.+\))?: .{1,72}'; then
+              echo "❌ Commit inválido: $subject"
               INVALID=1
             fi
-          done <<< "$COMMITS"
+          done <<< "$SUBJECTS"
           
           if [ $INVALID -eq 1 ]; then
             echo ""
