@@ -91,6 +91,7 @@ Quando um plano de arquitetura/deploy (seja escrito por outra sessão de IA ou p
 
 ## Referências
 
+- `docs/workflow-passo-a-passo.md` — o "como fazer" na prática, checklist do ciclo completo
 - `docs/guia-contribuicao.md` — gitflow e Conventional Commits
 - `AGENT.md` — arquitetura e workflow de sprint
 - `docs/relato-deploy-sprint0.md` — estudo de caso completo de onde essas regras vieram

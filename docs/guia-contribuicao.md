@@ -2,6 +2,8 @@
 
 Boas-vindas ao repositório do Movecity! Este guia define as convenções de branches e commits que toda a equipe deve seguir para manter o histórico organizado e o fluxo de desenvolvimento previsível.
 
+> Procurando o passo a passo prático de ponta a ponta (branch → PR → review → deploy)? Veja `docs/workflow-passo-a-passo.md`.
+
 ---
 
 ## Fluxo de Branches
