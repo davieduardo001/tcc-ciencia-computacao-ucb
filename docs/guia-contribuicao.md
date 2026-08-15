@@ -2,6 +2,8 @@
 
 Boas-vindas ao repositório do Movecity! Este guia define as convenções de branches e commits que toda a equipe deve seguir para manter o histórico organizado e o fluxo de desenvolvimento previsível.
 
+> Procurando o passo a passo prático de ponta a ponta (branch → PR → review → deploy)? Veja `docs/workflow-passo-a-passo.md`.
+
 ---
 
 ## Fluxo de Branches
@@ -181,6 +183,8 @@ commit             →  tipo: descrição curta no imperativo (max 72 chars)
 | **Squash merge** | Para `feat/*` e `fix/*` — mantém histórico limpo |
 | **Delete branch** | Branches feature são deletadas após merge |
 | **No force push** | Nunca fazer force push em branches protegidas |
+
+> **Atenção:** um comentário de texto no PR (ex.: "revisado", "ok pra mim") **não é aprovação**. Só conta o que for submetido via botão **"Review changes" → "Approve"**, na aba "Files changed". Verifique com `gh pr view <N> --json reviewDecision` antes de considerar um PR aprovado.
 
 ### Fluxo Completo
 

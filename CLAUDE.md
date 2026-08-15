@@ -8,6 +8,8 @@ Este arquivo fornece orientação ao Claude Code ao trabalhar com este repositó
 
 **Fonte de verdade:** `AGENT.md` — stack, time, arquitetura, próximos passos.
 
+**Manual completo do ciclo (backlog → deploy), explicando o porquê de cada etapa:** `docs/manual-sprint.md`.
+
 ## Idioma
 
 Todo o conteúdo em **Português (PT-BR)**. Commits podem ser em inglês ou PT-BR (Conventional Commits).
@@ -15,8 +17,9 @@ Todo o conteúdo em **Português (PT-BR)**. Commits podem ser em inglês ou PT-B
 ## Regras Obrigatórias
 
 - **NUNCA** commitar direto em `main` ou `homolog` sem confirmar com o usuário.
-- **NUNCA** incluir `Co-Authored-By` ou assinatura de agente/IA nos commits.
+- **NUNCA** incluir `Co-Authored-By` ou assinatura de agente/IA nos commits, PRs ou comentários de issue.
 - Mudanças em `docs/` e `src/` devem ser commits separados, salvo interdependência estrita.
+- Regras completas de como a IA deve operar no workflow (bypass de branch protection, o que conta como aprovação de PR, verificação antes de declarar algo pronto): `docs/boas-praticas-ia.md`.
 
 ## Fluxo de Branches
 
