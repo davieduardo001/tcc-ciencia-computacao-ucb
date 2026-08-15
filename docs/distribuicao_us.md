@@ -6,12 +6,16 @@
 
 ## @davieduardo001 — Orquestração e Gerenciamento
 
-| # | Responsabilidade |
+| # | Responsabilidade / User Story |
 |---|---|
 | — | Gerenciamento de backlog e priorização |
 | — | Orquestração da equipe e cerimônias |
 | — | Revisão de PRs e merge nas branches principais |
 | — | Manutenção da documentação arquitetural |
+| #31 | Gerenciar Ciclo de Vida da Sessão |
+| #34 | Documento de Arquitetura de Software |
+| #12 | Login via Provedor Social (Google) |
+| #17 | Visualizar Trajeto e Paradas da Linha no Mapa |
 
 ---
 
@@ -19,23 +23,20 @@
 
 | # | User Story |
 |---|---|
+| #32 | Criar Termos de Uso e Política de Privacidade |
 | #10 | Realizar Login com E-mail e Senha |
 | #11 | Criar Nova Conta de Usuário |
-| #12 | Login via Provedor Social (Google) |
 | #13 | Recuperação de Senha (Esqueci minha senha) |
-| #31 | Gerenciar Ciclo de Vida da Sessão |
 
 ---
 
-## @Kelvin963 — Épico Mapa & Rastreamento — Núcleo + Arquitetura (5 itens)
+## @Kelvin963 — Épico Mapa & Rastreamento — Núcleo (3 USs)
 
 | # | User Story |
 |---|---|
-| #9  | Criação de arquitetura inicial do sistema |
 | #14 | Visualizar Mapa com Localização Atual |
 | #15 | Buscar Linha por Número |
 | #16 | Rastrear Posição do Ônibus em Tempo Real |
-| #17 | Visualizar Trajeto e Paradas da Linha no Mapa |
 
 ---
 
@@ -71,7 +72,6 @@
 | #27 | Receber Alerta de Atraso na Linha Acompanhada |
 | #28 | Receber Alerta de Cancelamento de Viagem |
 | #29 | Gerenciar Preferências de Notificação |
-| #32 | Criar Termos de Uso e Política de Privacidade |
 | #33 | Criação do Protótipo — telas de Autenticação e Onboarding |
 
 ---
@@ -80,9 +80,9 @@
 
 | Responsável | Escopo | Qtd |
 |---|---|---|
-| @davieduardo001 | Orquestração + Backlog | — |
+| @davieduardo001 | Orquestração + Backlog + #31 + #34 | — |
 | @brenouchihar | Autenticação | 5 |
-| @Kelvin963 | Mapa & Rastreamento (núcleo) | 5 |
+| @Kelvin963 | Mapa & Rastreamento (núcleo) | 3 |
 | @louisassis | Mapa & Rastreamento (detalhes) | 4 |
 | @Vitoria-Albuquerque | Colaboração (reporte) + Protótipo (#33) | 5 + protótipo |
 | @gualbertonathalia | Colaboração (alertas) + Termos + Protótipo (#33) | 5 + protótipo |
@@ -90,14 +90,14 @@
 
 ---
 
-## Pendências e Lembretes
+## Diagramas de Sequência — Leitura Obrigatória
 
-### Assignees
-- [x] Confirmar GitHub da Nathalia → @gualbertonathalia
-- [ ] Adicionar Vitória e Nathalia como assignees na #33 (protótipo)
+> **Prazo de planejamento: 19/06/2026.** O desenvolvimento de código acontecerá no próximo semestre. Até lá, cada membro deve estudar e compreender o diagrama de sequência da(s) sua(s) issue(s) — ele descreve exatamente como o sistema se comporta por dentro para atender àquela funcionalidade.
 
-### Fluxogramas nas Issues
-- Algumas issues já têm fluxograma nos comentários
-- **Ação (feita pelo Davi):** apagar os comentários existentes e anexar os fluxogramas neste documento, para que cada membro re-adicione o fluxograma correspondente nas próprias issues
-- **Cada membro deve:** estudar todas as USs atribuídas ao seu nome, re-adicionar os fluxogramas nas issues correspondentes e se familiarizar com os fluxos antes de iniciar o desenvolvimento
+### Como visualizar o diagrama
 
+Os arquivos `.puml` de cada issue estão no repositório:
+**[docs/diagramas/sequencia/](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/tree/main/docs/diagramas/sequencia)**
+
+Para visualizar, abra o arquivo correspondente à sua issue, copie o conteúdo e cole no renderizador online (BAIXE O ARQUIVO E ADICIONE AOS COMENTÁRIOS!!!):
+**[https://www.plantuml.com/plantuml/uml/](https://www.plantuml.com/plantuml/uml/)**

@@ -1,0 +1,84 @@
+@startuml UC10_RealizarLogin
+hide footbox
+title Diagrama de Sequencia - Realizar Login com E-mail e Senha (US #10)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaLogin" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloUsuario" as User <<modelo>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+
+Passageiro -> View : informarCredenciais(email, senha)
+activate View
+
+View -> View : validarFormato(email, senha)
+
+alt campos validos
+    View -> Gateway : requisicaoLogin(email, senha)
+    activate Gateway
+
+    Gateway -> Auth : autenticar(email, senha)
+    activate Auth
+
+    Auth -> User : buscarPorEmail(email)
+    activate User
+    
+    alt usuario encontrado
+        User --> Auth : dadosUsuario(id, hashSenha, status)
+        deactivate User
+
+        Auth -> Auth : verificarHashSenha(senha, hashSenha)
+
+        alt senha correta e conta ativa
+            Auth -> Sessao : criarSessao(usuarioId)
+            activate Sessao
+            Sessao --> Auth : tokens(accessToken, refreshToken)
+            deactivate Sessao
+            
+            Auth --> Gateway : autenticado(tokens)
+            Gateway --> View : retornarResposta(tokens)
+            
+            View -> View : armazenarTokensLocalmente(tokens)
+            View -> View : redirecionarParaMapa()
+
+        else senha incorreta
+            Auth -> Auth : registrarTentativaFalha(usuarioId)
+            alt limite de tentativas excedido
+                Auth -> User : bloquearContaTemporariamente(usuarioId)
+                activate User
+                User --> Auth : contaBloqueada()
+                deactivate User
+                Auth --> Gateway : erroAutenticacao(contaBloqueada)
+                Gateway --> View : retornarResposta(contaBloqueada)
+                View -> View : exibirMensagemBloqueio()
+            else
+                Auth --> Gateway : erroAutenticacao(senhaInvalida)
+                deactivate Auth
+                Gateway --> View : retornarResposta(senhaInvalida)
+                View -> View : exibirMensagemErro("Usuario ou senha invalidos")
+            end
+
+        else conta inativa ou suspensa
+            Auth --> Gateway : erroAutenticacao(contaInativa)
+            Gateway --> View : retornarResposta(contaInativa)
+            View -> View : exibirMensagemErro("Conta inativa. Verifique seu e-mail.")
+        end
+
+    else usuario nao encontrado
+        User --> Auth : inexistente()
+        deactivate User
+        Auth --> Gateway : erroAutenticacao(usuarioInexistente)
+        Gateway --> View : retornarResposta(usuarioInexistente)
+        View -> View : exibirMensagemErro("Usuario ou senha invalidos")
+    end
+
+    deactivate Gateway
+
+else campos invalidos
+    View -> View : exibirErrosValidacao()
+end
+
+deactivate View
+@enduml

@@ -148,3 +148,63 @@ docs/configuração  →  git checkout main && git checkout -b docs/nome
 
 commit             →  tipo: descrição curta no imperativo (max 72 chars)
 ```
+
+---
+
+## Boas Práticas Adicionais
+
+### Antes de abrir PR
+
+1. **Rebase em homolog** antes de subir:
+   ```bash
+   git fetch origin homolog
+   git rebase origin/homolog
+   ```
+
+2. **Verificar se testes passam** localmente:
+   ```bash
+   # Backend
+   cd src/backend && pytest -v
+   
+   # Frontend
+   cd src/frontend && npm test
+   ```
+
+3. **Usar o PR template** — o GitHub preenche automaticamente ao criar o PR
+
+### Regras de Merge
+
+| Regra | Detalhe |
+|-------|---------|
+| **1 approval mínimo** | Branch `main` e `homolog` requerem 1 aprovação |
+| **Status checks** | CI deve passar (testes + lint) |
+| **Squash merge** | Para `feat/*` e `fix/*` — mantém histórico limpo |
+| **Delete branch** | Branches feature são deletadas após merge |
+| **No force push** | Nunca fazer force push em branches protegidas |
+
+### Fluxo Completo
+
+```
+1. git checkout homolog && git pull
+2. git checkout -b feat/issue-XX-nome
+3. Desenvolver + testar
+4. git add . && git commit -m "feat: descricao"
+5. git fetch origin homolog && git rebase origin/homolog
+6. git push -u origin feat/issue-XX-nome
+7. Abrir PR: feat/XX → homolog
+8. Aguardar review + CI passar
+9. Merge (squash) → homolog
+10. Abrir PR: homolog → main
+11. Merge → main → deploy automático
+```
+
+### O que NÃO fazer
+
+| ❌ Não faça | ✅ Faça isso |
+|-------------|--------------|
+| Commit direto em `main` | Sempre criar branch |
+| Merge sem approval | Aguardar 1 reviewer aprovar |
+| Force push em branch protegida | Usar commits normais |
+| Incluir `Co-Authored-By` | Apenas seu nome |
+| PR gigante com tudo junto | PRs pequenos e atômicos |
+| Branch desatualizada | Rebase antes de subir |

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "project": "Movecity — Mobilidade Urbana Colaborativa no DF",
+  "default_agent": "build",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "description": "Agente padrão para desenvolvimento com todas as ferramentas habilitadas.",
+      "permission": {
+        "read": "allow",
+        "edit": "allow",
+        "bash": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "ask",
+        "websearch": "ask",
+        "task": "allow",
+        "skill": "allow"
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "description": "Agente de planejamento — apenas leitura e análise, sem alterações.",
+      "permission": {
+        "read": "allow",
+        "edit": "deny",
+        "bash": "ask",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "task": "allow",
+        "skill": "allow"
+      }
+    },
+    "backend": {
+      "mode": "subagent",
+      "description": "Desenvolvimento backend FastAPI — endpoints, modelos, testes.",
+      "file": ".opencode/agents/backend.md"
+    },
+    "frontend": {
+      "mode": "subagent",
+      "description": "Desenvolvimento frontend Next.js — telas, componentes, integração.",
+      "file": ".opencode/agents/frontend.md"
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Review de código — apenas analisa e comenta, NUNCA faz alterações ou merge.",
+      "file": ".opencode/agents/reviewer.md"
+    },
+    "tester": {
+      "mode": "subagent",
+      "description": "Criação e execução de testes unitários (pytest/Jest).",
+      "file": ".opencode/agents/tester.md"
+    }
+  },
+  "permission": {
+    "skill": {
+      "*": "allow"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "movecity-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.4.1",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5"
+  }
+}

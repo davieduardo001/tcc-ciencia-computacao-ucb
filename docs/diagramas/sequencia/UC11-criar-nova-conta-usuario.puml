@@ -1,0 +1,66 @@
+@startuml UC11_CriarConta
+hide footbox
+title Diagrama de Sequencia - Criar Nova Conta de Usuário (US #11)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaRegistro" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloUsuario" as User <<modelo>>
+participant ":ServicoEmail" as Email <<servico externo>>
+
+Passageiro -> View : informarDadosRegistro(nome, email, senha, termosAceitos)
+activate View
+
+View -> View : validarDados(nome, email, senha, termosAceitos)
+
+alt dados validos e termos aceitos
+    View -> Gateway : requisicaoRegistro(nome, email, senha)
+    activate Gateway
+
+    Gateway -> Auth : registrarUsuario(nome, email, senha)
+    activate Auth
+
+    Auth -> User : verificarEmailExistente(email)
+    activate User
+    
+    alt email disponivel
+        User --> Auth : emailLivre
+        deactivate User
+
+        Auth -> User : criarNovoUsuario(nome, email, hashSenha(senha))
+        activate User
+        User --> Auth : usuarioCriado(id)
+        deactivate User
+
+        Auth -> Email : enviarEmailConfirmacao(email, tokenConfirmacao)
+        activate Email
+        Email --> Auth : e-mailEnviado
+        deactivate Email
+
+        Auth --> Gateway : registroConcluido()
+        deactivate Auth
+        Gateway --> View : retornarResposta(sucesso)
+        View -> View : exibirMensagemSucesso("Verifique seu e-mail para confirmar a conta.")
+        View -> View : redirecionarParaLogin()
+
+    else email ja cadastrado
+        User --> Auth : emailEmUso
+        deactivate User
+        Auth --> Gateway : erroRegistro(emailDuplicado)
+        Gateway --> View : retornarResposta(emailDuplicado)
+        View -> View : exibirErroCampoEmail("Este e-mail ja esta em uso.")
+    end
+
+    deactivate Gateway
+
+else termos nao aceitos
+    View -> View : exibirAvisoLGPD("Voce deve aceitar os termos de uso.")
+
+else dados invalidos (senha fraca, etc.)
+    View -> View : exibirErrosValidacao()
+end
+
+deactivate View
+@enduml

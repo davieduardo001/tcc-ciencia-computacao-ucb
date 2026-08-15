@@ -1,0 +1,102 @@
+@startuml UC13_RecuperacaoSenha
+hide footbox
+title Diagrama de Sequencia - Recuperação de Senha (US #13)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaEsqueciSenha" as ViewSol <<interface usuario>>
+participant ":TelaRedefinirSenha" as ViewRedef <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloUsuario" as User <<modelo>>
+participant ":ServicoEmail" as Email <<servico externo>>
+
+== Fase 1: Solicitacao de Reset ==
+
+Passageiro -> ViewSol : informarEmail(email)
+activate ViewSol
+
+ViewSol -> Gateway : requisicaoResetSenha(email)
+activate Gateway
+
+Gateway -> Auth : processarSolicitacaoReset(email)
+activate Auth
+
+Auth -> Auth : verificarRateLimit(email)
+
+alt dentro do limite
+    Auth -> User : buscarPorEmail(email)
+    activate User
+    
+    alt usuario existe
+        User --> Auth : dadosUsuario(id, nome)
+        deactivate User
+        Auth -> Auth : gerarTokenTemporario(id, TTL: 1h)
+        Auth -> Email : enviarEmailReset(email, token)
+        activate Email
+        Email --> Auth : e-mailEnviado
+        deactivate Email
+    else usuario nao existe
+        User --> Auth : inexistente()
+        deactivate User
+        Auth -> Auth : simularAtrasoProcessamento()
+    end
+
+    Auth --> Gateway : solicitacaoProcessada()
+    deactivate Auth
+    Gateway --> ViewSol : retornarResposta(sucessoGenerico)
+    ViewSol -> ViewSol : exibirMensagem("Se o e-mail estiver cadastrado, voce recebera um link.")
+
+else limite excedido
+    Auth --> Gateway : erroRateLimit()
+    Gateway --> ViewSol : retornarResposta(erroRateLimit)
+    ViewSol -> ViewSol : exibirAvisoMuitasTentativas()
+end
+
+deactivate Gateway
+deactivate ViewSol
+
+== Fase 2: Redefinicao de Senha ==
+
+Passageiro -> ViewRedef : acessarLinkComToken(token)
+activate ViewRedef
+
+ViewRedef -> Gateway : validarTokenReset(token)
+activate Gateway
+Gateway -> Auth : verificarToken(token)
+activate Auth
+
+alt token valido
+    Auth --> Gateway : tokenValido(usuarioId)
+    deactivate Auth
+    Gateway --> ViewRedef : retornarResposta(valido)
+    ViewRedef -> ViewRedef : exibirCamposNovaSenha()
+
+    Passageiro -> ViewRedef : informarNovaSenha(senha, confirmacao)
+    ViewRedef -> ViewRedef : validarSenhasIguais(senha, confirmacao)
+
+    ViewRedef -> Gateway : atualizarSenha(token, novaSenha)
+    activate Gateway
+    Gateway -> Auth : redefinirSenha(token, novaSenha)
+    activate Auth
+    Auth -> User : atualizarSenha(usuarioId, hash(novaSenha))
+    activate User
+    User --> Auth : senhaAtualizada
+    deactivate User
+    Auth -> Auth : invalidarToken(token)
+    Auth --> Gateway : senhaRedefinida()
+    deactivate Auth
+    Gateway --> ViewRedef : retornarResposta(sucesso)
+    ViewRedef -> ViewRedef : exibirConfirmacaoSucesso()
+    ViewRedef -> ViewRedef : redirecionarParaLogin()
+
+else token expirado ou invalido
+    Auth --> Gateway : tokenInvalido()
+    deactivate Auth
+    Gateway --> ViewRedef : retornarResposta(erroToken)
+    ViewRedef -> ViewRedef : exibirErro("Este link nao e mais valido ou expirou.")
+end
+
+deactivate Gateway
+deactivate ViewRedef
+@enduml

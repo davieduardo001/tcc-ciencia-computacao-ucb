@@ -72,6 +72,66 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 
 ---
 
+## Workflow de Desenvolvimento (Sprint)
+
+### Fluxo Completo
+
+```
+1. Planning       →  Selecionar USs do Sprint Backlog (1 US por pessoa mín.)
+       ↓
+2. Desenvolvimento →  Usar opencode (skills + agentes)
+       ↓
+3. PR              →  Abrir PR com testes + checklist preenchido
+       ↓
+4. Review          →  1 reviewer aprova (OBRIGATÓRIO)
+       ↓
+5. Homologação     →  Merge para homolog → deploy automático (Vercel)
+       ↓
+6. Produção        →  Merge homolog → main → deploy (Vercel + Fly.io)
+```
+
+### Regras Críticas
+
+| Regra | Detalhe |
+|-------|---------|
+| **PR requer aprovação** | 1 reviewer mínimo antes do merge. Sem exceção. |
+| **Nunca commitar direto** | `main` e `homolog` são protegidos |
+| **Conventional Commits** | `feat:`, `fix:`, `docs:`, `test:`, etc. |
+| **Sem Co-Authored-By** | Commits são apenas do desenvolvedor |
+| **1 US por pessoa** | Cada membro pega 1 US por sprint |
+
+### Critérios DOR (Definitivamente Pronto para Desenvolvimento)
+
+- [ ] PRD e SPEC documentados
+- [ ] Critérios de aceite definidos
+- [ ] Estimativa de complexidade
+- [ ] Dependências mapeadas
+- [ ] Diagrama de sequência disponível
+
+### Agentes e Skills (opencode)
+
+| Agente | Uso |
+|--------|-----|
+| `build` | Desenvolvimento padrão (todas as ferramentas) |
+| `plan` | Planejamento e análise (sem alterações) |
+| `backend` | FastAPI, modelos, endpoints |
+| `frontend` | Next.js, React, telas |
+| `reviewer` | Review de código (read-only) |
+| `tester` | Testes unitários (pytest/Jest) |
+| `dev-environment` | Infra local: Docker, migrations, dependências |
+
+| Skill | Uso |
+|-------|-----|
+| `desenvolver-us-backend` | Guia completo para dev backend |
+| `desenvolver-us-frontend` | Guia completo para dev frontend |
+| `criar-testes` | Criar testes unitários |
+| `review-pr` | Checklist de review de PR |
+| `criar-diagrama` | Criar diagramas PlantUML |
+
+Documentação completa: `docs/boas-praticas-opencode.md`
+
+---
+
 ## Próximos Passos
 
 1. Adicionar @gualbertonathalia como colaboradora no repositório
