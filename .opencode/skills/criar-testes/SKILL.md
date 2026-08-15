@@ -97,3 +97,13 @@ npm test
 | Cobertura | Testar cenário principal + alternativos |
 | Isolamento | Testes não devem depender de outros |
 | Nomes | Descritivos: `test_[acao]_[cenario]` |
+
+## Vincular à Issue
+
+Testes não têm vínculo automático com a issue no GitHub — o vínculo é manual, via comentário.
+
+Depois de criar e rodar os testes localmente com sucesso, comentar na issue da US:
+
+> "Testes adicionados: [lista dos arquivos/serviços]. Rodando localmente: [N] passed."
+
+Isso é além (não substitui) do comentário de PR aberto descrito em `desenvolver-us-backend` (passo 9) e do comentário de review descrito em `review-pr` (passo 4).
