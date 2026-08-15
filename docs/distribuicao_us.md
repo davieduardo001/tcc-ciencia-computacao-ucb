@@ -19,7 +19,7 @@
 
 ---
 
-## @brenouchihar — Épico Autenticação (4 USs)
+## @brenouchihar — Épico Autenticação (5 USs)
 
 | # | User Story |
 |---|---|
@@ -30,11 +30,10 @@
 
 ---
 
-## @Kelvin963 — Épico Mapa & Rastreamento — Núcleo (4 USs)
+## @Kelvin963 — Épico Mapa & Rastreamento — Núcleo (3 USs)
 
 | # | User Story |
 |---|---|
-| #32 | Criar Termos de Uso e Política de Privacidade |
 | #14 | Visualizar Mapa com Localização Atual |
 | #15 | Buscar Linha por Número |
 | #16 | Rastrear Posição do Ônibus em Tempo Real |
@@ -82,8 +81,8 @@
 | Responsável | Escopo | Qtd |
 |---|---|---|
 | @davieduardo001 | Orquestração + Backlog + #31 + #34 | — |
-| @brenouchihar | Autenticação | 4 |
-| @Kelvin963 | Mapa & Rastreamento (núcleo) | 4 |
+| @brenouchihar | Autenticação | 5 |
+| @Kelvin963 | Mapa & Rastreamento (núcleo) | 3 |
 | @louisassis | Mapa & Rastreamento (detalhes) | 4 |
 | @Vitoria-Albuquerque | Colaboração (reporte) + Protótipo (#33) | 5 + protótipo |
 | @gualbertonathalia | Colaboração (alertas) + Termos + Protótipo (#33) | 5 + protótipo |
