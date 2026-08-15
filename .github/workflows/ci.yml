@@ -3,9 +3,6 @@ name: CI — Testes no PR
 on:
   pull_request:
     branches: [homolog, main]
-    paths:
-      - "src/**"
-      - ".github/workflows/ci.yml"
 
   workflow_dispatch:
 
