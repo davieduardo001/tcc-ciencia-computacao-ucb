@@ -160,9 +160,25 @@ Passo a passo prático de deploy: `docs/workflow-passo-a-passo.md`, seções 6�
 
 ---
 
-## 9. Fechando o ciclo
+## 9. Fechando o ciclo: DoD (Definition of Done)
 
-- Issue comentada com o resultado (PR mergeado, rodando em produção).
+Assim como existe DoR pra uma US **entrar** em desenvolvimento (seção 3), existe DoD pra ela **sair** — em 2 níveis, porque a promoção pra `main` costuma acontecer em lote (várias USs de uma vez no fim da sprint), não uma a uma:
+
+**DoD-Sprint** (conta como feita na sprint):
+- [ ] PR mergeado em `homolog` (aprovação formal + CI verde)
+- [ ] Critérios de aceite (BDD) validados em homolog
+- [ ] Comentário na issue registrando o resultado
+
+**DoD-Release** (conta como entregue de verdade):
+- [ ] PR `homolog` → `main` aprovado e mergeado
+- [ ] Validado em produção (endpoint/tela real, não suposição)
+- [ ] Issue fechada
+- [ ] Documentação atualizada, se a US alterou algo documentado
+
+Isso é **obrigatório**, não opcional — está em `AGENT.md`, seção "Critérios DOD", e as skills `desenvolver-us-backend`/`desenvolver-us-frontend` (OpenCode) já incluem o passo de comentar cada nível na issue.
+
+Outros pontos de fechamento:
+
 - Se algo saiu diferente do planejado (débito técnico consciente, divergência de plano), isso é **documentado**, não escondido — vira uma issue de acompanhamento se representar risco antes de dado real de usuário (exemplo real: issue #42).
 - Card de sprint atualizado (checklist de `docs/templates/template-card-sprint.md`).
 - Próxima sprint: repete o ciclo a partir da seção 3.

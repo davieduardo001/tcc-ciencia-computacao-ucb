@@ -111,6 +111,21 @@ Regras de como agentes de IA devem operar nesse workflow (bypass, verificação,
 - [ ] Dependências mapeadas
 - [ ] Diagrama de sequência disponível
 
+### Critérios DOD (Definition of Done) — obrigatório, 2 níveis
+
+Uma US **não fecha** sem passar pelos dois níveis. Promoção pra `main` pode acontecer em lote (várias USs de uma vez), então o nível de sprint é o que garante que a US está genuinamente terminada antes do release.
+
+**DoD-Sprint** (conta como feita na sprint):
+- [ ] PR mergeado em `homolog` (aprovação formal + CI verde)
+- [ ] Critérios de aceite (cenários BDD) validados em homolog
+- [ ] Comentário na issue com o resultado
+
+**DoD-Release** (conta como entregue de verdade):
+- [ ] PR homolog → main aprovado e mergeado
+- [ ] Validado em produção (endpoint/tela real, não suposição)
+- [ ] Issue fechada
+- [ ] Documentação atualizada, se a US alterou algo documentado (arquitetura, setup, etc.)
+
 ### Agentes e Skills (opencode)
 
 | Agente | Uso |
