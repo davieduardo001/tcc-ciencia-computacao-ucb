@@ -18,17 +18,19 @@ chore/configuracao             ──────► main  (direto)
 
 ## Instruções
 
-1. Execute `git branch` para listar as branches existentes e identificar a branch atual.
-2. Apresente ao usuário a lista de branches ativas e pergunte:
+1. **Verificação de Estado:** Execute `git branch` para listar as branches existentes e identificar a branch atual.
+2. **Consulta ao Usuário:** Apresente a lista de branches ativas e pergunte:
    - "Deseja criar uma nova branch? Qual o tipo (feat/fix/docs/chore)?"
    - "Deseja commitar em uma das branches existentes? (Liste-as)"
    - "Deseja continuar na branch atual `[nome da branch]`?"
-3. Se o usuário optar por uma nova branch, sugira um nome seguindo o padrão e crie a partir da base correta:
+3. **Criação de Branch:** Sugira nome seguindo o padrão e crie a partir da base correta:
    - `feat/nome` ou `fix/nome` → base: `homolog`
    - `docs/nome` ou `chore/nome` → base: `main`
-4. Só proceda com o commit após a definição da branch de destino.
-5. Ao finalizar, oriente o merge conforme o tipo da branch.
-6. Toda a interação deve ser em **Português (PT-BR)**.
+4. **Execução:** Só proceda com o commit após a definição da branch de destino.
+5. **Orientação de merge:** Ao finalizar, oriente conforme o tipo:
+   - `feat/` ou `fix/`: merge em `homolog`, depois `homolog` → `main`
+   - `docs/` ou `chore/`: merge direto em `main`
+6. **Idioma:** Toda a interação com o usuário deve ser em **Português (PT-BR)**.
 
 ## Comandos úteis
 
