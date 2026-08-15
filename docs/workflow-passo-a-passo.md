@@ -1,197 +1,173 @@
-# Workflow Movecity — Passo a Passo
+# Workflow Movecity — Passo a Passo (com Agente de IA)
 
-Manual prático de como executar o ciclo completo de desenvolvimento no Movecity, do início de uma User Story até ela estar rodando em produção. É o "como fazer" — as regras e o porquê de cada uma estão em `docs/guia-contribuicao.md` (gitflow/commits) e `docs/boas-praticas-ia.md` (uso de IA no processo). Um estudo de caso real disso tudo acontecendo está em `docs/relato-deploy-sprint0.md`.
+Manual prático de como executar o ciclo completo de desenvolvimento no Movecity **usando um agente de IA** (Claude Code ou OpenCode) — do clone do repositório até a US rodando em produção. O trabalho é agêntico: você não digita `git`/`gh` na mão, você diz pro agente o que precisa e confere o que ele fez.
 
-Use este documento como checklist toda vez que for pegar uma US ou corrigir um bug.
-
----
-
-## Visão geral do ciclo
-
-```
-1. Criar branch (a partir de homolog, pra feat/fix)
-2. Desenvolver + testar local
-3. Commit (Conventional Commits)
-4. Push + abrir PR para homolog
-5. CI roda automaticamente
-6. Pedir review → aprovação formal
-7. Merge para homolog → deploy automático de homologação
-8. Validar em homolog
-9. Abrir PR homolog → main
-10. Review + merge → deploy automático de produção
-11. Validar em produção + comentar na issue
-```
+As regras e o porquê de cada uma estão em `docs/guia-contribuicao.md` (gitflow/commits) e `docs/boas-praticas-ia.md` (o que o agente pode fazer sozinho vs. precisa de confirmação sua). Um estudo de caso real disso tudo acontecendo está em `docs/relato-deploy-sprint0.md`.
 
 ---
 
-## 1. Criar a branch
-
-Sempre a partir de `homolog` atualizado (`feat/`, `fix/`) ou `main` atualizado (`docs/`, `chore/`):
+## 0. Clonar o repositório e abrir o agente
 
 ```bash
-git checkout homolog
-git pull origin homolog
-git checkout -b feat/issue-[numero]-[nome-curto]
+git clone https://github.com/davieduardo001/tcc-ciencia-computacao-ucb.git
+cd tcc-ciencia-computacao-ucb
 ```
 
-Nomeação: kebab-case, sempre prefixado pelo tipo (`feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`). Detalhes: `docs/guia-contribuicao.md`.
+Abra o agente **de dentro dessa pasta** — o contexto do projeto (`CLAUDE.md`/`AGENT.md` pro Claude Code, `opencode.json`/`.opencode/` pro OpenCode) é carregado automaticamente porque ele lê os arquivos do repositório.
+
+| Ferramenta | Como abrir |
+|---|---|
+| Claude Code | `claude` no terminal |
+| OpenCode | `opencode` no terminal |
+
+Na primeira mensagem, o agente já sabe: quem é o time, qual sua US (se você disser o número), a arquitetura, as regras de commit/branch. Não precisa colar contexto — só pedir.
 
 ---
 
-## 2. Desenvolver e testar localmente
+## 1. Pegar uma US
 
-- Leia a issue da US e o diagrama de sequência correspondente antes de codar.
-- Implemente seguindo a estrutura de pastas do projeto.
-- Rode os testes **antes** de commitar:
+Fale com o agente:
 
-```bash
-# Backend
-cd src/backend && pytest -v
+> "Lê a issue #23 e me explica o que precisa ser feito."
 
-# Frontend
-cd src/frontend && npm test
-```
-
-Não abra PR com teste falhando local — o CI vai reprovar do mesmo jeito, só que mais devagar.
+Ele vai buscar a issue no GitHub (`gh issue view`), ler o diagrama de sequência correspondente em `docs/diagramas/sequencia/` e te devolver um resumo. É o momento de tirar dúvida antes de qualquer código ser escrito — no Claude Code, isso normalmente entra em modo de planejamento; no OpenCode, é o **Plan Mode**.
 
 ---
 
-## 3. Commitar
+## 2. Criar a branch
+
+> "Cria a branch pra US #23."
+
+O que o agente executa por baixo:
 
 ```bash
-git add <arquivos>
-git commit -m "feat: descricao curta no imperativo"
+git checkout homolog && git pull origin homolog
+git checkout -b feat/issue-23-reportar-ocorrencia
 ```
 
-- Um commit = uma intenção.
-- Máximo 72 caracteres na primeira linha.
-- Mudanças em `docs/` e `src/` em commits separados.
-- **Nunca** `Co-Authored-By` ou menção a ferramenta de IA.
+Confirme que o nome da branch bate com o padrão (`feat/issue-[numero]-[nome-curto]`) antes de seguir.
 
 ---
 
-## 4. Push e abrir o PR
+## 3. Implementar
+
+> "Implementa a US #23 seguindo o diagrama de sequência."
+
+O agente vai criar/editar os arquivos necessários (endpoints, models, componentes). **Revise o que ele fez antes de aprovar** — peça pra ele te mostrar o diff (`git diff`) ou explicar as mudanças se algo não ficou claro. Você é quem confirma que o código faz sentido, não só que "rodou".
+
+---
+
+## 4. Testar
+
+> "Roda os testes."
+
+O agente executa `pytest -v` (backend) e/ou `npm test` (frontend) e te mostra o resultado real — não aceite um "deve estar passando", peça o output.
+
+Se algo falhar, peça pra ele investigar e corrigir antes de seguir pro commit.
+
+---
+
+## 5. Commitar
+
+> "Commita seguindo Conventional Commits."
+
+O agente monta a mensagem (`feat:`, `fix:`, etc.), separa `docs/` de `src/` se for o caso, e **nunca** inclui `Co-Authored-By` ou menção a ferramenta de IA — isso é regra fixa, não precisa pedir.
+
+---
+
+## 6. Abrir o PR
+
+> "Sobe a branch e abre o PR pra homolog."
 
 ```bash
-git push -u origin feat/issue-[numero]-[nome-curto]
+git push -u origin feat/issue-23-reportar-ocorrencia
 gh pr create --base homolog --title "..." --body "..."
 ```
 
-Preencha o template do PR (checklist + "Closes #[numero]" se a US for fechada por esse PR).
+O agente preenche o template do PR e referencia a issue (`Closes #23`).
 
 [anexar imagem: tela de abertura de PR no GitHub com o template preenchido]
 
 ---
 
-## 5. Acompanhar o CI
+## 7. Acompanhar o CI
 
-O CI (`ci.yml`) dispara sozinho no PR: lint de commits, pytest, Jest. Acompanhe com:
+> "Acompanha o CI do PR e me avisa se passar ou falhar."
 
-```bash
-gh pr checks <numero>
-# ou, pra assistir em tempo real:
-gh run watch <run-id>
-```
-
-Se algo falhar, corrija e dê push de novo na mesma branch — o CI roda de novo automaticamente.
+O agente roda `gh pr checks`/`gh run watch` e reporta o resultado real, não assume. Se falhar, ele investiga a causa antes de propor correção — não sai chutando fix.
 
 [anexar imagem: aba "Checks" do PR com os 3 jobs verdes]
 
 ---
 
-## 6. Pedir review e obter aprovação formal
+## 8. Pedir review (humano) e confirmar aprovação
 
-Peça review a 1 pessoa do time (`gh pr edit <numero> --add-reviewer <usuario>` ajuda a formalizar o pedido).
+Review é etapa humana — peça pra 1 pessoa do time revisar o PR. Passe esse caminho pra quem for aprovar:
 
-**Importante:** só conta como aprovação o que for submetido pelo botão certo. Um comentário de texto ("revisado", "ok pra mim") não desbloqueia o merge.
+1. Abrir o PR → aba **"Files changed"** (não "Conversation")
+2. Rolar até o fim → **"Review changes"** → **"Approve"** → **"Submit review"**
 
-Caminho pra quem for aprovar:
-1. Abrir o PR
-2. Ir na aba **"Files changed"** (não em "Conversation")
-3. Rolar até o fim da página
-4. Clicar em **"Review changes"**
-5. Selecionar **"Approve"** → **"Submit review"**
+Um comentário de texto ("revisado", "ok") **não conta**. Depois, peça pro agente confirmar de verdade:
+
+> "Confirma se o PR #23 já foi aprovado formalmente."
+
+Ele checa `reviewDecision` via `gh pr view` — só segue se vier `APPROVED`.
 
 [anexar imagem: aba Files changed com o botão "Review changes" em destaque]
 
-[anexar imagem: dialog de review com a opção "Approve" selecionada]
-
-Confirme a aprovação formal antes de mergear:
-
-```bash
-gh pr view <numero> --json reviewDecision -q .reviewDecision
-# precisa retornar: APPROVED
-```
-
 ---
 
-## 7. Merge para homolog
+## 9. Merge para homolog
 
-Com CI verde e `reviewDecision: APPROVED`, mergeie (squash, pra manter o histórico limpo):
+> "Pode mergear o PR #23."
 
-```bash
-gh pr merge <numero> --squash
-```
+O agente **deve confirmar com você antes de mergear**, mesmo com CI verde e aprovação — isso é regra (`docs/boas-praticas-ia.md`). Ele nunca decide sozinho bypassar a branch protection; se isso for necessário, é decisão sua, explícita, registrada na issue.
 
-Isso dispara o deploy automático de homologação (frontend na Vercel, backend no Fly.io — se o PR tocou em `src/backend/**`).
+O merge dispara o deploy automático de homologação (Vercel + Fly.io, se tocou em `src/backend/**`).
 
 [anexar imagem: workflow de deploy rodando após o merge]
 
 ---
 
-## 8. Validar em homolog
+## 10. Validar em homolog
 
-Confirme que o que subiu funciona de verdade antes de prosseguir pra produção:
+> "Confirma que os endpoints da US #23 estão respondendo em homolog."
 
-```bash
-curl https://movecity-gateway.fly.dev/health
-# e os endpoints relevantes da sua US
-```
-
-Para o frontend, a Vercel gera uma URL de preview própria por branch — use ela pra validar visualmente.
+O agente valida de verdade (`curl`, não só "o deploy deve ter funcionado"). Para telas, use a URL de preview que a Vercel gera por branch.
 
 ---
 
-## 9. Abrir PR homolog → main
+## 11. PR homolog → main e produção
 
-Quando o conjunto de mudanças em `homolog` estiver validado e pronto pra ir pra produção:
+Mesmo ciclo dos passos 6 a 10, trocando a base do PR pra `main`:
 
-```bash
-gh pr create --base main --head homolog --title "..." --body "..."
-```
+> "Abre o PR de homolog pra main."
 
-Mesmas regras do passo 6: precisa de aprovação formal, CI precisa passar.
-
----
-
-## 10. Merge para main
-
-```bash
-gh pr merge <numero> --squash
-```
-
-Dispara o deploy automático de produção.
+Mesmas regras: CI verde, aprovação formal, confirmação sua antes do merge.
 
 [anexar imagem: os serviços respondendo em produção após o merge]
 
 ---
 
-## 11. Validar e fechar o ciclo
+## 12. Fechar o ciclo
 
-- Confirme os endpoints/telas em produção.
-- Comente na issue da US com o resultado (`"PR mergeado: [link]. Rodando em produção."`).
-- Se a issue não fechou automaticamente via "Closes #XX", feche manualmente.
+> "Comenta na issue #23 que foi pra produção."
+
+O agente comenta o resultado na issue (sem mencionar que uma IA fez o trabalho — só o resultado). Se a issue não fechou sozinha via "Closes #23", peça pra fechar manualmente.
 
 ---
 
 ## Checklist rápido
 
+- [ ] Repositório clonado, agente aberto de dentro da pasta
+- [ ] Issue e diagrama de sequência lidos antes de codar
 - [ ] Branch criada a partir da base certa
-- [ ] Testes passando local antes do commit
+- [ ] Código revisado por você, não só "rodou"
+- [ ] Testes passando local (output real, não suposição)
 - [ ] Commits seguem Conventional Commits, sem menção a IA
 - [ ] PR aberto com template preenchido
 - [ ] CI verde
 - [ ] Review **formal** (`reviewDecision: APPROVED`), não só comentário
-- [ ] Merge → validado em homolog
-- [ ] PR homolog → main → validado em produção
+- [ ] Agente pediu sua confirmação antes de cada merge
+- [ ] Validado em homolog e em produção de verdade (curl/tela), não por suposição
 - [ ] Issue comentada/fechada
