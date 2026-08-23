@@ -1,0 +1,72 @@
+name: Deploy Frontend (Vercel)
+
+on:
+  push:
+    branches: [homolog, main]
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/deploy-vercel.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-homolog:
+    name: Deploy Homolog (Preview)
+    if: github.ref == 'refs/heads/homolog'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vercel-homolog
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: src/frontend
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Puxar configuração do ambiente (Preview)
+        run: vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+      - name: Build do projeto
+        run: vercel build --token=$VERCEL_TOKEN
+
+      - name: Deploy (Preview)
+        id: deploy
+        run: echo "url=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)" >> "$GITHUB_OUTPUT"
+
+      - name: Apontar alias fixo de homolog
+        run: vercel alias set "${{ steps.deploy.outputs.url }}" movecity-frontend-homolog.vercel.app --token=$VERCEL_TOKEN
+
+  deploy-producao:
+    name: Deploy Produção
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vercel-producao
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: src/frontend
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Puxar configuração do ambiente (Production)
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Build do projeto
+        run: vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Deploy (Production)
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
