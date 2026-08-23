@@ -16,9 +16,6 @@ jobs:
     concurrency:
       group: deploy-vercel-homolog
       cancel-in-progress: false
-    defaults:
-      run:
-        working-directory: src/frontend
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -37,7 +34,9 @@ jobs:
 
       - name: Deploy (Preview)
         id: deploy
-        run: echo "url=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)" >> "$GITHUB_OUTPUT"
+        run: |
+          url=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Apontar alias fixo de homolog
         run: vercel alias set "${{ steps.deploy.outputs.url }}" movecity-frontend-homolog.vercel.app --token=$VERCEL_TOKEN
@@ -49,9 +48,6 @@ jobs:
     concurrency:
       group: deploy-vercel-producao
       cancel-in-progress: false
-    defaults:
-      run:
-        working-directory: src/frontend
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
