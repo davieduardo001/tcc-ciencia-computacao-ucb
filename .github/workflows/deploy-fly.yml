@@ -26,6 +26,19 @@ jobs:
           .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_AUTH }}
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://movecity-auth.fly.dev/health)
+            if [ "$code" = "200" ]; then
+              echo "Servico auth respondendo (HTTP $code)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $code, aguardando..."
+            sleep 5
+          done
+          echo "Servico auth nao respondeu 200 em /health apos o deploy"
+          exit 1
 
   deploy-mobilidade:
     name: Deploy mobilidade
@@ -44,6 +57,19 @@ jobs:
           .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_MOBILIDADE }}
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://movecity-mobilidade.fly.dev/health)
+            if [ "$code" = "200" ]; then
+              echo "Servico mobilidade respondendo (HTTP $code)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $code, aguardando..."
+            sleep 5
+          done
+          echo "Servico mobilidade nao respondeu 200 em /health apos o deploy"
+          exit 1
 
   deploy-colaboracao:
     name: Deploy colaboracao
@@ -62,6 +88,19 @@ jobs:
           .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_COLABORACAO }}
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://movecity-colaboracao.fly.dev/health)
+            if [ "$code" = "200" ]; then
+              echo "Servico colaboracao respondendo (HTTP $code)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $code, aguardando..."
+            sleep 5
+          done
+          echo "Servico colaboracao nao respondeu 200 em /health apos o deploy"
+          exit 1
 
   deploy-gateway:
     name: Deploy gateway
@@ -81,3 +120,16 @@ jobs:
           .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_GATEWAY }}
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://movecity-gateway.fly.dev/health)
+            if [ "$code" = "200" ]; then
+              echo "Servico gateway respondendo (HTTP $code)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $code, aguardando..."
+            sleep 5
+          done
+          echo "Servico gateway nao respondeu 200 em /health apos o deploy"
+          exit 1
