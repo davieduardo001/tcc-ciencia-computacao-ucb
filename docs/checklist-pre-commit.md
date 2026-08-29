@@ -2,34 +2,39 @@
 
 Antes de fazer `git commit`, verificar:
 
-## Código
+## Comando Rápido
 
+```bash
+./scripts/verificar-deploy.sh
+```
+
+## Verificações Manuais
+
+### Código
 - [ ] Imports funcionam (`python -c "from X import Y"`)
 - [ ] Requirements.txt está completo
 - [ ] Testes passam localmente
 - [ ] Lint não tem erros
 
-## Deploy
-
+### Deploy
 - [ ] Health check funciona (`curl /health`)
 - [ ] Rotas públicas funcionam
 - [ ] Rotas protegidas retornam 401 sem token
 
-## Migrations
-
+### Migrations
 - [ ] Migrations funcionam (se aplicável)
 - [ ] Alembic upgrade head roda sem erro
 
-## Como Usar
+## Como Usar o Script
 
 ```bash
-# Verificar imports
-cd src/backend
-python -c "from gateway.main import app; print('Gateway OK')"
+# Verificar tudo de uma vez
+./scripts/verificar-deploy.sh
 
-# Rodar testes
-pytest -v
-
-# Verificar health check (com backend rodando)
-curl http://localhost:8000/health
+# O script verifica:
+# 1. Dependências do requirements.txt
+# 2. Imports do Gateway e Auth
+# 3. Health check (deve retornar 200)
+# 4. Rotas públicas
+# 5. Rota protegida (deve retornar 401)
 ```
