@@ -85,6 +85,25 @@ pytest
 - Cada serviço deve ter pelo menos 1 teste passando
 - Testar cenário principal e cenários alternativos (alt/else do diagrama)
 
+### 6.1. Verificar Localmente (ANTES de commitar)
+
+```bash
+# Opção rápida: rodar script de verificação
+./scripts/verificar-deploy.sh
+
+# Ou manualmente:
+cd src/backend
+python -c "from gateway.main import app; print('Gateway OK')"
+pytest -v
+curl http://localhost:8000/health
+```
+
+**Verificar:**
+- [ ] Imports funcionam
+- [ ] Testes passam
+- [ ] Health check retorna 200 (não 401)
+- [ ] Requirements.txt está completo
+
 ### 7. Commitar
 
 ```bash

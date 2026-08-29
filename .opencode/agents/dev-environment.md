@@ -1,7 +1,6 @@
 ---
 description: Gerencia infraestrutura local: Docker, migrations, dependências. NÃO edita código.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 temperature: 0.1
 steps: 10
 permissions:
