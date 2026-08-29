@@ -86,10 +86,20 @@ alembic upgrade head
 ### Rodar o Backend
 
 ```bash
+# Rodar Auth Service (porta 8001)
+cd src/backend/auth
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+
+# Rodar Gateway (porta 8000)
+cd src/backend/gateway
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend disponível em: http://localhost:8000
+**Portas:**
+- Gateway: http://localhost:8000
+- Auth Service: http://localhost:8001
+
+**Nota:** O Gateway valida JWT localmente. Não é necessário rodar o Auth Service para testar a validação de tokens.
 
 ---
 
