@@ -12,7 +12,7 @@ from models.base import Base
 
 # Importar todos os models para autogenerate
 from gateway.models import TestLog
-from auth.models import TestUser, Usuario, Sessao
+from auth.models import TestUser
 from mobilidade.models import TestLinha
 from colaboracao.models import TestReporte
 
