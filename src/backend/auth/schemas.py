@@ -1,40 +1,35 @@
-import re
-
-from pydantic import BaseModel, EmailStr, field_validator
-
-_SENHA_REGEX = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
+from pydantic import BaseModel, EmailStr
+from uuid import UUID
+from datetime import datetime
 
 
 class RegistroRequest(BaseModel):
     nome: str
     email: EmailStr
     senha: str
-    termos_aceitos: bool
-
-    @field_validator("nome")
-    @classmethod
-    def validar_nome(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Campo obrigatório")
-        return v
-
-    @field_validator("senha")
-    @classmethod
-    def validar_senha(cls, v: str) -> str:
-        if not _SENHA_REGEX.match(v):
-            raise ValueError("A senha deve ter ao menos 8 caracteres, incluindo letras e números")
-        return v
-
-    @field_validator("termos_aceitos")
-    @classmethod
-    def validar_termos_aceitos(cls, v: bool) -> bool:
-        if not v:
-            raise ValueError("Você deve aceitar os termos de uso")
-        return v
 
 
-class RegistroResponse(BaseModel):
-    id: str
+class LoginRequest(BaseModel):
+    email: EmailStr
+    senha: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class UsuarioResponse(BaseModel):
+    id: UUID
     nome: str
     email: str
+    status: str
+    criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MensagemResponse(BaseModel):
     mensagem: str
