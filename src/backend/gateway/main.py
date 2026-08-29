@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
 from gateway.routes import router as gateway_router
+from gateway.middleware import AutenticacaoMiddleware
 
 settings = get_settings()
 
@@ -19,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(AutenticacaoMiddleware)
 
 app.include_router(gateway_router, prefix="/gateway", tags=["gateway"])
 
