@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 def hello():
     return {"service": "auth", "status": "ok"}
 
+@router.get("/teste-brenouchihar")
+def teste_brenouchihar():
+    return {
+        "service": "auth",
+        "autor": "brenouchihar",
+        "mensagem": "hello world"
+    }
+
 
 @router.post("/registro", response_model=RegistroResponse, status_code=status.HTTP_201_CREATED)
 def registrar_usuario(dados: RegistroRequest, db: Session = Depends(get_db)):
