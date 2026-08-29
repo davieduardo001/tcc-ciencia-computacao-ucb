@@ -13,6 +13,9 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
         "/auth/login",
         "/auth/registrar",
         "/auth/refresh",
+        "/doc",
+        "/redoc",
+        "/openapi.json",
     ]
 
     async def dispatch(self, request: Request, call_next):
