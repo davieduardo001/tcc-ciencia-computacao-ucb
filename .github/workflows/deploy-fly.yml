@@ -105,7 +105,6 @@ jobs:
   deploy-gateway:
     name: Deploy gateway
     runs-on: ubuntu-latest
-    needs: [deploy-auth, deploy-mobilidade, deploy-colaboracao]
     concurrency:
       group: deploy-fly-gateway
       cancel-in-progress: false
