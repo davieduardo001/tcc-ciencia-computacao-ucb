@@ -9,6 +9,7 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
     ROTAS_PUBLICAS = [
         "/gateway/hello",
         "/gateway/health",
+        "/health",
         "/auth/login",
         "/auth/registrar",
         "/auth/refresh",
