@@ -66,9 +66,17 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 
 **Decisões registradas:**
 - Gateway valida JWT localmente — sem round-trip ao Auth Service
+- Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
 - Leaflet + OSM evita custos de mapa em apresentações
 - Fly.io para deploy simples via Docker
 - Neon free tier suficiente para escala do TCC
+
+**Fluxo de Autenticação (US #31):**
+- Gateway lê `access_token` do cookie httpOnly
+- Valida JWT localmente (verifica assinatura e expiração)
+- Extrai `identidadeUsuario` e passa via `request.state`
+- Serviços de domínio recebem `identidadeUsuario` já validado
+- Documentação completa: `docs/gateway-auth-flow.md`
 
 ---
 

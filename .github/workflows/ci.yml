@@ -48,6 +48,25 @@ jobs:
           cd src/backend
           pip install -r requirements.txt
 
+      - name: Verificar dependências
+        run: |
+          cd src/backend
+          pip install -r gateway/requirements.txt --dry-run
+
+      - name: Verificar imports
+        run: |
+          cd src/backend
+          python -c "from gateway.main import app; print('Gateway imports OK')"
+          python -c "from auth.main import app; print('Auth imports OK')"
+
+      - name: Health check
+        run: |
+          cd src/backend
+          uvicorn gateway.main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
+          curl -sf http://localhost:8000/health || exit 1
+          kill %1 || true
+
       - name: Rodar migrations
         run: |
           cd src/backend

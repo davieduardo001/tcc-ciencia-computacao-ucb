@@ -88,3 +88,64 @@ footer {
   color: #95a5a6;
   font-size: 0.875rem;
 }
+
+.form-cadastro {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.campo label {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.campo input[type="text"],
+.campo input[type="email"],
+.campo input[type="password"] {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.campo-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: normal;
+}
+
+.erro-campo {
+  color: #c0392b;
+  font-size: 0.85rem;
+}
+
+.mensagem-sucesso {
+  display: block;
+  text-align: center;
+  padding: 0.75rem;
+}
+
+.form-cadastro button {
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #2c3e50;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.form-cadastro button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

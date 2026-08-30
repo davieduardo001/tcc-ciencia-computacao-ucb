@@ -7,6 +7,7 @@ WORKDIR /app
 COPY src/backend/auth/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY src/backend/models ./models
 COPY src/backend/shared ./shared
 COPY src/backend/auth ./auth
 
