@@ -208,3 +208,184 @@ commit             →  tipo: descrição curta no imperativo (max 72 chars)
 | Incluir `Co-Authored-By` | Apenas seu nome |
 | PR gigante com tudo junto | PRs pequenos e atômicos |
 | Branch desatualizada | Rebase antes de subir |
+
+---
+
+## Vinculação de PRs a Issues
+
+Toda Pull Request **deve** estar vinculada a uma Issue. Isso garante rastreabilidade e organização.
+
+### Regras
+
+| Regra | Descrição |
+|-------|-----------|
+| **Toda PR deve ter uma issue** | Se a issue não existir, criar antes de abrir o PR |
+| **Vincular no "Development"** | Usar a seção "Linked issues" na sidebar do PR |
+| **Correções sem issue** | Criar uma issue primeiro com label `bug` ou `correção` |
+
+### Quando criar uma Issue
+
+| Cenário | Ação |
+|---------|------|
+| Nova feature (feat) | Criar issue com label `enhancement` |
+| Correção de bug (fix) | Criar issue com label `bug` |
+| Chore/configuração | Não precisa de issue |
+| Documentação | Não precisa de issue |
+
+### Como Vincular via GitHub UI
+
+1. Abrir o **PR** no GitHub
+2. Na sidebar direita, clicar em **"Linked issues"** → **"Add"**
+3. Selecionar a issue correspondente
+
+### Como Vincular via CLI (GraphQL)
+
+```bash
+# 1. Obter node IDs
+gh api graphql -f query='
+{
+  repository(owner: "davieduardo001", name: "tcc-ciencia-computacao-ucb") {
+    issue(number: <NUMERO_ISSUE>) { id }
+    pullRequest(number: <NUMERO_PR>) { id }
+  }
+}'
+
+# 2. Vincular
+gh api graphql -f query='
+mutation {
+  addCloseIssueReferences(input: {
+    issueId: "<NODE_ID_ISSUE>", 
+    pullRequestIds: ["<NODE_ID_PR>"]
+  }) {
+    clientMutationId
+  }
+}'
+```
+
+### Exemplo
+
+```bash
+# Vincular PR #56 à issue #31
+gh api graphql -f query='
+{
+  repository(owner: "davieduardo001", name: "tcc-ciencia-computacao-ucb") {
+    issue(number: 31) { id }
+    pullRequest(number: 56) { id }
+  }
+}'
+
+gh api graphql -f query='
+mutation {
+  addCloseIssueReferences(input: {
+    issueId: "I_kwDORgtye88AAAABD0k_dA", 
+    pullRequestIds: ["PR_kwDORgtye88AAAABBdokvw"]
+  }) {
+    clientMutationId
+  }
+}'
+```
+
+### Fluxo Completo
+
+```
+1. Criar issue (se não existir)
+2. Criar branch feat/* ou fix/*
+3. Desenvolver + commitar
+4. Abrir PR
+5. Vincular PR à issue (UI ou CLI)
+6. Aguardar review + CI
+7. Merge
+```
+
+---
+
+## Gerenciamento de Sprints
+
+### Regras
+
+| Regra | Descrição |
+|-------|-----------|
+| **Toda issue deve ter milestone** | Issue sem milestone é issue perdida |
+| **Sprint = Milestone** | Cada sprint é uma milestone no GitHub |
+| **Vincular issues filhas** | Sub-issues devem estar na mesma sprint |
+
+### Skills de Sprint
+
+| Skill | Descrição |
+|-------|-----------|
+| `criar-issue-sprint` | Cria issue e pergunta se adiciona à sprint |
+| `gerenciar-sprint` | Lista issues, mostra status, sugere objetivos |
+| `vincular-issues-sprint` | Vincula issues filhas à sprint |
+
+### Criar Issue com Sprint
+
+```bash
+# Criar issue e perguntar sobre sprint
+gh issue create \
+  --title "feat: adicionar filtro de linhas" \
+  --body "Como usuário, quero filtrar linhas por horário..." \
+  --label "enhancement"
+
+# Criar issue já com milestone
+gh issue create \
+  --title "fix: corrigir cálculo de rota" \
+  --body "O cálculo de rota está retornando valor incorreto..." \
+  --label "bug" \
+  --milestone "Sprint 0"
+```
+
+### Listar Issues da Sprint
+
+```bash
+# Listar issues abertas
+gh issue list --milestone "Sprint 0" --state open
+
+# Listar issues fechadas
+gh issue list --milestone "Sprint 0" --state closed
+
+# Ver progresso
+TOTAL=$(gh issue list --milestone "Sprint 0" --state all --json number | jq length)
+FECHADAS=$(gh issue list --milestone "Sprint 0" --state closed --json number | jq length)
+echo "Progresso: $FECHADAS/$TOTAL"
+```
+
+### Adicionar Issue à Sprint
+
+```bash
+# Adicionar issue específica
+gh issue edit <NUMERO> --milestone "Sprint 0"
+
+# Adicionar todas as issues sem milestone
+ISSUES=$(gh issue list --state open --json number,milestone \
+  --jq '.[] | select(.milestone == null) | .number')
+
+for ISSUE in $ISSUES; do
+  gh issue edit $ISSUE --milestone "Sprint 0"
+  echo "Issue #$ISSUE adicionada à Sprint 0"
+done
+```
+
+### Vincular Sub-Issues
+
+1. Abrir a issue pai no GitHub
+2. Na sidebar, encontrar "Sub-issues"
+3. Clicar em "Add" e selecionar as issues filhas
+
+### Fluxo Completo de Sprint
+
+```
+1. Criar sprint (milestone)
+   └─ Criar milestone no GitHub
+
+2. Criar issues
+   └─ Usar criar-issue-sprint
+
+3. Vincular issues à sprint
+   └─ Usar vincular-issues-sprint
+
+4. Acompanhar andamento
+   └─ Usar gerenciar-sprint
+
+5. Fechar sprint
+   └─ Fechar milestone
+```

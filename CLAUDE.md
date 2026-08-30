@@ -18,6 +18,27 @@ Todo o conteúdo em **Português (PT-BR)**. Commits podem ser em inglês ou PT-B
 - **NUNCA** incluir `Co-Authored-By` ou assinatura de agente/IA nos commits.
 - Mudanças em `docs/` e `src/` devem ser commits separados, salvo interdependência estrita.
 
+## Vinculação de PRs a Issues
+
+- **Toda PR** deve estar vinculada a uma Issue
+- Se não existir issue, criar antes de abrir o PR
+- Usar `Closes #<NUMERO>` no corpo do PR para auto-close
+- Vincular na seção "Linked issues" da sidebar do PR
+
+### Comando para vincular via CLI
+
+```bash
+gh api graphql -f query='
+mutation {
+  addCloseIssueReferences(input: {
+    issueId: "<NODE_ID_ISSUE>", 
+    pullRequestIds: ["<NODE_ID_PR>"]
+  }) {
+    clientMutationId
+  }
+}'
+```
+
 ## Fluxo de Branches
 
 ```
@@ -50,6 +71,9 @@ docs/* e chore/* →  main (direto)
 | `gerenciar-commits` | `.claude/commands/gerenciar-commits.md` | Organizar commits atômicos |
 | `gh-create-issue` | `.claude/commands/gh-create-issue.md` | Formalizar USs como issues |
 | `gerar-diagrama-sequencia` | `.claude/commands/gerar-diagrama-sequencia.md` | Gerar diagramas UML PlantUML |
+| `criar-issue-sprint` | `.opencode/skills/criar-issue-sprint/SKILL.md` | Criar issue com sprint |
+| `gerenciar-sprint` | `.opencode/skills/gerenciar-sprint/SKILL.md` | Gerenciar andamento da sprint |
+| `vincular-issues-sprint` | `.opencode/skills/vincular-issues-sprint/SKILL.md` | Vincular issues filhas à sprint |
 
 ## Arquitetura de Diagramas de Sequência
 
