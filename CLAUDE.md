@@ -59,6 +59,42 @@ docs/* e chore/* →  main (direto)
 - Estereótipos: `<<interface usuario>>`, `<<servico gateway>>`, `<<servico autenticacao>>`, `<<servico [dominio]>>`, `<<modelo>>`
 - Referência: `docs/diagramas/sequencia/` — UC14 a UC26
 
+## Gateway como Proxy (US #31)
+
+O Gateway é o **ponto único de entrada** para todas as requisições do frontend.
+
+### Regras de Proxy
+
+| Regra | Detalhe |
+|-------|---------|
+| **Ponto único de entrada** | Todas as requisições passam pelo Gateway |
+| **Nenhum serviço acessa o banco** | Tudo passa pelo Gateway |
+| **Cookies httpOnly** | Gateway seta/limpa cookies de autenticação |
+| **Roteamento por path** | `/api/auth/*` → Auth, `/api/mobilidade/*` → Mobilidade, `/api/colaboracao/*` → Colaboracao |
+
+### Endpoints de Proxy
+
+| Endpoint | Método | Destino |
+|----------|--------|---------|
+| `/api/auth/login` | POST | Auth Service |
+| `/api/auth/registrar` | POST | Auth Service |
+| `/api/auth/refresh` | POST | Auth Service |
+| `/api/auth/logout` | POST | Auth Service |
+| `/api/mobilidade/*` | GET/POST/PUT/DELETE | Mobilidade Service |
+| `/api/colaboracao/*` | GET/POST/PUT/DELETE | Colaboracao Service |
+
+### Arquivos do Gateway
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `middleware.py` | Valida JWT do cookie em cada request |
+| `jwt_validator.py` | Decodifica e valida tokens JWT |
+| `dependencies.py` | `get_usuario_atual` para endpoints protegidos |
+| `proxy.py` | Proxy genérico para serviços backend |
+| `cookies.py` | Helper para setar/limpar cookies httpOnly |
+| `config.py` | Configuração das URLs dos serviços |
+| `routes.py` | Endpoints de proxy (auth, mobilidade, colaboracao) |
+
 ## Documentação de Contexto (carregada automaticamente)
 
 @AGENT.md

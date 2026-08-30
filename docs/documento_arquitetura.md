@@ -306,3 +306,80 @@ KRUCHTEN, Philippe. The 4+1 view model of architecture. **IEEE Software**, v. 12
 CGDF — CONTROLADORIA GERAL DO DISTRITO FEDERAL. **Painel de Ouvidoria do Distrito Federal**. Brasília: CGDF, 2026.
 
 SOMMERVILLE, Ian. **Engenharia de Software**. 10. ed. São Paulo: Pearson, 2019.
+
+---
+
+## Atualização — Gateway como Proxy (US #31)
+
+### Visão Geral
+
+O Gateway é o **ponto único de entrada** para todas as requisições do frontend.
+Nenhum serviço backend se comunica com o banco diretamente — tudo passa pelo Gateway.
+
+```
+[Browser]
+    │  cookies: access_token + refresh_token
+    ▼
+[Next.js Frontend]
+    │  envia cookies automaticamente
+    ▼
+[API Gateway — Ponto Único de Entrada]
+    │  lê access_token do cookie
+    │  valida JWT localmente
+    │  extrai identidadeUsuario
+    │  roteia para serviços backend
+    ├──► [Auth Service] ──► [PostgreSQL]
+    ├──► [Mobilidade Service] ──► [PostgreSQL]
+    └──► [Colaboracao Service] ──► [PostgreSQL]
+```
+
+### Endpoints de Proxy
+
+| Endpoint | Método | Destino |
+|----------|--------|---------|
+| `/api/auth/login` | POST | Auth Service |
+| `/api/auth/registrar` | POST | Auth Service |
+| `/api/auth/refresh` | POST | Auth Service |
+| `/api/auth/logout` | POST | Auth Service |
+| `/api/mobilidade/*` | GET/POST/PUT/DELETE | Mobilidade Service |
+| `/api/colaboracao/*` | GET/POST/PUT/DELETE | Colaboracao Service |
+
+### Fluxo de Proxy
+
+```
+1. Browser envia request para /api/*
+2. Gateway recebe e valida JWT (middleware)
+3. Gateway roteia para serviço backend correspondente
+4. Serviço backend processa e retorna response
+5. Gateway retorna response para Browser
+```
+
+### Configuração dos Serviços
+
+```python
+# gateway/config.py
+SERVICES = {
+    "auth": "http://auth-service:8000",
+    "mobilidade": "http://mobilidade-service:8000",
+    "colaboracao": "http://colaboracao-service:8000",
+}
+```
+
+### Cookies
+
+| Cookie | HttpOnly | Secure | SameSite | Path | Max Age |
+|--------|----------|--------|----------|------|---------|
+| `access_token` | ✅ | ✅ | Lax | `/api` | 60 min |
+| `refresh_token` | ✅ | ✅ | Strict | `/api/auth` | 7 dias |
+
+### Arquivos do Gateway
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `middleware.py` | Valida JWT do cookie em cada request |
+| `jwt_validator.py` | Decodifica e valida tokens JWT |
+| `dependencies.py` | `get_usuario_atual` para endpoints protegidos |
+| `proxy.py` | Proxy genérico para serviços backend |
+| `cookies.py` | Helper para setar/limpar cookies httpOnly |
+| `config.py` | Configuração das URLs dos serviços |
+| `routes.py` | Endpoints de proxy (auth, mobilidade, colaboracao) |
