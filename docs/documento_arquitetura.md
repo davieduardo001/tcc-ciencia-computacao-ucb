@@ -163,7 +163,7 @@ Esta subseção documenta as principais decisões técnicas tomadas para o Movec
 | **Deploy — Backend** | Fly.io (Docker) | Deploy simples via Dockerfile; suporte a múltiplas regiões; free tier adequado para projeto-piloto. |
 | **Deploy — Frontend** | Vercel ou Fly.io | Integração nativa com Next.js; deploy automático por push. |
 | **CI/CD** | GitHub Actions | Integração nativa com o repositório; pipelines de teste e deploy automatizados sem custo adicional. |
-| **Autenticação** | JWT (stateless) | Elimina estado de sessão no servidor; validação local no API Gateway sem round-trip ao serviço de autenticação. |
+| **Autenticação** | JWT (stateless) + httpOnly cookies | Tokens em cookies httpOnly protegem contra XSS; Gateway valida localmente sem round-trip; refresh token permite renovação transparente. |
 
 *Tabela 2 – Decisões arquiteturais*
 

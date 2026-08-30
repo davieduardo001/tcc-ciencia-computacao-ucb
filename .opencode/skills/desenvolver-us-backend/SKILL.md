@@ -85,6 +85,25 @@ pytest
 - Cada serviço deve ter pelo menos 1 teste passando
 - Testar cenário principal e cenários alternativos (alt/else do diagrama)
 
+### 6.1. Verificar Localmente (ANTES de commitar)
+
+```bash
+# Opção rápida: rodar script de verificação
+./scripts/verificar-deploy.sh
+
+# Ou manualmente:
+cd src/backend
+python -c "from gateway.main import app; print('Gateway OK')"
+pytest -v
+curl http://localhost:8000/health
+```
+
+**Verificar:**
+- [ ] Imports funcionam
+- [ ] Testes passam
+- [ ] Health check retorna 200 (não 401)
+- [ ] Requirements.txt está completo
+
 ### 7. Commitar
 
 ```bash
@@ -110,6 +129,15 @@ git push -u origin feat/issue-[numero]-[nome-curto]
 
 Comentar na issue da US:
 > "PR aberto: [link do PR]. Aguardando review de [nome do reviewer]."
+
+### 10. Fechar o ciclo (DoD)
+
+Não é responsabilidade só do reviewer — quem desenvolveu acompanha até o fim:
+
+- Após o merge em `homolog`, validar os critérios de aceite lá e comentar na issue: **"DoD-Sprint atendido: PR mergeado em homolog ([link]), critérios de aceite validados."**
+- Quando o PR `homolog` → `main` for mergeado, validar em produção e comentar: **"DoD-Release atendido: em produção ([link/URL]). Issue fechada."** — e fechar a issue se não tiver fechado sozinha via "Closes #XX".
+
+Critérios completos: `AGENT.md`, seção "Critérios DOD".
 
 ## Regras Obrigatórias
 
