@@ -68,3 +68,56 @@ export async function registrarUsuario(
 
   return response.json();
 }
+
+export interface LoginPayload {
+  email: string;
+  senha: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export class LoginError extends Error {}
+
+export async function loginUsuario(
+  dados: LoginPayload
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: dados.email,
+      senha: dados.senha,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new LoginError(data.detail || "Não foi possível realizar o login.");
+  }
+
+  const data = await response.json();
+
+  if (data.access_token) {
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token);
+  }
+
+  return data;
+}
+
+export function getAccessToken(): string | null {
+  return localStorage.getItem("access_token");
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem("refresh_token");
+}
+
+export function clearTokens(): void {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+}
