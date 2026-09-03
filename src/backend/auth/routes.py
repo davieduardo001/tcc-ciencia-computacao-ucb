@@ -78,8 +78,8 @@ def login(dados: LoginInput, db: Session = Depends(get_db)):
     usuario.tentativas_falhas = 0
     usuario.bloqueado_ate = None
 
-    access_token = criar_access_token({"sub": usuario.id})
-    refresh_token = criar_refresh_token({"sub": usuario.id})
+    access_token = criar_access_token({"sub": str(usuario.id)})
+    refresh_token = criar_refresh_token({"sub": str(usuario.id)})
     expires_at = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
 
     sessao = Sessao(
