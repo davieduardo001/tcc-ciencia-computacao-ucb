@@ -5,28 +5,34 @@ export interface ServiceStatus {
   status: string;
 }
 
-export async function fetchServiceStatus(
-  service: string
-): Promise<ServiceStatus> {
-  const response = await fetch(`${API_URL}/${service}/hello`);
-  if (!response.ok) {
-    throw new Error(`Erro ao buscar status do serviço ${service}`);
-  }
-  return response.json();
+interface StatusAgregadoResponse {
+  service: string;
+  status: string;
+  servicos: ServiceStatus[];
 }
 
-export async function fetchAllServicesStatus(): Promise<
-  ServiceStatus[]
-> {
-  const services = ["gateway", "auth", "mobilidade", "colaboracao"];
-  const results = await Promise.allSettled(
-    services.map((service) => fetchServiceStatus(service))
-  );
-
-  return results.map((result, index) => ({
-    service: services[index],
-    status: result.status === "fulfilled" ? result.value.status : "error",
-  }));
+/**
+ * Busca o status do gateway e dos serviços de domínio (auth,
+ * mobilidade, colaboracao) em uma única chamada ao Gateway
+ * (/api/status), o ponto único de entrada. Cada chamada aqui já
+ * "acorda" serviços do Fly.io que estejam ociosos, já que qualquer
+ * request HTTP dispara o auto_start_machines.
+ */
+export async function fetchAllServicesStatus(): Promise<ServiceStatus[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/status`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error("Erro ao buscar status dos serviços");
+    }
+    const data: StatusAgregadoResponse = await response.json();
+    return data.servicos;
+  } catch {
+    return ["gateway", "auth", "mobilidade", "colaboracao"].map(
+      (service) => ({ service, status: "error" })
+    );
+  }
 }
 
 export interface RegistroPayload {

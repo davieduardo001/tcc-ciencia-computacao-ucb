@@ -1,3 +1,6 @@
+import asyncio
+
+import httpx
 from fastapi import APIRouter, Request, Response
 
 from gateway.config import get_gateway_settings
@@ -11,6 +14,43 @@ settings = get_gateway_settings()
 @router.get("/hello")
 def hello():
     return {"service": "gateway", "status": "ok"}
+
+
+@router.get("/status")
+async def status():
+    """Status agregado do gateway e dos serviços de domínio.
+
+    Usado pela home do frontend para exibir quais serviços estão
+    no ar. Uma chamada aqui já "acorda" serviços do Fly.io que
+    estejam ociosos (auto_stop_machines), pois qualquer request
+    HTTP ao serviço dispara o auto_start.
+    """
+    servicos = {
+        "auth": settings.AUTH_SERVICE_URL,
+        "mobilidade": settings.MOBILIDADE_SERVICE_URL,
+        "colaboracao": settings.COLABORACAO_SERVICE_URL,
+    }
+
+    async def verificar(nome: str, url: str) -> dict:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resposta = await client.get(f"{url}/health")
+            return {
+                "service": nome,
+                "status": "ok" if resposta.status_code == 200 else "error",
+            }
+        except httpx.HTTPError:
+            return {"service": nome, "status": "error"}
+
+    resultados = await asyncio.gather(
+        *(verificar(nome, url) for nome, url in servicos.items())
+    )
+
+    return {
+        "service": "gateway",
+        "status": "ok",
+        "servicos": [{"service": "gateway", "status": "ok"}, *resultados],
+    }
 
 
 # ============================================

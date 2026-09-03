@@ -5,7 +5,16 @@ describe("Home", () => {
   beforeEach(() => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ service: "gateway", status: "ok" }),
+      json: async () => ({
+        service: "gateway",
+        status: "ok",
+        servicos: [
+          { service: "gateway", status: "ok" },
+          { service: "auth", status: "ok" },
+          { service: "mobilidade", status: "ok" },
+          { service: "colaboracao", status: "ok" },
+        ],
+      }),
     }) as jest.Mock;
   });
 
