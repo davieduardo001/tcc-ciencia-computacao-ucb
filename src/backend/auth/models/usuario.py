@@ -10,6 +10,7 @@ class Usuario(Base):
     nome = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
+    lgpd_accepted_at = Column(DateTime, nullable=False, server_default=func.now())
     status = Column(String(50), default="ativo")
     tentativas_falhas = Column(Integer, default=0)
     bloqueado_ate = Column(DateTime, nullable=True)

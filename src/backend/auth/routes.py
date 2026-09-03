@@ -108,6 +108,7 @@ def registrar(dados: RegistrarInput, db: Session = Depends(get_db)):
         nome=dados.nome,
         email=dados.email,
         senha_hash=hash_senha(dados.senha),
+        lgpd_accepted_at=datetime.utcnow(),
         status="ativo",
     )
     db.add(usuario)
