@@ -13,5 +13,5 @@ class Usuario(Base):
     status = Column(String(50), default="ativo")
     tentativas_falhas = Column(Integer, default=0)
     bloqueado_ate = Column(DateTime, nullable=True)
-    criado_em = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
     atualizado_em = Column(DateTime, default=func.now(), onupdate=func.now())

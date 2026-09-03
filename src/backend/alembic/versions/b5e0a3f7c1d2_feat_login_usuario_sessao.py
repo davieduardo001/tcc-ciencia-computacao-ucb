@@ -20,6 +20,7 @@ def upgrade() -> None:
     op.add_column('usuarios', sa.Column('status', sa.String(length=50), nullable=True))
     op.add_column('usuarios', sa.Column('tentativas_falhas', sa.Integer(), nullable=True))
     op.add_column('usuarios', sa.Column('bloqueado_ate', sa.DateTime(), nullable=True))
+    op.add_column('usuarios', sa.Column('atualizado_em', sa.DateTime(), nullable=True))
 
     op.create_table('sessoes',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -35,6 +36,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table('sessoes')
+    op.drop_column('usuarios', 'atualizado_em')
     op.drop_column('usuarios', 'bloqueado_ate')
     op.drop_column('usuarios', 'tentativas_falhas')
     op.drop_column('usuarios', 'status')
