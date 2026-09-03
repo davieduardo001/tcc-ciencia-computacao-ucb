@@ -116,7 +116,7 @@ def registrar(dados: RegistrarInput, db: Session = Depends(get_db)):
     db.refresh(usuario)
 
     return RegistrarResponse(
-        id=usuario.id,
+        id=str(usuario.id),
         nome=usuario.nome,
         email=usuario.email,
         mensagem="Verifique seu e-mail para confirmar a conta.",
