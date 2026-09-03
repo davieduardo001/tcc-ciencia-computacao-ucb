@@ -21,14 +21,14 @@ class RegistrarInput(BaseModel):
 
 
 class RegistrarResponse(BaseModel):
-    id: int
+    id: str
     nome: str
     email: str
     mensagem: str
 
 
 class UsuarioResponse(BaseModel):
-    id: int
+    id: str
     nome: str
     email: str
     status: str
