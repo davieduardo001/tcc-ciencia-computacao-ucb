@@ -54,7 +54,7 @@ def login(dados: LoginInput, db: Session = Depends(get_db)):
 
     _verificar_bloqueio(usuario, db)
 
-    if not verificar_senha(dados.senha, usuario.hash_senha):
+    if not verificar_senha(dados.senha, usuario.senha_hash):
         usuario.tentativas_falhas += 1
         if usuario.tentativas_falhas >= MAX_TENTATIVAS_FALHAS:
             usuario.bloqueado_ate = datetime.utcnow() + timedelta(minutes=BLOQUEIO_MINUTOS)
@@ -107,7 +107,7 @@ def registrar(dados: RegistrarInput, db: Session = Depends(get_db)):
     usuario = Usuario(
         nome=dados.nome,
         email=dados.email,
-        hash_senha=hash_senha(dados.senha),
+        senha_hash=hash_senha(dados.senha),
         status="ativo",
     )
     db.add(usuario)
