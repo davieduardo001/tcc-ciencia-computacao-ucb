@@ -15,7 +15,7 @@ client = TestClient(app)
 def _mock_get_db(mock_db):
     def _generator():
         yield mock_db
-    return _generator
+    return _generator()
 
 
 def _criar_usuario_mock() -> Usuario:
