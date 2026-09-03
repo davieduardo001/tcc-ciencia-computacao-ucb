@@ -12,7 +12,13 @@ from auth.security import hash_senha
 client = TestClient(app)
 
 
-def _criar_usuario_mock(db: MagicMock) -> Usuario:
+def _mock_get_db(mock_db):
+    def _generator():
+        yield mock_db
+    return _generator
+
+
+def _criar_usuario_mock() -> Usuario:
     usuario = Usuario(
         id=uuid.uuid4(),
         nome="Teste User",
@@ -28,9 +34,9 @@ def _criar_usuario_mock(db: MagicMock) -> Usuario:
 @patch("auth.routes.get_db")
 def test_esqueci_senha_email_cadastrado(mock_get_db, mock_enviar_email):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
-    usuario = _criar_usuario_mock(mock_db)
+    usuario = _criar_usuario_mock()
     mock_db.query.return_value.filter.return_value.first.return_value = usuario
 
     response = client.post(
@@ -48,7 +54,7 @@ def test_esqueci_senha_email_cadastrado(mock_get_db, mock_enviar_email):
 @patch("auth.routes.get_db")
 def test_esqueci_senha_email_nao_cadastrado(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
     response = client.post(
@@ -65,7 +71,7 @@ def test_esqueci_senha_email_nao_cadastrado(mock_get_db):
 @patch("auth.routes.get_db")
 def test_esqueci_senha_email_invalido(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
     response = client.post(
         "/auth/esqueci-senha",
@@ -78,9 +84,9 @@ def test_esqueci_senha_email_invalido(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_sucesso(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
-    usuario = _criar_usuario_mock(mock_db)
+    usuario = _criar_usuario_mock()
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
         usuario_id=usuario.id,
@@ -89,8 +95,6 @@ def test_redefinir_senha_sucesso(mock_get_db):
         criado_em=datetime.now(timezone.utc),
         expira_em=datetime.now(timezone.utc) + timedelta(hours=1),
     )
-
-    mock_db.query.return_value.filter.return_value.first.return_value = token_obj
 
     def query_side_effect(model):
         mock_q = MagicMock()
@@ -121,7 +125,7 @@ def test_redefinir_senha_sucesso(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_senhas_nao_coincidem(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
     response = client.post(
         "/auth/redefinir-senha",
@@ -140,7 +144,7 @@ def test_redefinir_senha_senhas_nao_coincidem(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_senha_curta(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
     response = client.post(
         "/auth/redefinir-senha",
@@ -159,7 +163,7 @@ def test_redefinir_senha_senha_curta(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_token_invalido(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
     response = client.post(
@@ -179,7 +183,7 @@ def test_redefinir_senha_token_invalido(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_token_expirado(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
@@ -209,7 +213,7 @@ def test_redefinir_senha_token_expirado(mock_get_db):
 @patch("auth.routes.get_db")
 def test_redefinir_senha_token_ja_usado(mock_get_db):
     mock_db = MagicMock()
-    mock_get_db.return_value = iter([mock_db])
+    mock_get_db.side_effect = _mock_get_db(mock_db)
 
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
