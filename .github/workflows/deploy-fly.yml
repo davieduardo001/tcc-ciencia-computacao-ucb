@@ -9,8 +9,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  migrate:
+    name: Rodar migrations (Alembic)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-fly-migrate
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar dependências
+        run: |
+          cd src/backend
+          pip install -r requirements.txt
+      - name: alembic upgrade head
+        run: |
+          cd src/backend
+          alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   deploy-auth:
     name: Deploy auth
+    needs: migrate
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-fly-auth
@@ -42,6 +66,7 @@ jobs:
 
   deploy-mobilidade:
     name: Deploy mobilidade
+    needs: migrate
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-fly-mobilidade
@@ -73,6 +98,7 @@ jobs:
 
   deploy-colaboracao:
     name: Deploy colaboracao
+    needs: migrate
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-fly-colaboracao
