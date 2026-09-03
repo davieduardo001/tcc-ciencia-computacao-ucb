@@ -5,6 +5,8 @@ from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from models.base import Base
 
+from auth.models.usuario import Usuario  # noqa: F401 — garante que a tabela 'usuarios' existe no metadata antes do ForeignKey
+
 
 class TokenResetSenha(Base):
     __tablename__ = "tokens_reset_senha"
