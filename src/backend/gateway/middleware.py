@@ -12,6 +12,7 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
         "/health",
         "/",
         "/api/hello",
+        "/api/status",
         "/api/auth/login",
         "/api/auth/registrar",
         "/api/auth/refresh",
