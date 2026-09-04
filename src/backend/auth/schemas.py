@@ -32,3 +32,17 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     status: str
+
+
+class SolicitacaoResetSenha(BaseModel):
+    email: EmailStr
+
+
+class RedefinirSenha(BaseModel):
+    token: str
+    nova_senha: str
+    confirmacao_senha: str
+
+
+class RespostaGenerica(BaseModel):
+    mensagem: str
