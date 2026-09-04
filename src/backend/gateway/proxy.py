@@ -12,6 +12,12 @@ async def proxy_request(service_url: str, path: str, request: Request) -> Respon
 
     headers = dict(request.headers)
     headers.pop("host", None)
+    # Não repassar o Accept-Encoding do cliente: o navegador anuncia
+    # codecs (ex.: zstd, br) que o httpx do Gateway não sabe
+    # descomprimir sem pacotes extras. Deixar o httpx negociar sua
+    # própria compressão com o serviço de destino evita receber bytes
+    # comprimidos que ele não consegue decodificar.
+    headers.pop("accept-encoding", None)
 
     try:
         async with httpx.AsyncClient() as client:
