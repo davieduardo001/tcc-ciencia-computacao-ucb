@@ -54,7 +54,7 @@ export class RegistroError extends Error {}
 export async function registrarUsuario(
   dados: RegistroPayload
 ): Promise<RegistroResponse> {
-  const response = await fetch(`${API_URL}/auth/registro`, {
+  const response = await fetch(`${API_URL}/api/auth/registrar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -91,7 +91,8 @@ export class LoginError extends Error {}
 export async function loginUsuario(
   dados: LoginPayload
 ): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
