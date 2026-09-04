@@ -85,6 +85,12 @@ describe("Login", () => {
     });
   });
 
+  it("exibe link para a página de cadastro", () => {
+    render(<Login />);
+    const link = screen.getByRole("link", { name: "Cadastre-se" });
+    expect(link).toHaveAttribute("href", "/cadastro");
+  });
+
   it("bloqueia envio quando os campos não são preenchidos", async () => {
     render(<Login />);
     preencherFormulario({ email: "", senha: "" });
