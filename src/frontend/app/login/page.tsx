@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { loginUsuario, LoginError } from "@/lib/api";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -102,6 +103,10 @@ export default function Login() {
           <button type="submit" disabled={enviando}>
             {enviando ? "Entrando..." : "Entrar"}
           </button>
+
+          <p className="link-alternativo">
+            Ainda não tem conta? <Link href="/cadastro">Cadastre-se</Link>
+          </p>
         </form>
       </main>
 

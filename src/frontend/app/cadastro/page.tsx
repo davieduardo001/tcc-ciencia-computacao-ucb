@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { registrarUsuario, RegistroError } from "@/lib/api";
 
 const SENHA_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -136,6 +137,10 @@ export default function Cadastro() {
           <button type="submit" disabled={enviando}>
             {enviando ? "Cadastrando..." : "Cadastrar"}
           </button>
+
+          <p className="link-alternativo">
+            Já possui conta? <Link href="/login">Realizar login</Link>
+          </p>
         </form>
       </main>
 
