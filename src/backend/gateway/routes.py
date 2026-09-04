@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import httpx
 from fastapi import APIRouter, Request, Response
@@ -68,7 +69,7 @@ async def login(request: Request):
     )
 
     if response.status_code == 200:
-        data = response.json()
+        data = json.loads(response.body)
         set_auth_cookies(
             response,
             data.get("access_token", ""),
@@ -98,7 +99,7 @@ async def refresh(request: Request):
     )
 
     if response.status_code == 200:
-        data = response.json()
+        data = json.loads(response.body)
         set_auth_cookies(
             response,
             data.get("access_token", ""),
