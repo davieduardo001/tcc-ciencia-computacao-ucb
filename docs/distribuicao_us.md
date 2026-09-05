@@ -12,10 +12,38 @@
 | — | Orquestração da equipe e cerimônias |
 | — | Revisão de PRs e merge nas branches principais |
 | — | Manutenção da documentação arquitetural |
-| #31 | Gerenciar Ciclo de Vida da Sessão |
+| #31 | Gerenciar Ciclo de Vida da Sessão (Gateway como Proxy) |
 | #34 | Documento de Arquitetura de Software |
 | #12 | Login via Provedor Social (Google) |
 | #17 | Visualizar Trajeto e Paradas da Linha no Mapa |
+
+### Detalhes da US #31 — Gateway como Proxy
+
+O Gateway é o **ponto único de entrada** para todas as requisições do frontend.
+Nenhum serviço backend se comunica com o banco diretamente — tudo passa pelo Gateway.
+
+**Endpoints de Proxy:**
+
+| Endpoint | Método | Destino |
+|----------|--------|---------|
+| `/api/auth/login` | POST | Auth Service |
+| `/api/auth/registrar` | POST | Auth Service |
+| `/api/auth/refresh` | POST | Auth Service |
+| `/api/auth/logout` | POST | Auth Service |
+| `/api/mobilidade/*` | GET/POST/PUT/DELETE | Mobilidade Service |
+| `/api/colaboracao/*` | GET/POST/PUT/DELETE | Colaboracao Service |
+
+**Arquivos do Gateway:**
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `middleware.py` | Valida JWT do cookie em cada request |
+| `jwt_validator.py` | Decodifica e valida tokens JWT |
+| `dependencies.py` | `get_usuario_atual` para endpoints protegidos |
+| `proxy.py` | Proxy genérico para serviços backend |
+| `cookies.py` | Helper para setar/limpar cookies httpOnly |
+| `config.py` | Configuração das URLs dos serviços |
+| `routes.py` | Endpoints de proxy (auth, mobilidade, colaboracao) |
 
 ---
 

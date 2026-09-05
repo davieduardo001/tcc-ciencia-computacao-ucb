@@ -53,23 +53,43 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 
 ```
 [Browser]
-    │
+    │  cookies: access_token + refresh_token
     ▼
-[Next.js — Frontend]
-    │  Leaflet JS + OSM tiles + GPS GDF (GeoJSON)
+[Next.js Frontend]
+    │  envia cookies automaticamente
     ▼
-[API Gateway]
-    │  Valida JWT localmente (US #31)
-    ├──► [FastAPI — Serviços de Domínio] ──► [PostgreSQL — Neon]
-    └──► [Auth Service] ──► [ModeloSessao]
+[API Gateway — Ponto Único de Entrada]
+    │  lê access_token do cookie
+    │  valida JWT localmente
+    │  extrai identidadeUsuario
+    │  roteia para serviços backend
+    ├──► [Auth Service] ──► [PostgreSQL]
+    ├──► [Mobilidade Service] ──► [PostgreSQL]
+    └──► [Colaboracao Service] ──► [PostgreSQL]
 ```
 
+**Regra:** Nenhum serviço acessa o banco diretamente. Tudo passa pelo Gateway.
+
 **Decisões registradas:**
+- Gateway é o **ponto único de entrada** para todas as requisições
 - Gateway valida JWT localmente — sem round-trip ao Auth Service
+- Gateway seta cookies httpOnly (access + refresh) — proteção contra XSS
+- Gateway roteia requests para serviços backend via proxy
 - Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
 - Leaflet + OSM evita custos de mapa em apresentações
 - Fly.io para deploy simples via Docker
 - Neon free tier suficiente para escala do TCC
+
+**Endpoints do Gateway:**
+
+| Endpoint | Método | Destino |
+|----------|--------|---------|
+| `/api/auth/login` | POST | Auth Service |
+| `/api/auth/registrar` | POST | Auth Service |
+| `/api/auth/refresh` | POST | Auth Service |
+| `/api/auth/logout` | POST | Auth Service |
+| `/api/mobilidade/*` | GET/POST/PUT/DELETE | Mobilidade Service |
+| `/api/colaboracao/*` | GET/POST/PUT/DELETE | Colaboracao Service |
 
 **Fluxo de Autenticação (US #31):**
 - Gateway lê `access_token` do cookie httpOnly
@@ -153,6 +173,10 @@ Uma US **não fecha** sem passar pelos dois níveis. Promoção pra `main` pode 
 | `criar-testes` | Criar testes unitários |
 | `review-pr` | Checklist de review de PR |
 | `criar-diagrama` | Criar diagramas PlantUML |
+| `criar-issue-sprint` | Criar issue com sprint |
+| `gerenciar-sprint` | Gerenciar andamento da sprint |
+| `vincular-issues-sprint` | Vincular issues filhas à sprint |
+| `vincular-pr-issue` | Vincular PRs a issues |
 
 Documentação completa: `docs/boas-praticas-opencode.md`
 
