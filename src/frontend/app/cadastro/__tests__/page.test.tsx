@@ -99,4 +99,10 @@ describe("Cadastro", () => {
     });
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it("exibe link para a página de login", () => {
+    render(<Cadastro />);
+    const link = screen.getByRole("link", { name: "Realizar login" });
+    expect(link).toHaveAttribute("href", "/login");
+  });
 });

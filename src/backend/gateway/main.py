@@ -8,8 +8,8 @@ from gateway.middleware import AutenticacaoMiddleware
 settings = get_settings()
 
 app = FastAPI(
-    title="Movecity — Gateway",
-    description="Serviço de gateway da API de mobilidade urbana colaborativa",
+    title="Movecity — API Gateway",
+    description="Ponto único de entrada — proxy para todos os serviços backend",
     version="0.1.0",
 )
 
@@ -23,12 +23,12 @@ app.add_middleware(
 
 app.add_middleware(AutenticacaoMiddleware)
 
-app.include_router(gateway_router, prefix="/gateway", tags=["gateway"])
+app.include_router(gateway_router, prefix="/api", tags=["api"])
 
 
 @app.get("/")
 def root():
-    return {"message": "Movecity — Serviço gateway"}
+    return {"message": "Movecity — API Gateway"}
 
 
 @app.get("/health")
