@@ -163,12 +163,11 @@ def esqueci_senha(
     usuario = db.query(Usuario).filter(Usuario.email == dados.email).first()
 
     if usuario:
-        token_obj = TokenResetSenha.criar_novo(usuario_id=usuario.id)
+        token_obj, token_plano = TokenResetSenha.criar_novo(usuario_id=usuario.id)
         db.add(token_obj)
         db.commit()
-        db.refresh(token_obj)
 
-        enviar_email_reset_senha(dados.email, token_obj.token)
+        enviar_email_reset_senha(dados.email, token_plano)
         logger.info(f"Token de reset gerado para {dados.email}")
 
     return RespostaGenerica(
@@ -195,7 +194,7 @@ def redefinir_senha(
 
     token_obj = (
         db.query(TokenResetSenha)
-        .filter(TokenResetSenha.token == dados.token)
+        .filter(TokenResetSenha.token == TokenResetSenha.hash_token(dados.token))
         .first()
     )
 

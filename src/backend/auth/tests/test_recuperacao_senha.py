@@ -52,6 +52,27 @@ def test_esqueci_senha_email_cadastrado(mock_enviar_email):
         app.dependency_overrides.clear()
 
 
+@patch("auth.routes.enviar_email_reset_senha", return_value=True)
+def test_esqueci_senha_token_salvo_com_hash(mock_enviar_email):
+    """O token enviado por e-mail deve ser diferente do valor persistido no
+    banco — o banco guarda apenas o hash, nunca o token em claro."""
+    mock_db = MagicMock()
+    usuario = _criar_usuario_mock()
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        client.post("/auth/esqueci-senha", json={"email": "teste@email.com"})
+
+        token_persistido = mock_db.add.call_args.args[0]
+        token_enviado_email = mock_enviar_email.call_args.args[1]
+
+        assert token_persistido.token != token_enviado_email
+        assert token_persistido.token == TokenResetSenha.hash_token(token_enviado_email)
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_esqueci_senha_email_nao_cadastrado():
     mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.return_value = None
@@ -86,7 +107,7 @@ def test_redefinir_senha_sucesso():
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
         usuario_id=usuario.id,
-        token="token-valido-123",
+        token=TokenResetSenha.hash_token("token-valido-123"),
         usado=False,
         criado_em=datetime.now(timezone.utc),
         expira_em=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -180,7 +201,7 @@ def test_redefinir_senha_token_expirado():
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
         usuario_id=uuid.uuid4(),
-        token="token-expirado",
+        token=TokenResetSenha.hash_token("token-expirado"),
         usado=False,
         criado_em=datetime.now(timezone.utc) - timedelta(hours=2),
         expira_em=datetime.now(timezone.utc) - timedelta(hours=1),
@@ -212,7 +233,7 @@ def test_redefinir_senha_token_ja_usado():
     token_obj = TokenResetSenha(
         id=uuid.uuid4(),
         usuario_id=uuid.uuid4(),
-        token="token-ja-usado",
+        token=TokenResetSenha.hash_token("token-ja-usado"),
         usado=True,
         criado_em=datetime.now(timezone.utc),
         expira_em=datetime.now(timezone.utc) + timedelta(hours=1),
