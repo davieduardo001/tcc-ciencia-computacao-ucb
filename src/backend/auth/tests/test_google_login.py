@@ -25,6 +25,7 @@ def _criar_usuario(overrides=None) -> Usuario:
         "provider": "local",
         "status": "ativo",
         "lgpd_accepted_at": None,
+        "account_linking_pending": 0,
     }
     if overrides:
         kwargs.update(overrides)
@@ -55,6 +56,8 @@ def test_login_google_sucesso_novo_usuario():
             assert "access_token" in data
             assert "refresh_token" in data
             assert data["token_type"] == "bearer"
+            assert data["account_linking_pending"] is False
+            assert data["account_linking_required"] is False
             assert mock_db.add.call_args is not None
             add_calls = [call for call in mock_db.add.call_args_list if call.args and isinstance(call.args[0], Usuario)]
             assert len(add_calls) > 0
@@ -87,6 +90,9 @@ def test_login_google_sucesso_usuario_existente():
                 "id_token": "fake-google-token",
             })
             assert response.status_code == 200
+            data = response.json()
+            assert "access_token" in data
+            assert data["account_linking_pending"] is False
             assert mock_db.commit.call_args is not None
             assert usuario.senha_hash is None
             assert usuario.google_id == "google-user-123"
@@ -96,7 +102,7 @@ def test_login_google_sucesso_usuario_existente():
             app.dependency_overrides.pop(get_db_ref, None)
 
 
-def test_login_google_account_linking():
+def test_login_google_account_linking_necessario():
     usuario = _criar_usuario(overrides={"senha_hash": hash_senha("senha123"), "provider": "local"})
     mock_db = _make_mock_db()
     mock_db.query.return_value.filter.return_value.first.return_value = usuario
@@ -118,7 +124,12 @@ def test_login_google_account_linking():
                 "id_token": "fake-google-token",
             })
             assert response.status_code == 200
-            assert usuario.senha_hash is None
+            data = response.json()
+            assert data["account_linking_pending"] is True
+            assert data["account_linking_required"] is True
+            assert data["access_token"] == ""
+            assert data["refresh_token"] == ""
+            assert usuario.account_linking_pending == 1
             assert usuario.google_id == "google-user-789"
             assert usuario.provider == "google.com"
             assert usuario.avatar_url == "https://example.com/avatar.png"
@@ -138,5 +149,108 @@ def test_login_google_token_invalido():
             })
             assert response.status_code == 401
             assert "Token Google inválido" in response.json()["detail"]
+        finally:
+            app.dependency_overrides.pop(get_db_ref, None)
+
+
+def test_confirmar_link_google_sucesso():
+    usuario = _criar_usuario(overrides={"senha_hash": hash_senha("senha123"), "account_linking_pending": 1})
+    mock_db = _make_mock_db()
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+    mock_db.commit = MagicMock()
+    mock_db.refresh = MagicMock()
+
+    mock_token_info = {
+        "email": "teste@email.com",
+        "nome": "Teste User",
+        "google_id": "google-user-789",
+        "picture": "https://example.com/avatar.png",
+    }
+
+    app.dependency_overrides[get_db_ref] = lambda: mock_db
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = mock_token_info
+        try:
+            response = client.post("/auth/link-google/confirmar", json={
+                "id_token": "fake-google-token",
+                "email": "teste@email.com",
+                "google_id": "google-user-789",
+            })
+            assert response.status_code == 200
+            data = response.json()
+            assert "access_token" in data
+            assert "refresh_token" in data
+            assert usuario.senha_hash is None
+            assert usuario.account_linking_pending == 0
+        finally:
+            app.dependency_overrides.pop(get_db_ref, None)
+
+
+def test_confirmar_link_google_sem_ligacao_pendente():
+    usuario = _criar_usuario()
+    mock_db = _make_mock_db()
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    app.dependency_overrides[get_db_ref] = lambda: mock_db
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = {
+            "email": "teste@email.com",
+            "nome": "Teste User",
+            "google_id": "google-user-999",
+        }
+        try:
+            response = client.post("/auth/link-google/confirmar", json={
+                "id_token": "fake-google-token",
+                "email": "teste@email.com",
+                "google_id": "google-user-999",
+            })
+            assert response.status_code == 404
+            assert "Nenhuma conta aguardando vinculação" in response.json()["detail"]
+        finally:
+            app.dependency_overrides.pop(get_db_ref, None)
+
+
+def test_confirmar_link_google_dados_nao_conferem():
+    usuario = _criar_usuario(overrides={"senha_hash": hash_senha("senha123"), "account_linking_pending": 1})
+    mock_db = _make_mock_db()
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    app.dependency_overrides[get_db_ref] = lambda: mock_db
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = {
+            "email": "outro@email.com",
+            "nome": "Outro User",
+            "google_id": "google-user-different",
+        }
+        try:
+            response = client.post("/auth/link-google/confirmar", json={
+                "id_token": "fake-google-token",
+                "email": "teste@email.com",
+                "google_id": "google-user-789",
+            })
+            assert response.status_code == 400
+            assert "não conferem" in response.json()["detail"]
+        finally:
+            app.dependency_overrides.pop(get_db_ref, None)
+
+
+def test_login_google_conta_inativa_com_linking():
+    usuario = _criar_usuario(overrides={"senha_hash": hash_senha("senha123"), "status": "inativo", "account_linking_pending": 0})
+    mock_db = _make_mock_db()
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    app.dependency_overrides[get_db_ref] = lambda: mock_db
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = {
+            "email": "teste@email.com",
+            "nome": "Teste User",
+            "google_id": "google-user-999",
+        }
+        try:
+            response = client.post("/auth/login/google", json={
+                "id_token": "fake-google-token",
+            })
+            assert response.status_code == 403
+            assert "Conta inativa" in response.json()["detail"]
         finally:
             app.dependency_overrides.pop(get_db_ref, None)

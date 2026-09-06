@@ -36,6 +36,14 @@ class GoogleLoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     mensagem: str = "Login via Google realizado com sucesso."
+    account_linking_pending: bool = False
+    account_linking_required: bool = False
+
+
+class GoogleConfirmLinkInput(BaseModel):
+    id_token: str
+    email: str
+    google_id: str
 
 
 class UsuarioResponse(BaseModel):
@@ -43,6 +51,7 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     status: str
+    account_linking_pending: bool = False
 
 
 class SolicitacaoResetSenha(BaseModel):

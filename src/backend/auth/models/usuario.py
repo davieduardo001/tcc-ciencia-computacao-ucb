@@ -17,5 +17,6 @@ class Usuario(Base):
     status = Column(String(50), default="ativo")
     tentativas_falhas = Column(Integer, default=0)
     bloqueado_ate = Column(DateTime, nullable=True)
+    account_linking_pending = Column(Integer, default=0)
     created_at = Column(DateTime, default=func.now())
     atualizado_em = Column(DateTime, default=func.now(), onupdate=func.now())

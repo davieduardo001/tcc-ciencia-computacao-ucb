@@ -10,7 +10,7 @@ from shared.config import get_settings
 from auth.models import Usuario, Sessao, TokenResetSenha
 from auth.schemas import (
     LoginInput, LoginResponse, RegistrarInput, RegistrarResponse,
-    GoogleLoginInput, GoogleLoginResponse,
+    GoogleLoginInput, GoogleLoginResponse, GoogleConfirmLinkInput,
     SolicitacaoResetSenha, RedefinirSenha, RespostaGenerica,
 )
 from auth.security import hash_senha, verificar_senha, criar_access_token, criar_refresh_token
@@ -252,7 +252,19 @@ async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
                 detail="Conta inativa. Verifique seu e-mail.",
             )
         if usuario.senha_hash is not None:
-            usuario.senha_hash = None
+            usuario.google_id = google_id
+            usuario.provider = "google.com"
+            if picture:
+                usuario.avatar_url = picture
+            usuario.account_linking_pending = 1
+            db.commit()
+            db.refresh(usuario)
+            return GoogleLoginResponse(
+                access_token="",
+                refresh_token="",
+                account_linking_pending=True,
+                account_linking_required=True,
+            )
         usuario.tentativas_falhas = 0
         usuario.bloqueado_ate = None
         usuario.google_id = google_id
@@ -271,6 +283,65 @@ async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
             status="ativo",
         )
         db.add(usuario)
+
+    db.commit()
+    db.refresh(usuario)
+
+    access_token = criar_access_token({"sub": str(usuario.id)})
+    refresh_token = criar_refresh_token({"sub": str(usuario.id)})
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+
+    sessao = Sessao(
+        usuario_id=usuario.id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+    )
+    db.add(sessao)
+    db.commit()
+    db.refresh(sessao)
+
+    return GoogleLoginResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post("/link-google/confirmar", response_model=GoogleLoginResponse)
+async def confirmar_link_google(dados: GoogleConfirmLinkInput, db: Session = Depends(get_db)):
+    try:
+        dados_google = await validar_token_google(dados.id_token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token Google inválido: {str(e)}",
+        )
+
+    if dados_google["email"] != dados.email or dados_google["google_id"] != dados.google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dados do Google não conferem com a solicitação de vinculação.",
+        )
+
+    usuario = db.query(Usuario).filter(Usuario.email == dados.email).first()
+
+    if not usuario or usuario.account_linking_pending == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nenhuma conta aguardando vinculação com Google para este e-mail.",
+        )
+
+    if usuario.status != "ativo":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conta inativa. Verifique seu e-mail.",
+        )
+
+    usuario.senha_hash = None
+    usuario.tentativas_falhas = 0
+    usuario.bloqueado_ate = None
+    usuario.google_id = dados_google["google_id"]
+    usuario.provider = "google.com"
+    if dados_google.get("picture"):
+        usuario.avatar_url = dados_google["picture"]
+    usuario.account_linking_pending = 0
 
     db.commit()
     db.refresh(usuario)
