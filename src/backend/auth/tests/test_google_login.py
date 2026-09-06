@@ -101,13 +101,10 @@ def test_login_google_conta_inativa():
     usuario.status = "inativo"
 
     mock_db = MagicMock()
-
-    def mock_query(model):
-        m = MagicMock()
-        m.filter.return_value.first.return_value = usuario
-        return m
-
-    mock_db.query.side_effect = mock_query
+    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+    mock_db.add = MagicMock()
+    mock_db.commit = MagicMock()
+    mock_db.refresh = MagicMock()
 
     mock_token_info = {
         "email": "teste@email.com",
