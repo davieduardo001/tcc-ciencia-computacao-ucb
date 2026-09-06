@@ -29,8 +29,15 @@ def _criar_usuario() -> Usuario:
 
 def test_login_google_sucesso_usuario_existente():
     usuario = _criar_usuario()
+
     mock_db = MagicMock()
-    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    def mock_query(model):
+        m = MagicMock()
+        m.filter.return_value.first.return_value = usuario
+        return m
+
+    mock_db.query.side_effect = mock_query
 
     mock_token_info = {
         "email": "teste@email.com",
@@ -92,8 +99,15 @@ def test_login_google_token_invalido():
 def test_login_google_conta_inativa():
     usuario = _criar_usuario()
     usuario.status = "inativo"
+
     mock_db = MagicMock()
-    mock_db.query.return_value.filter.return_value.first.return_value = usuario
+
+    def mock_query(model):
+        m = MagicMock()
+        m.filter.return_value.first.return_value = usuario
+        return m
+
+    mock_db.query.side_effect = mock_query
 
     mock_token_info = {
         "email": "teste@email.com",
