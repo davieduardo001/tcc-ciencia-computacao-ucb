@@ -241,6 +241,7 @@ async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
     email = dados_google["email"]
     nome = dados_google["nome"]
     google_id = dados_google["google_id"]
+    picture = dados_google.get("picture")
 
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
 
@@ -250,15 +251,22 @@ async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Conta inativa. Verifique seu e-mail.",
             )
+        if usuario.senha_hash is not None:
+            usuario.senha_hash = None
         usuario.tentativas_falhas = 0
         usuario.bloqueado_ate = None
+        usuario.google_id = google_id
+        usuario.provider = "google.com"
+        if picture:
+            usuario.avatar_url = picture
     else:
         usuario = Usuario(
             nome=nome,
             email=email,
             senha_hash=None,
-            provider="google",
+            provider="google.com",
             google_id=google_id,
+            avatar_url=picture,
             lgpd_accepted_at=datetime.utcnow(),
             status="ativo",
         )

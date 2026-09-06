@@ -10,6 +10,7 @@ class Usuario(Base):
     nome = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     senha_hash = Column(String(255), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
     provider = Column(String(50), default="local")
     google_id = Column(String(255), nullable=True)
     lgpd_accepted_at = Column(DateTime, nullable=False, default=func.now())

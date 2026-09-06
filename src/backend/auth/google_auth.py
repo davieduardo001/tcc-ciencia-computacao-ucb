@@ -20,4 +20,5 @@ async def validar_token_google(id_token: str) -> dict:
         "email": dados.get("email"),
         "nome": dados.get("name"),
         "google_id": dados.get("sub"),
+        "picture": dados.get("picture"),
     }
