@@ -13,6 +13,10 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class GoogleLoginInput(BaseModel):
+    id_token: str
+
+
 class RegistrarInput(BaseModel):
     nome: str
     email: str
@@ -25,6 +29,13 @@ class RegistrarResponse(BaseModel):
     nome: str
     email: str
     mensagem: str
+
+
+class GoogleLoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    mensagem: str = "Login via Google realizado com sucesso."
 
 
 class UsuarioResponse(BaseModel):

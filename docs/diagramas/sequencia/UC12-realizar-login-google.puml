@@ -1,0 +1,94 @@
+@startuml UC12_RealizarLoginGoogle
+hide footbox
+title Diagrama de Sequencia - Login via Provedor Social Google (US #12)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaLogin" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloUsuario" as User <<modelo>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":GoogleAPI" as Google <<servico externo>>
+
+Passageiro -> View : clicarLoginGoogle()
+activate View
+
+View -> View : obterGoogleIdToken()
+
+alt token obtido com sucesso
+    View -> Gateway : requisicaoLoginGoogle(idToken)
+    activate Gateway
+
+    Gateway -> Auth : validarGoogleToken(idToken)
+    activate Auth
+
+    Auth -> Google : validarIdToken(idToken)
+    activate Google
+    Google --> Auth : dadosGoogle(email, nome, googleId)
+    deactivate Google
+
+    Auth -> Auth : extrairDadosGoogle(dadosGoogle)
+
+    Auth -> User : buscarPorEmail(email)
+    activate User
+
+    alt usuario encontrado
+        User --> Auth : dadosUsuario(id, email, nome, status)
+        deactivate User
+
+        Auth -> Auth : verificarStatusAtivo(status)
+
+        alt conta ativa
+            Auth -> Sessao : criarSessao(usuarioId)
+            activate Sessao
+            Sessao --> Auth : tokens(accessToken, refreshToken)
+            deactivate Sessao
+
+            Auth --> Gateway : autenticado(tokens)
+            Gateway --> View : retornarResposta(tokens)
+
+            View -> View : armazenarTokensLocalmente(tokens)
+            View -> View : redirecionarParaMapa()
+
+        else conta inativa ou suspensa
+            Auth --> Gateway : erroAutenticacao(contaInativa)
+            Gateway --> View : retornarResposta(contaInativa)
+            View -> View : exibirMensagemErro("Conta inativa. Verifique seu e-mail.")
+        end
+
+    else usuario nao encontrado
+        User --> Auth : inexistente()
+        deactivate User
+
+        Auth -> Auth : criarUsuarioAutomatico(nome, email)
+        activate Auth
+
+        Auth -> User : salvarNovoUsuario(nome, email, googleId)
+        activate User
+        User --> Auth : usuarioCriado(id)
+        deactivate User
+
+        Auth -> Sessao : criarSessao(usuarioId)
+        activate Sessao
+        Sessao --> Auth : tokens(accessToken, refreshToken)
+        deactivate Sessao
+
+        Auth --> Gateway : autenticado(tokens)
+        Gateway --> View : retornarResposta(tokens)
+
+        View -> View : armazenarTokensLocalmente(tokens)
+        View -> View : redirecionarParaMapa()
+        deactivate Auth
+
+    end
+
+    deactivate Gateway
+
+else token invalido ou nao obtido
+    View -> View : exibirErroGoogle()
+    View --> Passageiro : exibirAviso("Falha ao autenticar com Google")
+end
+
+deactivate View
+@enduml
