@@ -1,11 +1,11 @@
-from authlib.integrations.httpx_client import AsyncOAuth2Client
+import httpx
 from shared.config import get_settings
 
 settings = get_settings()
 
 
 async def validar_token_google(id_token: str) -> dict:
-    async with AsyncOAuth2Client() as client:
+    async with httpx.AsyncClient() as client:
         resp = await client.get(
             "https://oauth2.googleapis.com/tokeninfo",
             params={"id_token": id_token},

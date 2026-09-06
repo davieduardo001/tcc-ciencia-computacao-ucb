@@ -39,7 +39,8 @@ def test_login_google_sucesso_usuario_existente():
         "sub": "google-user-123",
     }
 
-    with patch("auth.routes.validar_token_google", return_value=mock_token_info):
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = mock_token_info
         with patch("shared.database.get_db", return_value=_override_get_db(mock_db)):
             response = client.post("/auth/login/google", json={
                 "id_token": "fake-google-token",
@@ -64,7 +65,8 @@ def test_login_google_sucesso_novo_usuario():
         "sub": "google-user-456",
     }
 
-    with patch("auth.routes.validar_token_google", return_value=mock_token_info):
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = mock_token_info
         with patch("shared.database.get_db", return_value=_override_get_db(mock_db)):
             response = client.post("/auth/login/google", json={
                 "id_token": "fake-google-token",
@@ -79,7 +81,8 @@ def test_login_google_sucesso_novo_usuario():
 def test_login_google_token_invalido():
     mock_db = MagicMock()
 
-    with patch("auth.routes.validar_token_google", side_effect=Exception("Token inválido")):
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.side_effect = Exception("Token inválido")
         with patch("shared.database.get_db", return_value=_override_get_db(mock_db)):
             response = client.post("/auth/login/google", json={
                 "id_token": "fake-google-token",
@@ -101,7 +104,8 @@ def test_login_google_conta_inativa():
         "sub": "google-user-789",
     }
 
-    with patch("auth.routes.validar_token_google", return_value=mock_token_info):
+    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
+        mock_validar.return_value = mock_token_info
         with patch("shared.database.get_db", return_value=_override_get_db(mock_db)):
             response = client.post("/auth/login/google", json={
                 "id_token": "fake-google-token",

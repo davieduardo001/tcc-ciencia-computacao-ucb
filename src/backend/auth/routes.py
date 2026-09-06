@@ -229,9 +229,9 @@ def redefinir_senha(
 
 
 @router.post("/login/google", response_model=GoogleLoginResponse)
-def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
+async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
     try:
-        dados_google = validar_token_google(dados.id_token)
+        dados_google = await validar_token_google(dados.id_token)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
