@@ -33,10 +33,9 @@ def test_login_google_sucesso_usuario_existente():
     mock_db.query.return_value.filter.return_value.first.return_value = usuario
 
     mock_token_info = {
-        "aud": "test-google-client-id",
         "email": "teste@email.com",
-        "name": "Teste User",
-        "sub": "google-user-123",
+        "nome": "Teste User",
+        "google_id": "google-user-123",
     }
 
     with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
@@ -59,10 +58,9 @@ def test_login_google_sucesso_novo_usuario():
     mock_db.refresh = MagicMock()
 
     mock_token_info = {
-        "aud": "test-google-client-id",
         "email": "novo@email.com",
-        "name": "Novo User",
-        "sub": "google-user-456",
+        "nome": "Novo User",
+        "google_id": "google-user-456",
     }
 
     with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
@@ -98,10 +96,9 @@ def test_login_google_conta_inativa():
     mock_db.query.return_value.filter.return_value.first.return_value = usuario
 
     mock_token_info = {
-        "aud": "test-google-client-id",
         "email": "teste@email.com",
-        "name": "Teste User",
-        "sub": "google-user-789",
+        "nome": "Teste User",
+        "google_id": "google-user-789",
     }
 
     with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
