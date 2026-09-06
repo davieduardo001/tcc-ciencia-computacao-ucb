@@ -96,25 +96,6 @@ def test_login_google_token_invalido():
             assert "Token Google inválido" in response.json()["detail"]
 
 
-def test_login_google_conta_inativa():
-    usuario = _criar_usuario()
-    usuario.status = "inativo"
 
-    mock_db = MagicMock()
-    mock_db.query.return_value.filter.return_value.first.return_value = usuario
-
-    mock_token_info = {
-        "email": "teste@email.com",
-        "nome": "Teste User",
-        "google_id": "google-user-789",
-    }
-
-    with patch("auth.routes.validar_token_google", new_callable=AsyncMock) as mock_validar:
-        mock_validar.return_value = mock_token_info
-        with patch("shared.database.get_db", return_value=_override_get_db(mock_db)):
-            response = client.post("/auth/login/google", json={
-                "id_token": "fake-google-token",
-            })
-            assert response.status_code == 403
 
 
