@@ -503,7 +503,8 @@ def test_rota_itens_possuem_campos_esperados():
 
 def test_rota_nao_importa_firebase_celery():
     """routes.py não deve importar firebase_admin, celery ou apscheduler."""
-    fonte = pathlib.Path("src/backend/colaboracao/routes.py").read_text()
+    routes_path = pathlib.Path(__file__).resolve().parents[1] / "routes.py"
+    fonte = routes_path.read_text()
     tree = ast.parse(fonte)
     imports = []
     for node in ast.walk(tree):
