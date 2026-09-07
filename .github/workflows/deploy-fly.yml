@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - name: Configurar GOOGLE_CLIENT_ID (login via Google, US #12)
+      - name: "Configurar GOOGLE_CLIENT_ID (login via Google, US #12)"
         if: ${{ secrets.GOOGLE_CLIENT_ID != '' }}
         run: >
           flyctl secrets set
