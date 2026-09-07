@@ -53,3 +53,39 @@ def test_refresh_seta_cookies_sem_quebrar_no_json_do_proxy():
 
     assert response.status_code == 200
     assert "access_token" in response.cookies
+
+
+def test_login_google_e_publico_sem_cookie_de_sessao():
+    """Regressão: login/google e link-google/confirmar ficaram fora de
+    ROTAS_PUBLICAS, então o AutenticacaoMiddleware barrava com 401
+    antes do CORSMiddleware rodar (virava erro de CORS no navegador,
+    já que o preflight nunca recebia Access-Control-Allow-Origin)."""
+    with patch(
+        "gateway.routes.proxy_request",
+        AsyncMock(return_value=_proxy_response_ok()),
+    ):
+        response = client.post(
+            "/api/auth/login/google",
+            json={"id_token": "id-token-fake"},
+        )
+
+    assert response.status_code == 200
+    assert "access_token" in response.cookies
+
+
+def test_link_google_confirmar_e_publico_sem_cookie_de_sessao():
+    with patch(
+        "gateway.routes.proxy_request",
+        AsyncMock(return_value=_proxy_response_ok()),
+    ):
+        response = client.post(
+            "/api/auth/link-google/confirmar",
+            json={
+                "id_token": "id-token-fake",
+                "email": "teste@example.com",
+                "google_id": "google-123",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "access_token" in response.cookies

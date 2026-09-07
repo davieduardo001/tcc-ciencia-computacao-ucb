@@ -38,6 +38,11 @@ jobs:
 
       - name: Build do projeto
         run: vercel build --prod --token=$VERCEL_TOKEN
+        env:
+          # NEXT_PUBLIC_* é inlined no bundle em build time — não
+          # precisa estar cadastrada na Vercel, só disponível pro
+          # `next build` (login via Google, US #12/#92).
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
 
       - name: Deploy (Production)
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
