@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_MINUTES: int = 60
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
+    GOOGLE_CLIENT_ID: str = ""
 
     class Config:
         env_file = ".env"
