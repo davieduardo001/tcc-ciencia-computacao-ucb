@@ -252,10 +252,9 @@ async def login_google(dados: GoogleLoginInput, db: Session = Depends(get_db)):
                 detail="Conta inativa. Verifique seu e-mail.",
             )
         if usuario.senha_hash is not None:
-            usuario.google_id = google_id
-            usuario.provider = "google.com"
-            if picture:
-                usuario.avatar_url = picture
+            # Não gravamos google_id/provider/avatar_url aqui: o vínculo só
+            # deve virar fato em /link-google/confirmar, que revalida o
+            # token do Google antes de tocar na conta.
             usuario.account_linking_pending = 1
             db.commit()
             db.refresh(usuario)
