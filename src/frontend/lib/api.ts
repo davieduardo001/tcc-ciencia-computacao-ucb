@@ -116,6 +116,114 @@ export async function loginUsuario(
   return data;
 }
 
+export interface GoogleLoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  account_linking_pending: boolean;
+  account_linking_required: boolean;
+}
+
+export class GoogleLoginError extends Error {}
+
+function armazenarTokensSeExistirem(data: {
+  access_token?: string;
+  refresh_token?: string;
+}): void {
+  if (data.access_token) {
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token ?? "");
+  }
+}
+
+/**
+ * Login via Google: envia o id_token (JWT) obtido do Google Identity
+ * Services. Se o e-mail já pertencer a uma conta local com senha, o
+ * backend não retorna tokens — retorna account_linking_required: true
+ * pra que o front peça confirmação antes de vincular (ver
+ * confirmarVinculoGoogle).
+ */
+export async function loginComGoogle(
+  idToken: string
+): Promise<GoogleLoginResponse> {
+  const response = await fetch(`${API_URL}/api/auth/login/google`, {
+    credentials: "include",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new GoogleLoginError(
+      data.detail || "Não foi possível entrar com o Google."
+    );
+  }
+
+  armazenarTokensSeExistirem(data);
+
+  return data;
+}
+
+export interface ConfirmarVinculoGooglePayload {
+  idToken: string;
+  email: string;
+  googleId: string;
+}
+
+/** Confirma a vinculação de uma conta local existente com o Google. */
+export async function confirmarVinculoGoogle(
+  dados: ConfirmarVinculoGooglePayload
+): Promise<GoogleLoginResponse> {
+  const response = await fetch(`${API_URL}/api/auth/link-google/confirmar`, {
+    credentials: "include",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id_token: dados.idToken,
+      email: dados.email,
+      google_id: dados.googleId,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new GoogleLoginError(
+      data.detail || "Não foi possível confirmar o vínculo com o Google."
+    );
+  }
+
+  armazenarTokensSeExistirem(data);
+
+  return data;
+}
+
+/**
+ * Decodifica (sem validar assinatura) o payload de um id_token JWT do
+ * Google, só pra extrair email/sub e mostrar a tela de confirmação de
+ * vínculo. A validação de verdade sempre acontece no Auth Service.
+ */
+export function decodificarIdTokenGoogle(idToken: string): {
+  email?: string;
+  sub?: string;
+} {
+  try {
+    const payload = idToken.split(".")[1];
+    const normalizado = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(normalizado)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem("access_token");
 }
