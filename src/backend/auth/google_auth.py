@@ -16,6 +16,9 @@ async def validar_token_google(id_token: str) -> dict:
     if dados.get("aud") != settings.GOOGLE_CLIENT_ID:
         raise ValueError("Client ID inválido")
 
+    if dados.get("email_verified") != "true":
+        raise ValueError("E-mail do Google não verificado")
+
     return {
         "email": dados.get("email"),
         "nome": dados.get("name"),
