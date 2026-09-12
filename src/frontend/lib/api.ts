@@ -272,3 +272,21 @@ export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
     return null;
   }
 }
+
+/**
+ * Encerra a sessão: chama o Gateway (que limpa os cookies httpOnly e
+ * repassa pro Auth Service revogar a sessão) e limpa os tokens locais.
+ * Sempre limpa o estado local, mesmo se a chamada ao Gateway falhar —
+ * logout nunca deve travar o usuário do lado de fora por causa de um
+ * erro de rede.
+ */
+export async function logoutUsuario(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } finally {
+    clearTokens();
+  }
+}

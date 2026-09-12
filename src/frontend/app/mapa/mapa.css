@@ -181,6 +181,43 @@
   border-top: 1px solid var(--border-2);
 }
 
+.ms-user > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.ms-user strong,
+.ms-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-sair-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border-2);
+  background: #fff;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: 0.14s;
+}
+
+.ms-sair-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  color: #d6453d;
+  border-color: #d6453d;
+}
+
+.ms-sair-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .ms-avatar {
   width: 36px;
   height: 36px;

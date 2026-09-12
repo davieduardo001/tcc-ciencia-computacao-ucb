@@ -1,17 +1,27 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AppShell from "../AppShell";
-import { buscarUsuarioAtual } from "@/lib/api";
+import { buscarUsuarioAtual, logoutUsuario } from "@/lib/api";
 
 jest.mock("@/lib/api", () => ({
   buscarUsuarioAtual: jest.fn(),
+  logoutUsuario: jest.fn(),
+}));
+
+const pushMock = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
 }));
 
 const buscarUsuarioAtualMock = buscarUsuarioAtual as jest.Mock;
+const logoutUsuarioMock = logoutUsuario as jest.Mock;
 
 describe("AppShell", () => {
   beforeEach(() => {
     buscarUsuarioAtualMock.mockReset();
     buscarUsuarioAtualMock.mockResolvedValue(null);
+    logoutUsuarioMock.mockReset();
+    logoutUsuarioMock.mockResolvedValue(undefined);
+    pushMock.mockReset();
   });
 
 
@@ -90,5 +100,43 @@ describe("AppShell", () => {
     });
     expect(screen.getByText("ana@teste.com")).toBeInTheDocument();
     expect(screen.getByText("AP")).toBeInTheDocument();
+  });
+
+  it("não mostra botão de sair para visitante", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue(null);
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Visitante")).toBeInTheDocument();
+    });
+    expect(screen.queryByTitle("Sair")).not.toBeInTheDocument();
+  });
+
+  it("botão de sair chama logoutUsuario e redireciona para /login", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue({
+      id: "1",
+      nome: "Ana Passageira",
+      email: "ana@teste.com",
+      avatarUrl: null,
+    });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const botaoSair = await screen.findByTitle("Sair");
+    fireEvent.click(botaoSair);
+
+    await waitFor(() => {
+      expect(logoutUsuarioMock).toHaveBeenCalledTimes(1);
+      expect(pushMock).toHaveBeenCalledWith("/login");
+    });
   });
 });

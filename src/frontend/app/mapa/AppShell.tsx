@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Bus,
+  LogOut,
   Map as MapIcon,
   Navigation,
   Plus,
@@ -15,7 +17,7 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
-import { buscarUsuarioAtual, UsuarioAtual } from "@/lib/api";
+import { buscarUsuarioAtual, logoutUsuario, UsuarioAtual } from "@/lib/api";
 import "./mapa.css";
 
 function iniciais(nome: string): string {
@@ -77,8 +79,16 @@ function ItemNav({
 }
 
 export default function AppShell({ active, children }: AppShellProps) {
+  const router = useRouter();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+  const [saindo, setSaindo] = useState(false);
+
+  async function handleSair() {
+    setSaindo(true);
+    await logoutUsuario();
+    router.push("/login");
+  }
 
   useEffect(() => {
     let ativo = true;
@@ -141,6 +151,17 @@ export default function AppShell({ active, children }: AppShellProps) {
               {carregandoUsuario ? "" : usuario?.email ?? "Não autenticado"}
             </small>
           </div>
+          {usuario && (
+            <button
+              type="button"
+              className="ms-sair-btn"
+              title="Sair"
+              onClick={handleSair}
+              disabled={saindo}
+            >
+              <LogOut size={16} />
+            </button>
+          )}
         </div>
       </aside>
 

@@ -74,6 +74,24 @@ def teste_brenouchihar():
     }
 
 
+@router.post("/logout", response_model=RespostaGenerica)
+def logout(request: Request, db: Session = Depends(get_db)):
+    """
+    Encerra a sessão associada ao access_token do cookie (se houver).
+
+    O Gateway é quem limpa os cookies httpOnly de fato — este endpoint
+    só remove o registro em `sessoes` para que o refresh token não
+    possa mais ser usado. Idempotente: sem cookie ou sessão já removida,
+    ainda responde sucesso.
+    """
+    token = request.cookies.get("access_token")
+    if token:
+        db.query(Sessao).filter(Sessao.access_token == token).delete()
+        db.commit()
+
+    return RespostaGenerica(mensagem="Logout realizado com sucesso.")
+
+
 @router.get("/me", response_model=MeResponse)
 def me(request: Request, db: Session = Depends(get_db)):
     """
