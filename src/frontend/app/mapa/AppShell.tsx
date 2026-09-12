@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -12,7 +15,15 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
+import { buscarUsuarioAtual, UsuarioAtual } from "@/lib/api";
 import "./mapa.css";
+
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase();
+}
 
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
@@ -66,6 +77,24 @@ function ItemNav({
 }
 
 export default function AppShell({ active, children }: AppShellProps) {
+  const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+
+  useEffect(() => {
+    let ativo = true;
+
+    buscarUsuarioAtual().then((dados) => {
+      if (ativo) {
+        setUsuario(dados);
+        setCarregandoUsuario(false);
+      }
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <aside className="ms-sidebar">
@@ -99,10 +128,18 @@ export default function AppShell({ active, children }: AppShellProps) {
         </span>
 
         <div className="ms-user">
-          <div className="ms-avatar">AM</div>
+          <div className="ms-avatar">
+            {usuario ? iniciais(usuario.nome) : <User size={16} />}
+          </div>
           <div>
-            <strong>Admin Movecity</strong>
-            <small>Conta demo</small>
+            <strong>
+              {carregandoUsuario
+                ? "Carregando..."
+                : usuario?.nome ?? "Visitante"}
+            </strong>
+            <small>
+              {carregandoUsuario ? "" : usuario?.email ?? "Não autenticado"}
+            </small>
           </div>
         </div>
       </aside>
@@ -115,7 +152,6 @@ export default function AppShell({ active, children }: AppShellProps) {
         <div className="ms-actions">
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
-            <span className="ms-badge-count">3</span>
           </button>
           <button type="button" className="ms-icon-btn" title="Preferências">
             <Settings size={17} />
