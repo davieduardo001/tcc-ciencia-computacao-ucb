@@ -1,6 +1,6 @@
 # Pesquisa: Integração com dados de linhas e GPS de ônibus do DF
 
-**Status:** Em discussão (Vitória + Davi)
+**Status:** Decidido (Vitória + Davi)
 **Contexto:** US #15 (Buscar Linha por Número), #16 (Rastrear Posição em Tempo Real), #17 (Visualizar Trajeto e Paradas) — as três dependem da mesma fonte de dados de linhas/GPS, por isso a decisão precisa ser tomada em conjunto.
 
 ---
@@ -46,4 +46,9 @@ Ideia trazida pela Vitória, em alinhamento com o Davi:
 
 ## Decisão
 
-_Pendente — em conversa entre Vitória e Davi._
+**Aprovado por Vitória e Davi.** Abordagem híbrida para as US #15, #16 e #17:
+
+1. **Linhas, paradas, trajeto e horários (estático)** — cache sob demanda no schema `mobilidade` a partir da API de rotas do Google Maps, consultada apenas quando um usuário busca uma linha ainda não cacheada (ou desatualizada). Terminais das linhas piloto (Taguatinga/Ceilândia) cadastrados manualmente para viabilizar a consulta terminal-a-terminal.
+2. **Posição em tempo real (#16)** — sem feed externo. Vem exclusivamente da localização real de usuários do Movecity que confirmarem estar embarcados numa linha (opt-in explícito), seguindo o modelo de bootstrap do Moovit. Sem reportes ativos, aplica-se o Cenário 3 da própria US ("nenhum veículo em operação").
+3. **Consentimento (LGPD)** — obrigatório e explícito na UX antes de qualquer compartilhamento de localização; ponto compartilhado deve ser desvinculado da identidade do usuário na exibição pra outros passageiros.
+4. **Antes de ir pra produção** (não bloqueia o desenvolvimento do MVP): confirmar formalmente o ToS do Google Maps Platform quanto a cache/armazenamento de longo prazo dos dados de linha/parada.
