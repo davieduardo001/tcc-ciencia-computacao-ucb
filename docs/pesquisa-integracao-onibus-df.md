@@ -37,6 +37,13 @@ Ideia trazida pela Vitória, em alinhamento com o Davi:
 - **LGPD / consentimento**: compartilhar localização em tempo real do usuário exige opt-in explícito e claro — já é um requisito não-funcional documentado em [documento_visao.md](documento_visao.md) ("Proteção rigorosa de dados de geolocalização"). Precisa de UX de confirmação ("estou embarcado na linha X") e, idealmente, anonimização do ponto compartilhado (não expor identidade do usuário atrelada à posição).
 - **Cold start**: no piloto, esperar ter poucos ou nenhum usuário reportando posição na maior parte do tempo — vale considerar dados simulados só para fins de demonstração/apresentação do TCC, deixando claro que é simulação.
 
+## Refinamentos (2026-09-12)
+
+- **Cache 100% sob demanda, nunca em lote**: só chamamos o Google quando um usuário busca uma linha específica que ainda não está no nosso banco (ou está velha, ex: >30 dias). Nunca pré-popular todas as linhas de uma vez — economiza chamada ao máximo.
+- **Limitação técnica identificada para o teste do ToS**: a API do Google (Routes/Directions, `mode=transit`) não tem endpoint de "me dê a linha X inteira" — ela só responde pra uma rota origem→destino específica. Pra testar e obter o itinerário completo de uma linha (do jeito que a #15 pede: "itinerário e sentido"), precisamos primeiro saber os dois terminais da linha. Dado que o piloto é só Taguatinga/Ceilândia, a proposta é: cadastrar manualmente 3–5 linhas reais dessa região (nome + terminais, via horário público do DFTRANS/SEMOB) e então testar o Google pedindo a rota terminal-a-terminal, salvando o resultado como "dump" no banco.
+- **Abordagem para o ToS**: em vez de só ler o termo de uso a frio, faremos um teste empírico com uma linha real primeiro (baixo risco, uso acadêmico/TCC) — mas isso não substitui checar o texto do ToS antes de decidir manter isso em produção a longo prazo.
+- **LGPD**: confirmado — consentimento tem que ficar 100% explícito na UX (tela de confirmação antes de compartilhar posição), sem exceção.
+
 ## Decisão
 
 _Pendente — em conversa entre Vitória e Davi._
