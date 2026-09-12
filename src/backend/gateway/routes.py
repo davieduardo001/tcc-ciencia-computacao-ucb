@@ -129,6 +129,16 @@ async def confirmar_link_google(request: Request):
     return response
 
 
+@router.get("/auth/me")
+async def me(request: Request):
+    """Dados do usuário autenticado: proxy simples (sem cookies pra setar)."""
+    return await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/me",
+        request,
+    )
+
+
 @router.post("/auth/refresh")
 async def refresh(request: Request):
     """Refresh token: proxy + atualizar cookies."""

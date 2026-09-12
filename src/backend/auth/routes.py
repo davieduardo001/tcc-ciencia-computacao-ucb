@@ -1,8 +1,9 @@
 import time
 import logging
+import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
@@ -11,9 +12,12 @@ from auth.models import Usuario, Sessao, TokenResetSenha
 from auth.schemas import (
     LoginInput, LoginResponse, RegistrarInput, RegistrarResponse,
     GoogleLoginInput, GoogleLoginResponse, GoogleConfirmLinkInput,
-    SolicitacaoResetSenha, RedefinirSenha, RespostaGenerica,
+    SolicitacaoResetSenha, RedefinirSenha, RespostaGenerica, MeResponse,
 )
-from auth.security import hash_senha, verificar_senha, criar_access_token, criar_refresh_token
+from auth.security import (
+    hash_senha, verificar_senha, criar_access_token, criar_refresh_token,
+    decodificar_access_token,
+)
 from auth.email_service import enviar_email_reset_senha
 from auth.google_auth import validar_token_google
 
@@ -68,6 +72,59 @@ def teste_brenouchihar():
         "autor": "brenouchihar",
         "mensagem": "hello world"
     }
+
+
+@router.post("/logout", response_model=RespostaGenerica)
+def logout(request: Request, db: Session = Depends(get_db)):
+    """
+    Encerra a sessão associada ao access_token do cookie (se houver).
+
+    O Gateway é quem limpa os cookies httpOnly de fato — este endpoint
+    só remove o registro em `sessoes` para que o refresh token não
+    possa mais ser usado. Idempotente: sem cookie ou sessão já removida,
+    ainda responde sucesso.
+    """
+    token = request.cookies.get("access_token")
+    if token:
+        db.query(Sessao).filter(Sessao.access_token == token).delete()
+        db.commit()
+
+    return RespostaGenerica(mensagem="Logout realizado com sucesso.")
+
+
+@router.get("/me", response_model=MeResponse)
+def me(request: Request, db: Session = Depends(get_db)):
+    """
+    Dados do usuário autenticado, a partir do cookie access_token.
+
+    O Gateway repassa o cookie ao proxyar a requisição (não injeta
+    identidade via header) — este endpoint valida a assinatura do
+    token ele mesmo, já que o Auth Service é alcançado pela URL
+    pública do Fly.io, não por rede privada.
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Não autenticado.")
+
+    payload = decodificar_access_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    try:
+        usuario_id = uuid.UUID(payload["sub"])
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+
+    return MeResponse(
+        id=str(usuario.id),
+        nome=usuario.nome,
+        email=usuario.email,
+        avatar_url=usuario.avatar_url,
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
