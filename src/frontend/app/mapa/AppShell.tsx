@@ -1,7 +1,13 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Bus,
+  LogOut,
   Map as MapIcon,
   Navigation,
   Plus,
@@ -11,7 +17,15 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
+import { buscarUsuarioAtual, logoutUsuario, UsuarioAtual } from "@/lib/api";
 import "./mapa.css";
+
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase();
+}
 
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
@@ -65,11 +79,45 @@ function ItemNav({
 }
 
 export default function AppShell({ active, children }: AppShellProps) {
+  const router = useRouter();
+  const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+  const [saindo, setSaindo] = useState(false);
+
+  async function handleSair() {
+    setSaindo(true);
+    await logoutUsuario();
+    router.push("/login");
+  }
+
+  useEffect(() => {
+    let ativo = true;
+
+    buscarUsuarioAtual().then((dados) => {
+      if (ativo) {
+        setUsuario(dados);
+        setCarregandoUsuario(false);
+      }
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <aside className="ms-sidebar">
         <div className="ms-brand">
-          <div className="ms-brand-mark">M</div>
+          <div className="ms-brand-mark">
+            <Image
+              src="/movecity-icon.png"
+              alt=""
+              width={38}
+              height={38}
+              priority
+            />
+          </div>
           <div>
             <strong>Movecity</strong>
             <small>Mobilidade DF</small>
@@ -90,11 +138,30 @@ export default function AppShell({ active, children }: AppShellProps) {
         </span>
 
         <div className="ms-user">
-          <div className="ms-avatar">AM</div>
-          <div>
-            <strong>Admin Movecity</strong>
-            <small>Conta demo</small>
+          <div className="ms-avatar">
+            {usuario ? iniciais(usuario.nome) : <User size={16} />}
           </div>
+          <div>
+            <strong>
+              {carregandoUsuario
+                ? "Carregando..."
+                : usuario?.nome ?? "Visitante"}
+            </strong>
+            <small>
+              {carregandoUsuario ? "" : usuario?.email ?? "Não autenticado"}
+            </small>
+          </div>
+          {usuario && (
+            <button
+              type="button"
+              className="ms-sair-btn"
+              title="Sair"
+              onClick={handleSair}
+              disabled={saindo}
+            >
+              <LogOut size={16} />
+            </button>
+          )}
         </div>
       </aside>
 
@@ -106,7 +173,6 @@ export default function AppShell({ active, children }: AppShellProps) {
         <div className="ms-actions">
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
-            <span className="ms-badge-count">3</span>
           </button>
           <button type="button" className="ms-icon-btn" title="Preferências">
             <Settings size={17} />

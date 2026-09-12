@@ -236,3 +236,57 @@ export function clearTokens(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
 }
+
+export interface UsuarioAtual {
+  id: string;
+  nome: string;
+  email: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * Busca os dados do usuário autenticado (sessão via cookie httpOnly
+ * setado pelo Gateway no login). Retorna null quando não há sessão
+ * válida — nunca lança exceção, para uso simples em componentes que
+ * só precisam exibir "logado" vs "visitante".
+ */
+export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/me`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      id: data.id,
+      nome: data.nome,
+      email: data.email,
+      avatarUrl: data.avatar_url ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Encerra a sessão: chama o Gateway (que limpa os cookies httpOnly e
+ * repassa pro Auth Service revogar a sessão) e limpa os tokens locais.
+ * Sempre limpa o estado local, mesmo se a chamada ao Gateway falhar —
+ * logout nunca deve travar o usuário do lado de fora por causa de um
+ * erro de rede.
+ */
+export async function logoutUsuario(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } finally {
+    clearTokens();
+  }
+}

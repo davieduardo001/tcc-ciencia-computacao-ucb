@@ -56,13 +56,17 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--grad-2), var(--primary));
-  color: #fff;
+  overflow: hidden;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 18px;
   box-shadow: 0 6px 14px rgba(0, 109, 119, 0.3);
+  flex-shrink: 0;
+}
+
+.ms-brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .ms-brand strong {
@@ -175,6 +179,43 @@
   gap: 10px;
   padding: 12px 8px 4px;
   border-top: 1px solid var(--border-2);
+}
+
+.ms-user > div:not(.ms-avatar) {
+  flex: 1;
+  min-width: 0;
+}
+
+.ms-user strong,
+.ms-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-sair-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border-2);
+  background: #fff;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: 0.14s;
+}
+
+.ms-sair-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  color: #d6453d;
+  border-color: #d6453d;
+}
+
+.ms-sair-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .ms-avatar {
