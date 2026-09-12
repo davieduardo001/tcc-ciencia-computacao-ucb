@@ -203,6 +203,11 @@
 /* ===== Topbar ===== */
 .ms-topbar {
   grid-area: top;
+  /* altura explicita: um flex container como item de grid de uma unica
+     linha nao estica de forma confiavel so com align-self stretch —
+     sem isso, a barra encolhia pro tamanho do conteudo (~36px) e a
+     busca/os icones (45px/42px) transbordavam por cima e por baixo. */
+  height: var(--topbar-h);
   background: #fff;
   border-bottom: 1px solid var(--border);
   display: flex;
