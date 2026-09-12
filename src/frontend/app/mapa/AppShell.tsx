@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
@@ -69,7 +70,15 @@ export default function AppShell({ active, children }: AppShellProps) {
     <div className="app-shell">
       <aside className="ms-sidebar">
         <div className="ms-brand">
-          <div className="ms-brand-mark">M</div>
+          <div className="ms-brand-mark">
+            <Image
+              src="/movecity-icon.png"
+              alt=""
+              width={38}
+              height={38}
+              priority
+            />
+          </div>
           <div>
             <strong>Movecity</strong>
             <small>Mobilidade DF</small>

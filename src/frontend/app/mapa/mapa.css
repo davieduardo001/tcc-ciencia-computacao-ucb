@@ -56,13 +56,17 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--grad-2), var(--primary));
-  color: #fff;
+  overflow: hidden;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 18px;
   box-shadow: 0 6px 14px rgba(0, 109, 119, 0.3);
+  flex-shrink: 0;
+}
+
+.ms-brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .ms-brand strong {
