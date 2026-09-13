@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import logging
 import unicodedata
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from mobilidade.providers import osrm_router
 from mobilidade.models.linha import Linha
 from mobilidade.providers.contratos import (
     LinhaEncontrada,
@@ -21,6 +23,7 @@ from mobilidade.providers.contratos import (
     LinhaResumo,
     ParadaLinha,
 )
+from mobilidade.providers.linha_mock import LinhaMockProvider
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +80,32 @@ class LinhaService:
         if resultado is None:
             return None
 
+        resultado = await self._com_trajeto_real(resultado)
+
         self._salvar_no_cache(db, resultado)
         return resultado
+
+    async def _com_trajeto_real(self, resultado: LinhaEncontrada) -> LinhaEncontrada:
+        """
+        Road-snapping (best-effort): o LinhaMockProvider só tem 3-4
+        pontos crus por linha, que o Leaflet desenha como reta —
+        corta quarteirão, ignora rua. Só roda no cache-miss (uma vez
+        por linha, não por request) e só pro provider mock — a Routes
+        API do Google já devolve geometria real, então road-snapping
+        de novo em cima dela seria redundante.
+
+        Se o OSRM falhar (fora do ar, timeout, sem rota), mantém os
+        pontos originais do provider — nunca quebra a busca por causa
+        disso.
+        """
+        if not isinstance(self._provider, LinhaMockProvider):
+            return resultado
+
+        trajeto_real = await osrm_router.rotear(resultado.trajeto)
+        if not trajeto_real:
+            return resultado
+
+        return replace(resultado, trajeto=trajeto_real)
 
     async def sugerir(self, termo: str) -> list[LinhaResumo]:
         """
