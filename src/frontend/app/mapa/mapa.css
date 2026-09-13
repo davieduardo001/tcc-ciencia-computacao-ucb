@@ -446,6 +446,147 @@
   }
 }
 
+/* ===== Marcador de parada (US #17) ===== */
+.mapa-icone-parada {
+  background: transparent;
+  border: none;
+}
+
+.mapa-icone-parada-core {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--primary);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ===== Seta de sentido de operação (US #17) ===== */
+.mapa-icone-sentido {
+  background: transparent;
+  border: none;
+}
+
+.mapa-icone-sentido-seta {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 14px solid var(--primary);
+  filter: drop-shadow(0 1px 2px rgba(16, 40, 48, 0.35));
+}
+
+/* ===== Painel de trajeto e paradas de uma linha (US #17) ===== */
+.mapa-painel-linha {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
+  width: 360px;
+  max-width: calc(100% - 40px);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  overflow: auto;
+  z-index: 1000;
+}
+
+.mapa-painel-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.mapa-painel-cabecalho strong {
+  display: block;
+  font-size: 16px;
+}
+
+.mapa-painel-sentido {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+.mapa-painel-corpo {
+  padding: 16px 18px 20px;
+}
+
+.mapa-painel-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.mapa-timeline {
+  position: relative;
+  padding-left: 6px;
+}
+
+.mapa-timeline::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--accent);
+}
+
+.mapa-timeline-passo {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  position: relative;
+}
+
+.mapa-timeline-no {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.mapa-timeline-no.inicio {
+  background: #1aa05a;
+  border-color: #1aa05a;
+}
+
+.mapa-timeline-no.fim {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.mapa-timeline-rotulo {
+  font-size: 14px;
+}
+
+@media (max-width: 920px) {
+  .mapa-painel-linha {
+    top: auto;
+    bottom: calc(var(--bottomnav-h, 64px) + 18px);
+    right: 16px;
+    left: 16px;
+    width: auto;
+    max-width: none;
+    max-height: 45vh;
+  }
+}
+
 /* ===== Navegação inferior (mobile) ===== */
 .ms-bottomnav {
   display: none;

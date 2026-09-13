@@ -46,6 +46,10 @@ const NAV_ITEMS = [
 interface AppShellProps {
   active: (typeof NAV_ITEMS)[number]["id"];
   children: React.ReactNode;
+  /** US #17 — busca de linha pelo topbar. Sem essa prop, a busca fica
+   * só visual (páginas que ainda não a implementam). */
+  onBuscarLinha?: (termo: string) => void;
+  buscandoLinha?: boolean;
 }
 
 function ItemNav({
@@ -78,7 +82,12 @@ function ItemNav({
   );
 }
 
-export default function AppShell({ active, children }: AppShellProps) {
+export default function AppShell({
+  active,
+  children,
+  onBuscarLinha,
+  buscandoLinha,
+}: AppShellProps) {
   const router = useRouter();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
@@ -166,10 +175,23 @@ export default function AppShell({ active, children }: AppShellProps) {
       </aside>
 
       <header className="ms-topbar">
-        <div className="ms-search">
+        <form
+          className="ms-search"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            const termo = new FormData(evento.currentTarget).get("busca-linha");
+            if (onBuscarLinha && typeof termo === "string") {
+              onBuscarLinha(termo);
+            }
+          }}
+        >
           <Search size={17} className="ms-search-icon" />
-          <input placeholder="Para onde vamos? Busque linha, parada ou destino" />
-        </div>
+          <input
+            name="busca-linha"
+            placeholder="Buscar linha (ex: 116 ou 0.110)"
+            disabled={buscandoLinha}
+          />
+        </form>
         <div className="ms-actions">
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
