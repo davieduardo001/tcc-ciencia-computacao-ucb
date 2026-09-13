@@ -78,6 +78,13 @@ class LinhaService:
         resultado = await self._provider.buscar_linha(numero_linha)
 
         if resultado is None:
+            # Cache vencido mas o provider não sabe da linha: é o caso
+            # normal desde que os dados passaram a vir da ingestão do
+            # SEMOB (ingestao_semob.py) em vez de um provider por linha.
+            # Servir o snapshot antigo é melhor do que responder 404 pra
+            # uma linha que existe.
+            if cache is not None:
+                return self._registro_para_resultado(cache)
             return None
 
         resultado = await self._com_trajeto_real(resultado)
@@ -107,7 +114,7 @@ class LinhaService:
 
         return replace(resultado, trajeto=trajeto_real)
 
-    async def sugerir(self, termo: str) -> list[LinhaResumo]:
+    async def sugerir(self, termo: str, db: Session | None = None) -> list[LinhaResumo]:
         """
         Autocomplete (US #17): sugere linhas cujo número, nome, sentido
         ou alguma parada combine com o termo digitado — buscar
@@ -117,10 +124,14 @@ class LinhaService:
         Termo vazio devolve todas as linhas conhecidas (útil pra listar
         "linhas disponíveis" quando o campo de busca ainda está vazio).
 
-        Não usa cache/banco — a lista de linhas conhecidas vem direto do
-        provider (é pequena e estática), então não compensa persistir.
+        A fonte é a tabela `linha`, populada pela ingestão do SEMOB
+        (ingestao_semob.py) — são 923 linhas reais do DF. Se a tabela
+        ainda estiver vazia (banco novo, ambiente de teste), cai pro
+        provider, que conhece só as linhas do mock.
         """
-        resumos = await self._provider.listar_resumo()
+        resumos = self._resumos_do_banco(db) if db is not None else []
+        if not resumos:
+            resumos = await self._provider.listar_resumo()
 
         termo_normalizado = _normalizar(termo.strip())
         if not termo_normalizado:
@@ -131,6 +142,18 @@ class LinhaService:
             return any(termo_normalizado in _normalizar(campo) for campo in campos)
 
         return [resumo for resumo in resumos if combina(resumo)]
+
+    def _resumos_do_banco(self, db: Session) -> list[LinhaResumo]:
+        """Catálogo de linhas já ingeridas, pronto pro autocomplete."""
+        return [
+            LinhaResumo(
+                numero=registro.numero,
+                nome=registro.nome,
+                sentido=registro.sentido,
+                paradas_nomes=[p.get("nome", "") for p in (registro.paradas or [])],
+            )
+            for registro in db.query(Linha).order_by(Linha.numero).all()
+        ]
 
     def _esta_desatualizada(self, cache: Linha) -> bool:
         limite = datetime.now(timezone.utc) - timedelta(days=LINHA_CACHE_MAX_DIAS)

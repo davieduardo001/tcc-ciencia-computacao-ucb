@@ -34,11 +34,13 @@ def test_listar_resumo_inclui_nomes_das_paradas():
     assert "Terminal Ceilândia Centro" in resumo_0108.paradas_nomes
 
 
-def test_conhece_mais_linhas_alem_de_0110_e_0108():
-    # Regressão: "só tem duas rotas" — o catálogo do mock cresceu pra
-    # dar mais opções reais pro autocomplete da US #17.
+def test_mock_e_so_rede_de_seguranca_nao_o_catalogo():
+    # O catálogo de verdade (923 linhas do DF) vem da ingestão do SEMOB
+    # pra tabela `linha` — ver mobilidade/ingestao_semob.py. O mock só
+    # cobre o caso de banco ainda vazio, então continua minúsculo de
+    # propósito.
     provider = LinhaMockProvider()
 
     numeros = {r.numero for r in asyncio.run(provider.listar_resumo())}
 
-    assert {"0.110", "0.108", "0.120", "0.130", "0.140"}.issubset(numeros)
+    assert numeros == {"0.110", "0.108"}

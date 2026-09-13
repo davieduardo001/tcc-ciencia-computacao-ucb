@@ -33,7 +33,7 @@ def teste_kelvin():
 
 
 @router.get("/linhas", response_model=list[LinhaResumoResponse])
-async def sugerir_linhas(q: str = ""):
+async def sugerir_linhas(q: str = "", db: Session = Depends(get_db)):
     """
     US #17 — Autocomplete de linhas.
 
@@ -41,7 +41,7 @@ async def sugerir_linhas(q: str = ""):
     com `q` (ex: buscar "Ceilândia" sugere as linhas que passam por lá).
     `q` vazio ("" ou omitido) lista todas as linhas conhecidas.
     """
-    resumos = await _linha_service.sugerir(q)
+    resumos = await _linha_service.sugerir(q, db)
     return [
         LinhaResumoResponse(numero=r.numero, nome=r.nome, sentido=r.sentido)
         for r in resumos
