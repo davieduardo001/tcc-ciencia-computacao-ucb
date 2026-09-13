@@ -47,6 +47,24 @@ _TERMINAIS_LINHAS_PILOTO: dict[str, tuple[str, str, str, str]] = {
         "0.108 — Ceilândia / Plano Piloto",
         "Ceilândia → Plano Piloto",
     ),
+    "0.120": (
+        "Terminal Samambaia, Samambaia, DF",
+        "Rodoviária do Plano Piloto, Brasília, DF",
+        "0.120 — Samambaia / Plano Piloto",
+        "Samambaia → Rodoviária do Plano Piloto",
+    ),
+    "0.130": (
+        "Terminal do Gama, Gama, DF",
+        "Rodoviária do Plano Piloto, Brasília, DF",
+        "0.130 — Gama / Plano Piloto",
+        "Gama → Rodoviária do Plano Piloto",
+    ),
+    "0.140": (
+        "Terminal Sobradinho, Sobradinho, DF",
+        "Rodoviária do Plano Piloto, Brasília, DF",
+        "0.140 — Sobradinho / Plano Piloto",
+        "Sobradinho → Rodoviária do Plano Piloto",
+    ),
 }
 
 _FIELD_MASK = (

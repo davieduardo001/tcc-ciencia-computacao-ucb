@@ -1,8 +1,10 @@
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 from mobilidade.linha_service import LinhaService
 from mobilidade.models.linha import Linha
 from mobilidade.providers.contratos import LinhaEncontrada, LinhaResumo, ParadaLinha
+from mobilidade.providers.linha_mock import LinhaMockProvider
 from shared.database import SessionLocal
 
 
@@ -118,3 +120,81 @@ def test_sugerir_sem_combinacao_retorna_lista_vazia():
     resultado = asyncio.run(service.sugerir("nao existe em lugar nenhum"))
 
     assert resultado == []
+
+
+# ---------------------------------------------------------------------------
+# Road-snapping via OSRM (só pro LinhaMockProvider — ver _com_trajeto_real)
+# ---------------------------------------------------------------------------
+
+
+def _limpar_numero(db, numero: str) -> None:
+    db.query(Linha).filter(Linha.numero == numero).delete()
+    db.commit()
+
+
+def test_busca_com_mock_provider_usa_trajeto_do_osrm_quando_disponivel():
+    db = SessionLocal()
+    try:
+        # Força cache-miss: se "0.110" já estivesse cacheado (de outro
+        # teste), o provider nem seria chamado e o mock do OSRM nunca
+        # entraria em jogo.
+        _limpar_numero(db, "0.110")
+
+        provider = LinhaMockProvider()
+        service = LinhaService(provider)
+
+        trajeto_osrm = [(-15.83, -48.04), (-15.80, -47.90), (-15.79, -47.88)]
+        with patch(
+            "mobilidade.linha_service.osrm_router.rotear",
+            AsyncMock(return_value=trajeto_osrm),
+        ):
+            resultado = asyncio.run(service.buscar("0.110", db))
+
+        assert resultado is not None
+        assert resultado.trajeto == trajeto_osrm
+    finally:
+        _limpar_numero(db, "0.110")
+        db.close()
+
+
+def test_busca_com_mock_provider_mantem_trajeto_original_se_osrm_falhar():
+    db = SessionLocal()
+    try:
+        _limpar_numero(db, "0.110")
+
+        provider = LinhaMockProvider()
+        service = LinhaService(provider)
+
+        with patch(
+            "mobilidade.linha_service.osrm_router.rotear",
+            AsyncMock(return_value=None),
+        ):
+            resultado = asyncio.run(service.buscar("0.110", db))
+
+        assert resultado is not None
+        assert len(resultado.trajeto) > 0
+    finally:
+        _limpar_numero(db, "0.110")
+        db.close()
+
+
+def test_busca_com_provider_nao_mock_nao_chama_osrm():
+    db = SessionLocal()
+    try:
+        _limpar_linha_teste(db)
+
+        service = LinhaService(_ProviderContador())
+
+        with patch(
+            "mobilidade.linha_service.osrm_router.rotear",
+            AsyncMock(return_value=[(-1.0, -1.0)]),
+        ) as rotear_mock:
+            resultado = asyncio.run(service.buscar("9.001", db))
+
+        assert resultado is not None
+        assert resultado.trajeto == [(-15.83, -48.04)]  # inalterado
+        rotear_mock.assert_not_called()
+    finally:
+        db.query(Linha).filter(Linha.numero == "9.001").delete()
+        db.commit()
+        db.close()

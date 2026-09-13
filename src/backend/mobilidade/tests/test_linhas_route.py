@@ -1,8 +1,28 @@
+from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from mobilidade.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _sem_osrm_de_verdade():
+    """
+    Essas rotas usam o LinhaMockProvider real (sem GOOGLE_MAPS_API_KEY
+    no CI), e a primeira busca de cada linha tenta road-snapping via
+    OSRM (ver LinhaService._com_trajeto_real). Sem isso, os testes
+    dependeriam de rede real pro router.project-osrm.org — flaky e
+    lento. Retornar None aqui faz o LinhaService cair de volta pros
+    pontos originais do mock, mantendo as asserções abaixo estáveis.
+    """
+    with patch(
+        "mobilidade.linha_service.osrm_router.rotear",
+        AsyncMock(return_value=None),
+    ):
+        yield
 
 
 def test_busca_linha_encontrada():

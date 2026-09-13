@@ -29,6 +29,16 @@ def test_listar_resumo_inclui_nomes_das_paradas():
 
     resumos = asyncio.run(provider.listar_resumo())
 
-    assert len(resumos) == 2
+    assert len(resumos) >= 2
     resumo_0108 = next(r for r in resumos if r.numero == "0.108")
     assert "Terminal Ceilândia Centro" in resumo_0108.paradas_nomes
+
+
+def test_conhece_mais_linhas_alem_de_0110_e_0108():
+    # Regressão: "só tem duas rotas" — o catálogo do mock cresceu pra
+    # dar mais opções reais pro autocomplete da US #17.
+    provider = LinhaMockProvider()
+
+    numeros = {r.numero for r in asyncio.run(provider.listar_resumo())}
+
+    assert {"0.110", "0.108", "0.120", "0.130", "0.140"}.issubset(numeros)
