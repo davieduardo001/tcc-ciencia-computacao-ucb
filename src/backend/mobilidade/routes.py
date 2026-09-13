@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from mobilidade.linha_service import LinhaService
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
-from mobilidade.schemas import LinhaResponse
+from mobilidade.schemas import LinhaResponse, LinhaResumoResponse
 from shared.config import get_settings
 from shared.database import get_db
 
@@ -30,6 +30,22 @@ def hello():
 @router.get("/teste-kelvin")
 def teste_kelvin():
     return {"service": "mobilidade", "autor": "Kelvin963", "mensagem": "hello world"}
+
+
+@router.get("/linhas", response_model=list[LinhaResumoResponse])
+async def sugerir_linhas(q: str = ""):
+    """
+    US #17 — Autocomplete de linhas.
+
+    Sugere linhas cujo número, nome, sentido ou alguma parada combine
+    com `q` (ex: buscar "Ceilândia" sugere as linhas que passam por lá).
+    `q` vazio ("" ou omitido) lista todas as linhas conhecidas.
+    """
+    resumos = await _linha_service.sugerir(q)
+    return [
+        LinhaResumoResponse(numero=r.numero, nome=r.nome, sentido=r.sentido)
+        for r in resumos
+    ]
 
 
 @router.get("/linhas/{numero_linha}", response_model=LinhaResponse)

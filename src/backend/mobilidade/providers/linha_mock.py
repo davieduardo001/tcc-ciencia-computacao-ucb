@@ -14,7 +14,12 @@
 
 from __future__ import annotations
 
-from mobilidade.providers.contratos import LinhaEncontrada, LinhaProvider, ParadaLinha
+from mobilidade.providers.contratos import (
+    LinhaEncontrada,
+    LinhaProvider,
+    LinhaResumo,
+    ParadaLinha,
+)
 
 _LINHAS_MOCK: dict[str, LinhaEncontrada] = {
     "0.110": LinhaEncontrada(
@@ -64,6 +69,17 @@ class LinhaMockProvider:
 
     async def buscar_linha(self, numero_linha: str) -> LinhaEncontrada | None:
         return _LINHAS_MOCK.get(numero_linha)
+
+    async def listar_resumo(self) -> list[LinhaResumo]:
+        return [
+            LinhaResumo(
+                numero=linha.numero,
+                nome=linha.nome,
+                sentido=linha.sentido,
+                paradas_nomes=[parada.nome for parada in linha.paradas],
+            )
+            for linha in _LINHAS_MOCK.values()
+        ]
 
 
 # Verificação estática: garante que LinhaMockProvider satisfaz o contrato

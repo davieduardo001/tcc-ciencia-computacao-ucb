@@ -18,3 +18,9 @@ class LinhaResponse(BaseModel):
 
 class LinhaNaoEncontrada(BaseModel):
     detail: str = "Linha não encontrada."
+
+
+class LinhaResumoResponse(BaseModel):
+    numero: str
+    nome: str
+    sentido: str

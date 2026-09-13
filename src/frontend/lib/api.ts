@@ -308,6 +308,34 @@ export interface LinhaDetalhada {
 
 export class BuscarLinhaError extends Error {}
 
+export interface LinhaResumo {
+  numero: string;
+  nome: string;
+  sentido: string;
+}
+
+/**
+ * US #17 — Autocomplete: sugere linhas por número, nome ou destino
+ * (ex: digitar "Ceilândia" sugere as linhas que passam por lá).
+ * Termo vazio lista todas as linhas conhecidas.
+ *
+ * Nunca lança exceção — é só uma sugestão, uma falha aqui não deve
+ * travar a busca principal (ver buscarLinha). Retorna [] em qualquer
+ * erro.
+ */
+export async function sugerirLinhas(termo: string): Promise<LinhaResumo[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/linhas?q=${encodeURIComponent(termo)}`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
 /**
  * US #17 — Busca os detalhes de uma linha (trajeto, paradas, sentido)
  * pra desenhar no mapa. Usa o mesmo endpoint da US #15
