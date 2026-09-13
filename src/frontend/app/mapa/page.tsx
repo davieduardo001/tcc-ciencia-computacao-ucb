@@ -24,6 +24,7 @@ export default function MapaPage() {
   const [buscandoLinha, setBuscandoLinha] = useState(false);
   const [sugestoesLinha, setSugestoesLinha] = useState<LinhaResumo[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sequenciaBuscaRef = useRef(0);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -58,6 +59,14 @@ export default function MapaPage() {
   const handleDigitarBuscaLinha = useCallback((termo: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
+    // Toda busca recebe um número de sequência e só aplica o resultado se
+    // ainda for a mais recente. Sem isso, uma busca anterior que demore
+    // mais pra responder sobrescreve a atual: digitar "asa norte" pausando
+    // depois do "a" disparava uma busca por "a" (que casa com quase toda
+    // linha) e a lista errada chegava depois, parecendo que a busca não
+    // filtrava nada.
+    const sequencia = ++sequenciaBuscaRef.current;
+
     if (!termo.trim()) {
       setSugestoesLinha([]);
       return;
@@ -65,7 +74,9 @@ export default function MapaPage() {
 
     debounceRef.current = setTimeout(async () => {
       const resultado = await sugerirLinhas(termo);
-      setSugestoesLinha(resultado);
+      if (sequencia === sequenciaBuscaRef.current) {
+        setSugestoesLinha(resultado);
+      }
     }, DEBOUNCE_SUGESTOES_MS);
   }, []);
 
