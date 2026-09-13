@@ -290,3 +290,55 @@ export async function logoutUsuario(): Promise<void> {
     clearTokens();
   }
 }
+
+export interface ParadaLinha {
+  nome: string;
+  lat: number;
+  lng: number;
+}
+
+export interface LinhaDetalhada {
+  numero: string;
+  nome: string;
+  sentido: string;
+  paradas: ParadaLinha[];
+  trajeto: [number, number][];
+  horariosPrevistos: string[];
+}
+
+export class BuscarLinhaError extends Error {}
+
+/**
+ * US #17 — Busca os detalhes de uma linha (trajeto, paradas, sentido)
+ * pra desenhar no mapa. Usa o mesmo endpoint da US #15
+ * (GET /api/mobilidade/linhas/{numero}, via Gateway).
+ *
+ * Retorna null quando a linha não é encontrada (404 — cenário 2 da
+ * US #15/#17), sem lançar exceção nesse caso. Outras falhas (rede,
+ * 401/500) lançam BuscarLinhaError.
+ */
+export async function buscarLinha(
+  numero: string
+): Promise<LinhaDetalhada | null> {
+  const response = await fetch(
+    `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}`,
+    { credentials: "include", cache: "no-store" }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new BuscarLinhaError("Não foi possível buscar a linha. Tente novamente.");
+  }
+
+  const data = await response.json();
+  return {
+    numero: data.numero,
+    nome: data.nome,
+    sentido: data.sentido,
+    paradas: data.paradas,
+    trajeto: data.trajeto,
+    horariosPrevistos: data.horarios_previstos,
+  };
+}
