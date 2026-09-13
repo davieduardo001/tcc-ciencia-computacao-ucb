@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 
@@ -26,6 +26,32 @@ class ParadaLinha:
     nome: str
     lat: float
     lng: float
+
+
+@dataclass(frozen=True)
+class LinhaResumo:
+    """
+    Resumo de uma linha conhecida, usado pra sugestões de busca
+    (autocomplete) — sem o trajeto completo, que só é montado sob
+    demanda em buscar_linha (evita chamar a Routes API só pra listar).
+
+    Campos:
+        numero          → espelha o numero_linha, ex: "0.110"
+        nome            → nome legível, ex: "0.110 — Taguatinga / Rodoviária"
+        sentido         → ex: "Taguatinga → Rodoviária do Plano Piloto"
+        paradas_nomes   → nomes das paradas, pra permitir buscar por
+                          destino (ex: digitar "Ceilândia" sugere as
+                          linhas que passam por lá). O provider real
+                          (Google Maps) devolve lista vazia aqui — só
+                          descobre as paradas de fato ao buscar a linha
+                          inteira, então a busca por destino nele só
+                          funciona pelo provider mock por enquanto.
+    """
+
+    numero: str
+    nome: str
+    sentido: str
+    paradas_nomes: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -70,5 +96,13 @@ class LinhaProvider(Protocol):
         (Cenário 2 da US #15: linha não encontrada) — nunca lança exceção
         para esse caso. Falhas de rede/timeout devem ser deixadas subir
         como exceção, para que o LinhaService decida como tratar.
+        """
+        ...
+
+    async def listar_resumo(self) -> list[LinhaResumo]:
+        """
+        Lista o resumo de todas as linhas conhecidas por essa fonte —
+        usado pra sugestões de busca (autocomplete), não pro trajeto
+        completo de nenhuma linha específica.
         """
         ...

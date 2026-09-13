@@ -22,3 +22,13 @@ def test_linha_desconhecida_retorna_none():
     resultado = asyncio.run(provider.buscar_linha("9.999"))
 
     assert resultado is None
+
+
+def test_listar_resumo_inclui_nomes_das_paradas():
+    provider = LinhaMockProvider()
+
+    resumos = asyncio.run(provider.listar_resumo())
+
+    assert len(resumos) == 2
+    resumo_0108 = next(r for r in resumos if r.numero == "0.108")
+    assert "Terminal Ceilândia Centro" in resumo_0108.paradas_nomes

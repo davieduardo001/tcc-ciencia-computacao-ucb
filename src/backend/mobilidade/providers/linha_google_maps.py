@@ -21,7 +21,12 @@ from __future__ import annotations
 
 import httpx
 
-from mobilidade.providers.contratos import LinhaEncontrada, LinhaProvider, ParadaLinha
+from mobilidade.providers.contratos import (
+    LinhaEncontrada,
+    LinhaProvider,
+    LinhaResumo,
+    ParadaLinha,
+)
 from mobilidade.providers.polyline_decoder import decodificar_polyline
 from shared.config import get_settings
 
@@ -130,6 +135,19 @@ class LinhaGoogleMapsProvider:
             trajeto=trajeto,
             horarios_previstos=horarios_previstos,
         )
+
+    async def listar_resumo(self) -> list[LinhaResumo]:
+        """
+        Lista as linhas piloto cadastradas em _TERMINAIS_LINHAS_PILOTO,
+        sem chamar a Routes API — paradas só são conhecidas ao buscar a
+        linha inteira (buscar_linha), então paradas_nomes fica vazio
+        aqui. Busca por destino/parada nas sugestões só funciona de
+        verdade com o provider mock por enquanto.
+        """
+        return [
+            LinhaResumo(numero=numero, nome=nome, sentido=sentido)
+            for numero, (_origem, _destino, nome, sentido) in _TERMINAIS_LINHAS_PILOTO.items()
+        ]
 
 
 # Verificação estática: garante que LinhaGoogleMapsProvider satisfaz o

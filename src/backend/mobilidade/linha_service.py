@@ -9,16 +9,28 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from mobilidade.models.linha import Linha
-from mobilidade.providers.contratos import LinhaEncontrada, LinhaProvider, ParadaLinha
+from mobilidade.providers.contratos import (
+    LinhaEncontrada,
+    LinhaProvider,
+    LinhaResumo,
+    ParadaLinha,
+)
 
 logger = logging.getLogger(__name__)
 
 LINHA_CACHE_MAX_DIAS = 30
+
+
+def _normalizar(texto: str) -> str:
+    """Minúsculo e sem acento, pra 'ceilandia' encontrar 'Ceilândia'."""
+    sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore")
+    return sem_acento.decode("ascii").lower()
 
 
 class LinhaService:
@@ -67,6 +79,31 @@ class LinhaService:
 
         self._salvar_no_cache(db, resultado)
         return resultado
+
+    async def sugerir(self, termo: str) -> list[LinhaResumo]:
+        """
+        Autocomplete (US #17): sugere linhas cujo número, nome, sentido
+        ou alguma parada combine com o termo digitado — buscar
+        "Ceilândia" sugere as linhas que passam por lá, não só o número
+        exato da linha.
+
+        Termo vazio devolve todas as linhas conhecidas (útil pra listar
+        "linhas disponíveis" quando o campo de busca ainda está vazio).
+
+        Não usa cache/banco — a lista de linhas conhecidas vem direto do
+        provider (é pequena e estática), então não compensa persistir.
+        """
+        resumos = await self._provider.listar_resumo()
+
+        termo_normalizado = _normalizar(termo.strip())
+        if not termo_normalizado:
+            return resumos
+
+        def combina(resumo: LinhaResumo) -> bool:
+            campos = [resumo.numero, resumo.nome, resumo.sentido, *resumo.paradas_nomes]
+            return any(termo_normalizado in _normalizar(campo) for campo in campos)
+
+        return [resumo for resumo in resumos if combina(resumo)]
 
     def _esta_desatualizada(self, cache: Linha) -> bool:
         limite = datetime.now(timezone.utc) - timedelta(days=LINHA_CACHE_MAX_DIAS)

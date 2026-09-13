@@ -1,4 +1,10 @@
-import { registrarUsuario, loginUsuario, buscarLinha, BuscarLinhaError } from "../api";
+import {
+  registrarUsuario,
+  loginUsuario,
+  buscarLinha,
+  BuscarLinhaError,
+  sugerirLinhas,
+} from "../api";
 
 /**
  * Regressão: o front-end já bateu em /auth/registro e /auth/login
@@ -96,5 +102,49 @@ describe("api.ts — buscarLinha (US #17)", () => {
     }) as jest.Mock;
 
     await expect(buscarLinha("0.110")).rejects.toThrow(BuscarLinhaError);
+  });
+});
+
+describe("api.ts — sugerirLinhas (autocomplete, US #17)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("chama /api/mobilidade/linhas?q= com o termo digitado", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { numero: "0.108", nome: "0.108 — Ceilândia / Plano Piloto", sentido: "Ceilândia → Plano Piloto" },
+      ],
+    }) as jest.Mock;
+
+    const resultado = await sugerirLinhas("ceilandia");
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/mobilidade\/linhas\?q=ceilandia$/);
+    expect(options.credentials).toBe("include");
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].numero).toBe("0.108");
+  });
+
+  it("nunca lança exceção — retorna [] em qualquer falha", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+
+    const resultado = await sugerirLinhas("0.110");
+
+    expect(resultado).toEqual([]);
+  });
+
+  it("retorna [] quando a resposta não é ok", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    }) as jest.Mock;
+
+    const resultado = await sugerirLinhas("0.110");
+
+    expect(resultado).toEqual([]);
   });
 });

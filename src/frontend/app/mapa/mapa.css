@@ -290,6 +290,63 @@
   box-shadow: 0 0 0 4px rgba(26, 160, 173, 0.14);
 }
 
+/* ===== Sugestões de busca de linha (autocomplete, US #17) ===== */
+.ms-search-sugestoes {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 1100;
+}
+
+.ms-search-sugestoes li + li {
+  margin-top: 2px;
+}
+
+.ms-search-sugestoes button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.ms-search-sugestoes button:hover {
+  background: var(--bg-soft);
+}
+
+.ms-search-sugestoes strong {
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.ms-search-sugestao-nome {
+  font-size: 13.5px;
+}
+
+.ms-search-sugestao-sentido {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .ms-actions {
   margin-left: auto;
   display: flex;

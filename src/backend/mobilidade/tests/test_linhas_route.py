@@ -26,6 +26,48 @@ def test_busca_linha_nao_encontrada():
     assert response.json()["detail"] == "Linha não encontrada."
 
 
+# ---------------------------------------------------------------------------
+# US #17 (autocomplete) — GET /mobilidade/linhas?q=
+# ---------------------------------------------------------------------------
+
+
+def test_sugerir_linhas_sem_termo_lista_todas():
+    response = client.get("/mobilidade/linhas")
+
+    assert response.status_code == 200
+    numeros = {item["numero"] for item in response.json()}
+    assert {"0.110", "0.108"}.issubset(numeros)
+
+
+def test_sugerir_linhas_por_numero():
+    response = client.get("/mobilidade/linhas", params={"q": "0.110"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["numero"] == "0.110"
+    assert data[0]["sentido"] == "Taguatinga → Rodoviária do Plano Piloto"
+
+
+def test_sugerir_linhas_por_destino_sem_acento():
+    # "ceilandia" (sem acento, minúsculo) deve encontrar a 0.108, que
+    # passa por "Terminal Ceilândia Centro" — cenário real do pedido:
+    # buscar por pra onde o ônibus vai, não só o número exato.
+    response = client.get("/mobilidade/linhas", params={"q": "ceilandia"})
+
+    assert response.status_code == 200
+    numeros = {item["numero"] for item in response.json()}
+    assert "0.108" in numeros
+    assert "0.110" not in numeros
+
+
+def test_sugerir_linhas_sem_combinacao_retorna_lista_vazia():
+    response = client.get("/mobilidade/linhas", params={"q": "nao existe"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_segunda_busca_usa_cache_do_banco():
     # A primeira chamada popula o cache (schema mobilidade, tabela linha).
     # A segunda deve devolver os mesmos dados sem precisar do provider —

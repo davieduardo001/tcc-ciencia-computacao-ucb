@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +17,7 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
-import { buscarUsuarioAtual, logoutUsuario, UsuarioAtual } from "@/lib/api";
+import { buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
 import "./mapa.css";
 
 function iniciais(nome: string): string {
@@ -46,10 +46,15 @@ const NAV_ITEMS = [
 interface AppShellProps {
   active: (typeof NAV_ITEMS)[number]["id"];
   children: React.ReactNode;
-  /** US #17 — busca de linha pelo topbar. Sem essa prop, a busca fica
+  /** US #17 — busca de linha pelo topbar. Sem essas props, a busca fica
    * só visual (páginas que ainda não a implementam). */
   onBuscarLinha?: (termo: string) => void;
   buscandoLinha?: boolean;
+  /** Autocomplete: chamado a cada tecla digitada (com debounce de quem
+   * usa), pra popular sugestoesLinha. */
+  onDigitarBuscaLinha?: (termo: string) => void;
+  sugestoesLinha?: LinhaResumo[];
+  onSelecionarSugestaoLinha?: (numero: string) => void;
 }
 
 function ItemNav({
@@ -87,11 +92,28 @@ export default function AppShell({
   children,
   onBuscarLinha,
   buscandoLinha,
+  onDigitarBuscaLinha,
+  sugestoesLinha,
+  onSelecionarSugestaoLinha,
 }: AppShellProps) {
   const router = useRouter();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
   const [saindo, setSaindo] = useState(false);
+  const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
+  const fecharSugestoesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function fecharSugestoesComAtraso() {
+    // Atraso pequeno pra permitir o onClick da sugestão disparar antes
+    // do onBlur do input fechar a lista (senão o clique nunca chega).
+    fecharSugestoesTimeout.current = setTimeout(() => setSugestoesAbertas(false), 150);
+  }
+
+  function cancelarFechamentoDeSugestoes() {
+    if (fecharSugestoesTimeout.current) {
+      clearTimeout(fecharSugestoesTimeout.current);
+    }
+  }
 
   async function handleSair() {
     setSaindo(true);
@@ -180,17 +202,60 @@ export default function AppShell({
           onSubmit={(evento) => {
             evento.preventDefault();
             const termo = new FormData(evento.currentTarget).get("busca-linha");
-            if (onBuscarLinha && typeof termo === "string") {
-              onBuscarLinha(termo);
+            if (typeof termo !== "string") return;
+
+            // Enter com sugestão única na lista seleciona ela direto —
+            // importante pra busca por destino ("Ceilândia"), que nunca
+            // bate como número exato de linha.
+            if (sugestoesLinha?.length === 1 && onSelecionarSugestaoLinha) {
+              onSelecionarSugestaoLinha(sugestoesLinha[0].numero);
+            } else {
+              onBuscarLinha?.(termo);
             }
+            setSugestoesAbertas(false);
           }}
         >
           <Search size={17} className="ms-search-icon" />
           <input
             name="busca-linha"
-            placeholder="Buscar linha (ex: 116 ou 0.110)"
+            placeholder="Buscar linha ou destino (ex: 0.110 ou Ceilândia)"
             disabled={buscandoLinha}
+            autoComplete="off"
+            onChange={(evento) => {
+              setSugestoesAbertas(true);
+              onDigitarBuscaLinha?.(evento.target.value);
+            }}
+            onFocus={() => {
+              cancelarFechamentoDeSugestoes();
+              setSugestoesAbertas(true);
+            }}
+            onBlur={fecharSugestoesComAtraso}
           />
+
+          {sugestoesAbertas && sugestoesLinha && sugestoesLinha.length > 0 && (
+            <ul className="ms-search-sugestoes" role="listbox">
+              {sugestoesLinha.map((linha) => (
+                <li key={linha.numero}>
+                  <button
+                    type="button"
+                    onMouseDown={(evento) => {
+                      // preventDefault evita o blur do input antes do
+                      // clique registrar (senão a lista some antes).
+                      evento.preventDefault();
+                    }}
+                    onClick={() => {
+                      onSelecionarSugestaoLinha?.(linha.numero);
+                      setSugestoesAbertas(false);
+                    }}
+                  >
+                    <strong>{linha.numero}</strong>
+                    <span className="ms-search-sugestao-nome">{linha.nome}</span>
+                    <span className="ms-search-sugestao-sentido">{linha.sentido}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </form>
         <div className="ms-actions">
           <button type="button" className="ms-icon-btn" title="Alertas">

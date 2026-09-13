@@ -117,6 +117,8 @@ describe("AppShell", () => {
     expect(screen.queryByTitle("Sair")).not.toBeInTheDocument();
   });
 
+  const PLACEHOLDER_BUSCA = "Buscar linha ou destino (ex: 0.110 ou Ceilândia)";
+
   it("submete a busca de linha chamando onBuscarLinha com o termo digitado", () => {
     const onBuscarLinha = jest.fn();
 
@@ -126,7 +128,7 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    const input = screen.getByPlaceholderText("Buscar linha (ex: 116 ou 0.110)");
+    const input = screen.getByPlaceholderText(PLACEHOLDER_BUSCA);
     fireEvent.change(input, { target: { value: "0.110" } });
     fireEvent.submit(input.closest("form")!);
 
@@ -140,9 +142,100 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    expect(
-      screen.getByPlaceholderText("Buscar linha (ex: 116 ou 0.110)")
-    ).toBeDisabled();
+    expect(screen.getByPlaceholderText(PLACEHOLDER_BUSCA)).toBeDisabled();
+  });
+
+  // ---------------------------------------------------------------------
+  // US #17 (autocomplete) — sugestões de linha no topbar
+  // ---------------------------------------------------------------------
+
+  const SUGESTOES = [
+    { numero: "0.108", nome: "0.108 — Ceilândia / Plano Piloto", sentido: "Ceilândia → Plano Piloto" },
+    { numero: "0.110", nome: "0.110 — Taguatinga / Rodoviária", sentido: "Taguatinga → Rodoviária" },
+  ];
+
+  it("chama onDigitarBuscaLinha a cada tecla digitada", () => {
+    const onDigitarBuscaLinha = jest.fn();
+
+    render(
+      <AppShell active="mapa" onDigitarBuscaLinha={onDigitarBuscaLinha}>
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(PLACEHOLDER_BUSCA), {
+      target: { value: "ceil" },
+    });
+
+    expect(onDigitarBuscaLinha).toHaveBeenCalledWith("ceil");
+  });
+
+  it("mostra as sugestões (número, nome e sentido) quando o campo tem foco", () => {
+    render(
+      <AppShell active="mapa" sugestoesLinha={SUGESTOES}>
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.focus(screen.getByPlaceholderText(PLACEHOLDER_BUSCA));
+
+    expect(screen.getByText("0.108 — Ceilândia / Plano Piloto")).toBeInTheDocument();
+    expect(screen.getByText("Ceilândia → Plano Piloto")).toBeInTheDocument();
+    expect(screen.getByText("0.110 — Taguatinga / Rodoviária")).toBeInTheDocument();
+  });
+
+  it("chama onSelecionarSugestaoLinha ao clicar numa sugestão", () => {
+    const onSelecionarSugestaoLinha = jest.fn();
+
+    render(
+      <AppShell
+        active="mapa"
+        sugestoesLinha={SUGESTOES}
+        onSelecionarSugestaoLinha={onSelecionarSugestaoLinha}
+      >
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.focus(screen.getByPlaceholderText(PLACEHOLDER_BUSCA));
+    fireEvent.click(screen.getByText("Ceilândia → Plano Piloto"));
+
+    expect(onSelecionarSugestaoLinha).toHaveBeenCalledWith("0.108");
+  });
+
+  it("Enter com sugestão única seleciona ela em vez de buscar o texto digitado", () => {
+    const onBuscarLinha = jest.fn();
+    const onSelecionarSugestaoLinha = jest.fn();
+
+    render(
+      <AppShell
+        active="mapa"
+        sugestoesLinha={[SUGESTOES[0]]}
+        onBuscarLinha={onBuscarLinha}
+        onSelecionarSugestaoLinha={onSelecionarSugestaoLinha}
+      >
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const input = screen.getByPlaceholderText(PLACEHOLDER_BUSCA);
+    fireEvent.change(input, { target: { value: "ceilandia" } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(onSelecionarSugestaoLinha).toHaveBeenCalledWith("0.108");
+    expect(onBuscarLinha).not.toHaveBeenCalled();
+  });
+
+  it("não mostra a lista de sugestões quando não há nenhuma", () => {
+    render(
+      <AppShell active="mapa" sugestoesLinha={[]}>
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.focus(screen.getByPlaceholderText(PLACEHOLDER_BUSCA));
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
   it("botão de sair chama logoutUsuario e redireciona para /login", async () => {
