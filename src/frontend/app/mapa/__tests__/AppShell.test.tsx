@@ -117,6 +117,34 @@ describe("AppShell", () => {
     expect(screen.queryByTitle("Sair")).not.toBeInTheDocument();
   });
 
+  it("submete a busca de linha chamando onBuscarLinha com o termo digitado", () => {
+    const onBuscarLinha = jest.fn();
+
+    render(
+      <AppShell active="mapa" onBuscarLinha={onBuscarLinha}>
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const input = screen.getByPlaceholderText("Buscar linha (ex: 116 ou 0.110)");
+    fireEvent.change(input, { target: { value: "0.110" } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(onBuscarLinha).toHaveBeenCalledWith("0.110");
+  });
+
+  it("desabilita o campo de busca enquanto buscandoLinha é true", () => {
+    render(
+      <AppShell active="mapa" buscandoLinha>
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    expect(
+      screen.getByPlaceholderText("Buscar linha (ex: 116 ou 0.110)")
+    ).toBeDisabled();
+  });
+
   it("botão de sair chama logoutUsuario e redireciona para /login", async () => {
     buscarUsuarioAtualMock.mockResolvedValue({
       id: "1",
