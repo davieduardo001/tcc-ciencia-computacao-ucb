@@ -41,6 +41,29 @@ def test_login_seta_cookies_sem_quebrar_no_json_do_proxy():
     assert "refresh_token" in response.cookies
 
 
+def test_cookies_de_sessao_usam_samesite_none():
+    """Regressão: frontend (movecity-frontend.vercel.app) e Gateway
+    (movecity-gateway.fly.dev) são domínios diferentes — cross-site de
+    verdade. Com SameSite=Lax/Strict o navegador não manda o cookie em
+    fetch() cross-site, então GET /auth/me (e qualquer rota que dependa
+    só do cookie) sempre voltava 401 mesmo logo após login bem-sucedido.
+    """
+    with patch(
+        "gateway.routes.proxy_request",
+        AsyncMock(return_value=_proxy_response_ok()),
+    ):
+        response = client.post(
+            "/api/auth/login",
+            json={"email": "teste@example.com", "senha": "senha123"},
+        )
+
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert len(set_cookie_headers) == 2
+    for header in set_cookie_headers:
+        assert "samesite=none" in header.lower()
+        assert "secure" in header.lower()
+
+
 def test_refresh_seta_cookies_sem_quebrar_no_json_do_proxy():
     with patch(
         "gateway.routes.proxy_request",
