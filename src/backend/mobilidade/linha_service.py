@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import unicodedata
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,12 @@ from mobilidade.providers.linha_mock import LinhaMockProvider
 logger = logging.getLogger(__name__)
 
 LINHA_CACHE_MAX_DIAS = 30
+
+# Por quanto tempo o catálogo do autocomplete fica em memória. O conteúdo
+# só muda quando a ingestão do SEMOB roda (mensal), então 5 min é curto o
+# bastante pra refletir uma ingestão recente sem reler o banco a cada
+# tecla digitada.
+CATALOGO_CACHE_SEGUNDOS = 300.0
 
 
 def _normalizar(texto: str) -> str:
@@ -53,6 +60,8 @@ class LinhaService:
                 f"recebido: {type(provider).__name__}"
             )
         self._provider = provider
+        self._catalogo: list[LinhaResumo] | None = None
+        self._catalogo_em = 0.0
 
     async def buscar(self, numero_linha: str, db: Session) -> LinhaEncontrada | None:
         """
@@ -143,17 +152,59 @@ class LinhaService:
 
         return [resumo for resumo in resumos if combina(resumo)]
 
+    def invalidar_catalogo(self) -> None:
+        """
+        Descarta o catálogo em memória, forçando a próxima sugestão a
+        reler o banco.
+
+        Usado pelos testes (que semeiam e apagam linhas entre casos) e
+        disponível para quem rodar a ingestão dentro do mesmo processo.
+        Em produção a ingestão roda como job separado (workflow
+        `ingestao-semob.yml`), então lá o catálogo se renova sozinho
+        quando CATALOGO_CACHE_SEGUNDOS expira.
+        """
+        self._catalogo = None
+        self._catalogo_em = 0.0
+
     def _resumos_do_banco(self, db: Session) -> list[LinhaResumo]:
-        """Catálogo de linhas já ingeridas, pronto pro autocomplete."""
-        return [
+        """
+        Catálogo de linhas já ingeridas, pronto pro autocomplete.
+
+        Duas otimizações que só ficaram visíveis com as 923 linhas reais
+        (com o mock de 2 linhas nada disso aparecia):
+
+        1. Seleciona coluna a coluna. `db.query(Linha)` traria junto o
+           `trajeto` — ~660 pontos por linha, ~930 mil coordenadas no
+           total (~30 MB) puxadas e desserializadas a cada busca. Era o
+           que derrubava a rota com 502 por timeout.
+        2. Guarda o resultado em memória. O catálogo só muda quando a
+           ingestão roda (mensal), então reler o banco a cada tecla
+           digitada é desperdício.
+        """
+        agora = time.monotonic()
+        if self._catalogo is not None and (agora - self._catalogo_em) < CATALOGO_CACHE_SEGUNDOS:
+            return self._catalogo
+
+        colunas = (Linha.numero, Linha.nome, Linha.sentido, Linha.paradas)
+        catalogo = [
             LinhaResumo(
-                numero=registro.numero,
-                nome=registro.nome,
-                sentido=registro.sentido,
-                paradas_nomes=[p.get("nome", "") for p in (registro.paradas or [])],
+                numero=numero,
+                nome=nome,
+                sentido=sentido,
+                paradas_nomes=[p.get("nome", "") for p in (paradas or [])],
             )
-            for registro in db.query(Linha).order_by(Linha.numero).all()
+            for numero, nome, sentido, paradas in db.query(*colunas)
+            .order_by(Linha.numero)
+            .all()
         ]
+
+        # Catálogo vazio não vira cache: o chamador cai pro provider e a
+        # próxima chamada tenta o banco de novo (ex: logo após a ingestão).
+        if catalogo:
+            self._catalogo = catalogo
+            self._catalogo_em = agora
+
+        return catalogo
 
     def _esta_desatualizada(self, cache: Linha) -> bool:
         limite = datetime.now(timezone.utc) - timedelta(days=LINHA_CACHE_MAX_DIAS)
