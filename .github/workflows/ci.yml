@@ -115,43 +115,70 @@ jobs:
 
       - name: Verificar Conventional Commits
         run: |
-          echo "=== Verificando mensagens de commit ==="
           PR_NUMBER=${{ github.event.pull_request.number }}
-          
+          BASE="${{ github.event.pull_request.base.ref }}"
+          HEAD="${{ github.event.pull_request.head.ref }}"
+
           if [ -z "$PR_NUMBER" ]; then
             echo "Não é PR. Pulando verificação."
             exit 0
           fi
-          
-          # Pegar apenas a primeira linha (subject) de cada commit do PR
-          SUBJECTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/commits --jq '.[].commit.message | split("\n")[0]')
 
-          echo "Commits encontrados:"
-          echo "$SUBJECTS"
+          PADRAO='^(feat|fix|docs|style|refactor|chore|test|perf|ci|build|revert)(\(.+\))?: .{1,72}'
+          INVALID=0
+
+          # 1) Título do PR.
+          #
+          # Como o projeto faz squash merge, é o TÍTULO que vira a
+          # mensagem do commit na branch de destino — não os commits da
+          # branch. Validar só os commits deixava passar título fora do
+          # padrão: foi assim que "feat/issue Receber Notificações de
+          # Rotas Preferidas #22" entrou no homolog pelo PR #94 e passou
+          # a reprovar todo PR de promoção daí em diante.
+          echo "=== Título do PR (vira a mensagem do commit no squash) ==="
+          TITULO=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.title')
+          echo "$TITULO"
+          if ! echo "$TITULO" | grep -qE "$PADRAO"; then
+            echo "❌ Título fora do padrão: $TITULO"
+            INVALID=1
+          fi
           echo ""
 
-          # Validar cada commit (ignorando merge commits)
-          INVALID=0
-          while IFS= read -r subject; do
-            # Pular linhas vazias e merge commits
-            [ -z "$subject" ] && continue
-            [[ "$subject" == Merge\ * ]] && continue
+          # 2) Commits da branch.
+          #
+          # Pulado no PR de promoção homolog -> main: ali o conteúdo já
+          # passou por este mesmo check ao entrar em homolog, e revalidar
+          # significa reprovar o PR de hoje por causa de histórico antigo
+          # que ninguém pode mais corrigir sem reescrever branch
+          # compartilhada.
+          if [ "$BASE" = "main" ] && [ "$HEAD" = "homolog" ]; then
+            echo "=== PR de promoção homolog -> main ==="
+            echo "Commits já validados quando entraram em homolog. Pulando."
+          else
+            echo "=== Verificando mensagens de commit ==="
+            SUBJECTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/commits --jq '.[].commit.message | split("\n")[0]')
+            echo "$SUBJECTS"
+            echo ""
 
-            # Verificar se segue Conventional Commits
-            if ! echo "$subject" | grep -qE '^(feat|fix|docs|style|refactor|chore|test|perf|ci|build|revert)(\(.+\))?: .{1,72}'; then
-              echo "❌ Commit inválido: $subject"
-              INVALID=1
-            fi
-          done <<< "$SUBJECTS"
-          
+            while IFS= read -r subject; do
+              [ -z "$subject" ] && continue
+              [[ "$subject" == Merge\ * ]] && continue
+
+              if ! echo "$subject" | grep -qE "$PADRAO"; then
+                echo "❌ Commit inválido: $subject"
+                INVALID=1
+              fi
+            done <<< "$SUBJECTS"
+          fi
+
           if [ $INVALID -eq 1 ]; then
             echo ""
-            echo "=== Alguns commits não seguem Conventional Commits ==="
+            echo "=== Fora do padrão Conventional Commits ==="
             echo "Formato esperado: <tipo>: <descrição>"
             echo "Tipos: feat, fix, docs, style, refactor, chore, test, perf, ci, build, revert"
             exit 1
           fi
-          
-          echo "✅ Todos os commits seguem Conventional Commits"
+
+          echo "✅ Título e commits seguem Conventional Commits"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
