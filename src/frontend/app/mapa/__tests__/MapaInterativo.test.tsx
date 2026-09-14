@@ -16,7 +16,9 @@ jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="map-container">{children}</div>
   ),
-  TileLayer: () => null,
+  TileLayer: ({ url, attribution }: { url?: string; attribution?: string }) => (
+    <div data-testid="tile-layer" data-url={url} data-attribution={attribution} />
+  ),
   Marker: ({
     icon,
     children,
@@ -525,5 +527,33 @@ describe("MapaInterativo — rastreio das linhas do itinerário (US #16 + #20)",
     await act(async () => {});
 
     expect(buscarPosicoesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaInterativo — base do mapa", () => {
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+    });
+  });
+
+  it("usa o CARTO Voyager, com suporte a tela retina", () => {
+    render(<MapaInterativo />);
+
+    const tiles = screen.getByTestId("tile-layer");
+    expect(tiles.getAttribute("data-url")).toBe(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+    );
+  });
+
+  it("credita OpenStreetMap e CARTO — é obrigação de licença", () => {
+    // Os dados são do OpenStreetMap; a CARTO faz só o estilo. Omitir
+    // qualquer um dos dois viola os termos de uso das duas.
+    render(<MapaInterativo />);
+
+    const atribuicao = screen.getByTestId("tile-layer").getAttribute("data-attribution") ?? "";
+    expect(atribuicao).toContain("OpenStreetMap");
+    expect(atribuicao).toContain("CARTO");
+    expect(atribuicao).toContain("carto.com/attributions");
   });
 });

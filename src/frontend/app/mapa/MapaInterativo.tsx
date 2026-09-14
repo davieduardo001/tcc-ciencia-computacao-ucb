@@ -23,6 +23,31 @@ import "./mapa.css";
 
 // Ponto padrão: área-piloto Taguatinga/Ceilândia (DF), usada quando o
 // navegador não consegue obter a posição real do usuário.
+// Base do mapa: CARTO Voyager, em vez do tile padrão do OpenStreetMap.
+// O padrão do OSM é denso e saturado — rodovia vermelha, mata verde
+// forte, rótulo em toda quadra — e isso brigava com o que a gente
+// desenha por cima: trajeto, paradas, ônibus ao vivo, marcadores de
+// embarque. O Voyager é o meio-termo: continua legível, mas com cor
+// suave o bastante pra que a informação do Movecity fique em primeiro
+// plano.
+//
+// Gratuito e sem chave, como o tile do OSM. A atribuição é obrigatória
+// e cita os dois: os dados continuam sendo do OpenStreetMap, a CARTO
+// só faz o estilo.
+//
+// O `{r}` é substituído pelo Leaflet por "@2x" em tela retina,
+// servindo o tile de maior resolução — verificado que a CARTO responde
+// nas duas variantes.
+//
+// maxZoom 20 em vez do padrão 18 do Leaflet: a CARTO serve até pelo
+// menos z21 (conferido), e dois níveis a mais ajudam a distinguir a
+// parada certa numa via com canteiro central.
+const URL_TILES =
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+const ATRIBUICAO_MAPA =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
 const PONTO_PADRAO = { lat: -15.8305, lng: -48.0425 };
 const ZOOM_PADRAO = 14;
 const ZOOM_LOCALIZADO = 16;
@@ -350,8 +375,9 @@ export default function MapaInterativo({
         className="mapa-leaflet"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={ATRIBUICAO_MAPA}
+          url={URL_TILES}
+          maxZoom={20}
         />
         <CapturaCliqueNoMapa
           ativo={escolhendoNoMapa}
