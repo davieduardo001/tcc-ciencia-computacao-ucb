@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpDown,
+  Bus,
   Crosshair,
   Footprints,
   LoaderCircle,
@@ -43,6 +44,12 @@ interface PlanejadorViagemProps {
   calculando: boolean;
   erro: string | null;
   onFechar: () => void;
+  /** US #16 — quantos ônibus estão rodando cada linha do itinerário,
+   * indexado por número da linha. */
+  veiculosPorLinha: Record<string, number>;
+  /** Falso enquanto a primeira consulta de posição não voltou — evita
+   * dizer "nenhum ônibus" antes de ter perguntado. */
+  rastreando: boolean;
 }
 
 function CampoLugar({
@@ -242,6 +249,8 @@ export default function PlanejadorViagem({
   calculando,
   erro,
   onFechar,
+  veiculosPorLinha,
+  rastreando,
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
 
@@ -364,6 +373,36 @@ export default function PlanejadorViagem({
                           <div className="plan-passo-linha">
                             <em className="plan-badge-linha">{perna.numero}</em>
                             <span className="plan-passo-nome">{perna.nome}</span>
+                          </div>
+
+                          {/* US #16 no contexto da US #20: quem planeja a
+                              viagem quer saber onde está o ônibus que vai
+                              pegar, sem ter que buscar a linha de novo. */}
+                          <div className="plan-passo-aovivo">
+                            {(() => {
+                              const rodando = veiculosPorLinha[perna.numero] ?? 0;
+                              if (rodando > 0) {
+                                return (
+                                  <>
+                                    <span className="mapa-pulso" />
+                                    <Bus size={12} />
+                                    <span>
+                                      <strong>{rodando}</strong>{" "}
+                                      {rodando === 1
+                                        ? "ônibus rodando agora"
+                                        : "ônibus rodando agora"}
+                                    </span>
+                                  </>
+                                );
+                              }
+                              return (
+                                <span className="plan-passo-sem-onibus">
+                                  {rastreando
+                                    ? "Nenhum ônibus desta linha reportando posição agora"
+                                    : "Procurando ônibus..."}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div className="plan-passo-detalhe">
                             <span>

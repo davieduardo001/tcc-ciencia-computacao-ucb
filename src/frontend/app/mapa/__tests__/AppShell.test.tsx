@@ -44,16 +44,47 @@ describe("AppShell", () => {
       </AppShell>
     );
 
+    // "Rotas Salvas" segue não implementada (US #25).
     expect(
-      screen.queryByRole("link", { name: "Linhas de Ônibus" })
+      screen.queryByRole("link", { name: "Rotas Salvas" })
     ).not.toBeInTheDocument();
 
-    const itensIndisponiveis = screen.getAllByLabelText(
-      /Linhas de Ônibus/i
-    );
-    itensIndisponiveis.forEach((item) => {
+    screen.getAllByLabelText(/Rotas Salvas/i).forEach((item) => {
       expect(item).toHaveAttribute("aria-disabled", "true");
     });
+  });
+
+  it("linhas e rotas navegam para o mapa com o painel certo", () => {
+    // As duas funcionalidades vivem dentro do mapa, não em páginas
+    // separadas — marcá-las como "em breve" dizia ao usuário que não
+    // existiam, sendo que as US #15, #17 e #20 estão entregues.
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const linhas = screen.getAllByRole("link", { name: /Linhas de Ônibus/i });
+    expect(linhas.length).toBeGreaterThan(0);
+    linhas.forEach((l) =>
+      expect(l).toHaveAttribute("href", "/mapa?painel=linhas")
+    );
+
+    const rotas = screen.getAllByRole("link", { name: /^Rotas$/i });
+    expect(rotas.length).toBeGreaterThan(0);
+    rotas.forEach((l) => expect(l).toHaveAttribute("href", "/mapa?painel=rotas"));
+  });
+
+  it("perfil não aparece na sidebar — já existe na barra de cima", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    expect(screen.queryByText("Perfil")).not.toBeInTheDocument();
+    // O botão de perfil da topbar continua lá.
+    expect(screen.getByTitle("Perfil")).toBeInTheDocument();
   });
 
   it("mostra o selo 'Em breve' na sidebar para itens indisponíveis", () => {
