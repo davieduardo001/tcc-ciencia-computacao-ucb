@@ -43,6 +43,10 @@ jobs:
           # precisa estar cadastrada na Vercel, só disponível pro
           # `next build` (login via Google, US #12/#92).
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          # Base do mapa (CARTO Voyager). Chave gratuita, sem conta e
+          # sem cartão: carto.com/basemaps/apikey. Sem o secret o mapa
+          # cai pro tile padrão do OpenStreetMap e continua funcionando.
+          NEXT_PUBLIC_CARTO_API_KEY: ${{ secrets.CARTO_API_KEY }}
 
       - name: Deploy (Production)
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN

@@ -23,30 +23,61 @@ import "./mapa.css";
 
 // Ponto padrão: área-piloto Taguatinga/Ceilândia (DF), usada quando o
 // navegador não consegue obter a posição real do usuário.
-// Base do mapa: CARTO Voyager, em vez do tile padrão do OpenStreetMap.
-// O padrão do OSM é denso e saturado — rodovia vermelha, mata verde
-// forte, rótulo em toda quadra — e isso brigava com o que a gente
-// desenha por cima: trajeto, paradas, ônibus ao vivo, marcadores de
-// embarque. O Voyager é o meio-termo: continua legível, mas com cor
-// suave o bastante pra que a informação do Movecity fique em primeiro
-// plano.
+// Base do mapa.
 //
-// Gratuito e sem chave, como o tile do OSM. A atribuição é obrigatória
-// e cita os dois: os dados continuam sendo do OpenStreetMap, a CARTO
-// só faz o estilo.
+// O tile padrão do OpenStreetMap é denso e saturado — rodovia vermelha,
+// mata verde forte, rótulo em toda quadra —, o que briga com tudo que
+// desenhamos por cima: trajeto, paradas, ônibus ao vivo, marcadores de
+// embarque. O CARTO Voyager é o meio-termo que queremos: legível, com
+// cor suave o bastante pra deixar a informação do Movecity à frente.
 //
-// O `{r}` é substituído pelo Leaflet por "@2x" em tela retina,
-// servindo o tile de maior resolução — verificado que a CARTO responde
-// nas duas variantes.
+// A questão é que a CARTO passou a exigir chave. Sem ela, o servidor
+// responde 200 com um PNG válido, só que com "API KEY REQUIRED"
+// estampado na imagem — dá pra passar por uma verificação de status
+// HTTP sem que ninguém perceba, e só aparece quando alguém olha o mapa.
 //
-// maxZoom 20 em vez do padrão 18 do Leaflet: a CARTO serve até pelo
-// menos z21 (conferido), e dois níveis a mais ajudam a distinguir a
-// parada certa numa via com canteiro central.
-const URL_TILES =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+// A chave é gratuita (5 milhões de tiles/mês, sem conta e sem cartão,
+// enviada na hora por e-mail em carto.com/basemaps/apikey), e projeto
+// acadêmico ganha limite maior. Mesmo padrão do GOOGLE_CLIENT_ID: vive
+// como secret do GitHub e entra no bundle em build time.
+//
+// Sem a chave configurada, cai pro tile padrão do OSM: mais carregado,
+// mas funciona sempre e não depende de ninguém. Melhor um mapa feio do
+// que um mapa carimbado.
+type BaseDoMapa = {
+  url: string;
+  subdominios: string;
+  zoomMaximo: number;
+  atribuicao: string;
+};
 
-const ATRIBUICAO_MAPA =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const BASE_CARTO_VOYAGER = (chave: string): BaseDoMapa => ({
+  // O `{r}` é substituído pelo Leaflet por "@2x" em tela retina.
+  url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${chave}`,
+  // A CARTO serve quatro subdomínios; o padrão do Leaflet é só "abc".
+  subdominios: "abcd",
+  // Dois níveis além do padrão 18 do Leaflet ajudam a distinguir a
+  // parada certa numa via com canteiro central.
+  zoomMaximo: 20,
+  atribuicao:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+});
+
+const BASE_OSM_PADRAO: BaseDoMapa = {
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  subdominios: "abc",
+  zoomMaximo: 19,
+  atribuicao:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+};
+
+/** Exportada para teste: a decisão depende de variável de ambiente. */
+export function escolherBaseDoMapa(chaveCarto?: string): BaseDoMapa {
+  const chave = (chaveCarto ?? "").trim();
+  return chave ? BASE_CARTO_VOYAGER(chave) : BASE_OSM_PADRAO;
+}
+
+const BASE_MAPA = escolherBaseDoMapa(process.env.NEXT_PUBLIC_CARTO_API_KEY);
 
 const PONTO_PADRAO = { lat: -15.8305, lng: -48.0425 };
 const ZOOM_PADRAO = 14;
@@ -375,9 +406,10 @@ export default function MapaInterativo({
         className="mapa-leaflet"
       >
         <TileLayer
-          attribution={ATRIBUICAO_MAPA}
-          url={URL_TILES}
-          maxZoom={20}
+          attribution={BASE_MAPA.atribuicao}
+          url={BASE_MAPA.url}
+          subdomains={BASE_MAPA.subdominios}
+          maxZoom={BASE_MAPA.zoomMaximo}
         />
         <CapturaCliqueNoMapa
           ativo={escolhendoNoMapa}
