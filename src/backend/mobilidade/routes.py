@@ -5,12 +5,15 @@ from mobilidade.geocode_service import GeocodeService
 from mobilidade.linha_service import LinhaService
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
+from mobilidade.posicao_service import PosicaoService
 from mobilidade.rota_service import RotaService
 from mobilidade.schemas import (
     LinhaResponse,
     LinhaResumoResponse,
     LugarResponse,
     OpcaoViagemResponse,
+    PosicaoVeiculoResponse,
+    PosicoesLinhaResponse,
 )
 from shared.config import get_settings
 from shared.database import get_db
@@ -33,6 +36,10 @@ _linha_service = LinhaService(_linha_provider)
 # Nominatim pra respeitar o limite de 1 req/s da política de uso).
 _rota_service = RotaService()
 _geocode_service = GeocodeService()
+
+# US #16 — uma instância só por processo: o cache do feed de GPS é
+# compartilhado entre todos os usuários (ver posicao_service.py).
+_posicao_service = PosicaoService()
 
 
 @router.get("/hello")
@@ -171,4 +178,34 @@ async def buscar_linha(numero_linha: str, db: Session = Depends(get_db)):
         ],
         trajeto=resultado.trajeto,
         horarios_previstos=resultado.horarios_previstos,
+    )
+
+
+@router.get("/linhas/{numero_linha}/posicoes", response_model=PosicoesLinhaResponse)
+async def posicoes_da_linha(numero_linha: str):
+    """
+    US #16 — Rastrear Posição do Ônibus em Tempo Real.
+
+    Cenário 1: veículos em operação → posições atuais no mapa.
+    Cenário 2: atualização automática → o front repete esta chamada.
+    Cenário 3: nenhum veículo em operação → `veiculos` vazio, e o front
+               exibe o aviso. É o estado real quando a linha não tem
+               ônibus rodando com GPS reportando no momento.
+    """
+    veiculos = await _posicao_service.posicoes_da_linha(numero_linha)
+
+    return PosicoesLinhaResponse(
+        numero=numero_linha,
+        veiculos=[
+            PosicaoVeiculoResponse(
+                prefixo=v.prefixo,
+                lat=v.lat,
+                lng=v.lng,
+                sentido=v.sentido,
+                velocidade=v.velocidade,
+                atualizado_em=v.atualizado_em.isoformat(),
+                operadora=v.operadora,
+            )
+            for v in veiculos
+        ],
     )

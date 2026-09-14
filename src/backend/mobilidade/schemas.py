@@ -66,3 +66,32 @@ class OpcaoViagemResponse(BaseModel):
     distancia_km: float
     caminhada_metros: int
     duracao_estimada_min: int
+
+
+# ---------------------------------------------------------------------------
+# US #16 — Posição do ônibus em tempo real
+# ---------------------------------------------------------------------------
+
+
+class PosicaoVeiculoResponse(BaseModel):
+    """Um ônibus da linha, ao vivo (US #16)."""
+
+    prefixo: str
+    lat: float
+    lng: float
+    sentido: str | None = None
+    velocidade: float | None = None
+    atualizado_em: str
+    operadora: str
+
+
+class PosicoesLinhaResponse(BaseModel):
+    """
+    Resposta do rastreamento de uma linha.
+
+    `veiculos` vazio é o Cenário 3 da US #16 ("nenhum veículo em
+    operação") — situação normal fora do horário de pico, não erro.
+    """
+
+    numero: str
+    veiculos: list[PosicaoVeiculoResponse]

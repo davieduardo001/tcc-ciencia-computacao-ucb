@@ -8,6 +8,7 @@ import {
   calcularRotas,
   CalcularRotaError,
   nomearLugar,
+  buscarPosicoesDaLinha,
 } from "../api";
 
 /**
@@ -271,5 +272,58 @@ describe("api.ts — rota origem → destino (US #20)", () => {
     }) as jest.Mock;
 
     await expect(nomearLugar(-15.8, -48.1)).resolves.toBeNull();
+  });
+});
+
+describe("api.ts — posição ao vivo (US #16)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("chama /api/mobilidade/linhas/{numero}/posicoes e converte o payload", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        numero: "0.620",
+        veiculos: [
+          {
+            prefixo: "122190",
+            lat: -15.60806,
+            lng: -47.69308,
+            sentido: "VOLTA",
+            velocidade: 8.06,
+            atualizado_em: "2026-09-13T22:13:40",
+            operadora: "VIAÇÃO PIRACICABANA - BACIA 01",
+          },
+        ],
+      }),
+    }) as jest.Mock;
+
+    const veiculos = await buscarPosicoesDaLinha("0.620");
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/mobilidade\/linhas\/0\.620\/posicoes$/);
+    expect(options.credentials).toBe("include");
+    expect(veiculos).toHaveLength(1);
+    expect(veiculos[0].prefixo).toBe("122190");
+    expect(veiculos[0].atualizadoEm).toBe("2026-09-13T22:13:40");
+    expect(veiculos[0].velocidade).toBe(8.06);
+  });
+
+  it("lista vazia é normal — nenhum ônibus em operação (Cenário 3)", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ numero: "0.110", veiculos: [] }),
+    }) as jest.Mock;
+
+    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual([]);
+  });
+
+  it("falha de rede não derruba a tela — devolve []", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+
+    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual([]);
   });
 });
