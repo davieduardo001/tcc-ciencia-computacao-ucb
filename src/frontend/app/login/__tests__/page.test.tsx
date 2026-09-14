@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Login from "../page";
 
 jest.mock("next/navigation", () => ({
@@ -15,7 +15,23 @@ describe("Login", () => {
 
   afterEach(() => {
     jest.resetAllMocks();
+    delete (window as unknown as { google?: unknown }).google;
   });
+
+  function capturarCallbackGoogle(): (response: { credential: string }) => void {
+    let callback: (response: { credential: string }) => void = () => {};
+    window.google = {
+      accounts: {
+        id: {
+          initialize: (config) => {
+            callback = config.callback;
+          },
+          renderButton: jest.fn(),
+        },
+      },
+    };
+    return (...args) => callback(...args);
+  }
 
   function preencherFormulario({
     email = "ana@example.com",
@@ -100,5 +116,132 @@ describe("Login", () => {
       expect(screen.getAllByText("Campo obrigatório").length).toBeGreaterThanOrEqual(2);
     });
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("realiza login via Google com sucesso e redireciona pro mapa", async () => {
+    const dispararCredencial = capturarCallbackGoogle();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "token-google",
+        refresh_token: "refresh-google",
+        token_type: "bearer",
+        account_linking_pending: false,
+        account_linking_required: false,
+      }),
+    });
+
+    render(<Login />);
+    await act(async () => {
+      dispararCredencial({ credential: "id-token-fake" });
+    });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/auth/login/google"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(localStorage.getItem("access_token")).toBe("token-google");
+  });
+
+  it("pede confirmação de vínculo quando o e-mail do Google já tem conta com senha", async () => {
+    const dispararCredencial = capturarCallbackGoogle();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "",
+        refresh_token: "",
+        token_type: "bearer",
+        account_linking_pending: true,
+        account_linking_required: true,
+      }),
+    });
+
+    render(<Login />);
+    // header.payload.signature — payload é {"email":"ana@example.com","sub":"google-123"} em base64url
+    const payload = btoa(JSON.stringify({ email: "ana@example.com", sub: "google-123" }));
+    await act(async () => {
+      dispararCredencial({ credential: `header.${payload}.signature` });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Já existe uma conta com senha para/)
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+  });
+
+  it("confirma o vínculo com o Google e redireciona pro mapa", async () => {
+    const dispararCredencial = capturarCallbackGoogle();
+    const payload = btoa(JSON.stringify({ email: "ana@example.com", sub: "google-123" }));
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: "",
+          refresh_token: "",
+          token_type: "bearer",
+          account_linking_pending: true,
+          account_linking_required: true,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: "token-vinculado",
+          refresh_token: "refresh-vinculado",
+          token_type: "bearer",
+          account_linking_pending: false,
+          account_linking_required: false,
+        }),
+      });
+
+    render(<Login />);
+    await act(async () => {
+      dispararCredencial({ credential: `header.${payload}.signature` });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Confirmar vínculo com o Google" })
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar vínculo com o Google" })
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining("/api/auth/link-google/confirmar"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(localStorage.getItem("access_token")).toBe("token-vinculado");
+  });
+
+  it("exibe erro quando o login via Google falha", async () => {
+    const dispararCredencial = capturarCallbackGoogle();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: "Token Google inválido" }),
+    });
+
+    render(<Login />);
+    await act(async () => {
+      dispararCredencial({ credential: "id-token-invalido" });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Token Google inválido")).toBeInTheDocument();
+    });
   });
 });

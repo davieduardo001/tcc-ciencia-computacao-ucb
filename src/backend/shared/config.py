@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_MINUTES: int = 60
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_MAPS_API_KEY: str = ""
 
     class Config:
         env_file = ".env"

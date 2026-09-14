@@ -10,6 +10,18 @@ async def proxy_request(service_url: str, path: str, request: Request) -> Respon
     """
     body = await request.body()
 
+    # A query string precisa ser repassada explicitamente: o `{path:path}`
+    # das rotas de proxy captura só o caminho, e montar a URL de destino
+    # sem ela descartava todo parâmetro silenciosamente. Onde o parâmetro
+    # tem default o estrago era invisível (o autocomplete de linhas
+    # chegava como `q=""` e devolvia as 923 linhas do DF em vez do
+    # filtro); onde é obrigatório, virava 422 (a rota origem→destino da
+    # US #20). Repassada já codificada, sem decodificar e recodificar,
+    # pra não corromper acento nem espaço.
+    url = f"{service_url}{path}"
+    if request.url.query:
+        url = f"{url}?{request.url.query}"
+
     headers = dict(request.headers)
     headers.pop("host", None)
     # Não repassar o Accept-Encoding do cliente: o navegador anuncia
@@ -23,7 +35,7 @@ async def proxy_request(service_url: str, path: str, request: Request) -> Respon
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method=request.method,
-                url=f"{service_url}{path}",
+                url=url,
                 headers=headers,
                 content=body if body else None,
                 timeout=30.0,

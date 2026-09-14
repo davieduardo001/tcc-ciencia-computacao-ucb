@@ -1,5 +1,7 @@
+from typing import Optional
+
 import bcrypt
-from jose import jwt
+from jose import JWTError, jwt
 from shared.config import get_settings
 
 settings = get_settings()
@@ -29,3 +31,20 @@ def criar_refresh_token(data: dict) -> str:
     expire = datetime.utcnow() + timedelta(days=expire_days)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+def decodificar_access_token(token: str) -> Optional[dict]:
+    """
+    Decodifica e valida a assinatura de um access token.
+
+    Usado pelo endpoint GET /auth/me: como o Auth Service é acessado
+    pelo Gateway via URL publica do Fly.io (nao rede privada), nao da
+    pra confiar num header repassado pelo Gateway sem verificacao —
+    o Auth Service precisa validar a assinatura do token ele mesmo.
+
+    Retorna None para token ausente, expirado ou invalido.
+    """
+    try:
+        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError:
+        return None

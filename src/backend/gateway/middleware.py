@@ -14,6 +14,8 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
         "/api/hello",
         "/api/status",
         "/api/auth/login",
+        "/api/auth/login/google",
+        "/api/auth/link-google/confirmar",
         "/api/auth/registrar",
         "/api/auth/refresh",
         "/api/auth/logout",

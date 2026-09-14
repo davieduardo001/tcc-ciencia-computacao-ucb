@@ -1,4 +1,12 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
 pydantic>=2.0
 pydantic-settings>=2.0
+httpx>=0.27.0
+# A imagem python:3.12-slim não traz a base de fusos do sistema, e o
+# serviço precisa de America/Sao_Paulo pra interpretar o `datalocal` do
+# SEMOB (ver posicao_service.FUSO_SEMOB). Sem isso o ZoneInfo levanta
+# ZoneInfoNotFoundError e o código cai no deslocamento fixo.
+tzdata>=2024.1
