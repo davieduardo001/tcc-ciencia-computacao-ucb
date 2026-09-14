@@ -52,3 +52,34 @@ Ideia trazida pela Vitória, em alinhamento com o Davi:
 2. **Posição em tempo real (#16)** — sem feed externo. Vem exclusivamente da localização real de usuários do Movecity que confirmarem estar embarcados numa linha (opt-in explícito), seguindo o modelo de bootstrap do Moovit. Sem reportes ativos, aplica-se o Cenário 3 da própria US ("nenhum veículo em operação").
 3. **Consentimento (LGPD)** — obrigatório e explícito na UX antes de qualquer compartilhamento de localização; ponto compartilhado deve ser desvinculado da identidade do usuário na exibição pra outros passageiros.
 4. **Antes de ir pra produção** (não bloqueia o desenvolvimento do MVP): confirmar formalmente o ToS do Google Maps Platform quanto a cache/armazenamento de longo prazo dos dados de linha/parada.
+
+---
+
+## Correção (2026-09-13): os endpoints do SEMOB estão vivos
+
+A conclusão acima ("não existe API oficial") estava **errada num ponto específico**, e vale registrar o erro para não se repetir: os endpoints `dados.semob.df.gov.br` foram descartados porque **o repositório comunitário que os documentava** estava 404 — mas os endpoints em si nunca chegaram a ser testados. Eles respondem normalmente, são públicos, sem autenticação, e alimentam o próprio app oficial DF no Ponto.
+
+### O que cada um entrega (medido em 13/09/2026)
+
+| Endpoint | Conteúdo |
+|---|---|
+| `GET /espaciais` | 1.408 trajetos (923 linhas × IDA/VOLTA/CIRCULAR) em GeoJSON `LineString`, já seguindo rua — 929.439 pontos. ~28 MB |
+| `GET /horario` | Horários por linha e sentido, com dias da semana e operadora. ~6,5 MB |
+| `GET /pontos` | 7.140 abrigos de parada com latitude/longitude, endereço e tipo de abrigo. ~2,2 MB |
+| `GET /posicao` | **Posição GPS ao vivo da frota**, em GeoJSON, por operadora. 11 operadoras, 3.574 veículos, 2.736 com posição dos últimos 30 min; 678 informam linha e sentido |
+| `GET /parada` | 4.876 paradas → quais linhas param em cada uma (sem coordenada) |
+| `GET /operadora` | Operadoras e frota (placa, modelo, `prefixo` — casa com o `prefixo` do `/posicao`) |
+
+Complementarmente, os relatórios em `sismob.semob.df.gov.br/flq/linhas/{operadora}` trazem a **denominação oficial** de cada linha (em PDF). Os cinco códigos de operadora de ônibus são `PR` (Piracicabana, Bacia 01), `PI` (Pioneira, 02), `HP` (Urbi, 03 — grupo HP Transportes), `VM` (Marechal, 04) e `SJ` (São José, 05).
+
+### O que muda nas decisões
+
+1. **Linhas, paradas, trajeto e horários**: passam a vir do SEMOB, não do Google Maps. Sem API key, sem billing, sem depender de acordo com terceiro. Como os payloads não aceitam filtro por query string e somam ~37 MB, a leitura é **em lote** (`mobilidade/ingestao_semob.py` popula a tabela `linha`), e não sob demanda por linha — o oposto do que o refinamento de 2026-09-12 propôs, porque ali a restrição era custo por chamada do Google, que aqui não existe.
+2. **Posição em tempo real (US #16)**: existe feed oficial. O plano de depender exclusivamente de crowdsourcing (modelo Moovit) deixa de ser necessário como fonte primária — pode virar complemento, se a equipe quiser, mas não é mais o único caminho. As ressalvas de LGPD continuam valendo para qualquer coisa que envolva localização de usuário.
+3. **ToS do Google Maps**: deixa de ser bloqueio para produção nessas USs, já que não usamos mais a fonte do Google para dados de linha.
+
+### Ressalvas que permanecem
+
+- São endpoints **sem documentação pública nem SLA**. Podem mudar ou sair do ar sem aviso. Mitigação adotada: os dados são copiados para o nosso banco na ingestão, então uma queda do SEMOB não derruba a busca — só congela o snapshot.
+- `/parada` (quais linhas param onde) e `/pontos` (onde ficam os abrigos) **não têm chave em comum**, então a associação parada↔linha é feita por proximidade geográfica do abrigo ao traçado (40 m). É aproximação nossa, não a lista oficial de paradas da linha.
+- A denominação oficial cobre 823 das 923 linhas; as demais recebem nome genérico.
