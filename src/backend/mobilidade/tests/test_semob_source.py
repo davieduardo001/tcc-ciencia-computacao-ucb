@@ -32,6 +32,20 @@ def test_nome_da_parada_tira_cep_e_cidade():
     assert nome_da_parada("W3 Sul, SQS 315, Brasília, CEP: 70384-000") == "W3 Sul, SQS 315"
     assert nome_da_parada("Terminal Ceilândia, Brasília") == "Terminal Ceilândia"
     assert nome_da_parada("Eixo Monumental") == "Eixo Monumental"
+    # CEP grudado no texto, sem vírgula — acontece no /pontos.
+    assert nome_da_parada("SHVP - Rua 4, CHÁCARA 10CEP: 72006-203") == "SHVP - Rua 4, CHÁCARA 10"
+
+
+def test_nome_da_parada_sem_nada_util_fica_vazio():
+    """
+    582 dos 7.142 abrigos do /pontos vêm só com o CEP ou só com a
+    cidade. Exibir "CEP: 71596-265" como nome de parada é pior do que
+    não exibir nome — a UI tem rótulo neutro pra esse caso.
+    """
+    assert nome_da_parada("CEP: 71596-265") == ""
+    assert nome_da_parada("Brasília, CEP: 70610-650") == ""
+    assert nome_da_parada("Brasília") == ""
+    assert nome_da_parada("") == ""
 
 
 def test_horarios_agrupa_por_linha_e_sentido_sem_repetir():

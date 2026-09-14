@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaInterativo from "../MapaInterativo";
-import { LinhaDetalhada } from "@/lib/api";
+import { LinhaDetalhada, OpcaoViagem } from "@/lib/api";
 
 jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -34,7 +34,16 @@ jest.mock("react-leaflet", () => ({
       data-pontos={JSON.stringify(positions)}
     />
   ),
+  // US #20 — usado pelo modo "escolher ponto no mapa". Guarda o handler
+  // pra que os testes possam simular o clique sem um mapa real.
+  useMapEvents: (handlers: { click?: (e: unknown) => void }) => {
+    handlersDeMapa.click = handlers.click;
+    return null;
+  },
 }));
+
+/** Handlers registrados via useMapEvents, pra simular eventos do mapa. */
+const handlersDeMapa: { click?: (evento: unknown) => void } = {};
 
 jest.mock("leaflet", () => ({
   __esModule: true,
@@ -193,5 +202,151 @@ describe("MapaInterativo", () => {
       'Linha "999" não encontrada.'
     );
     expect(screen.queryByTestId("polyline")).not.toBeInTheDocument();
+  });
+
+  it("mostra rótulo neutro quando a parada não tem nome cadastrado", () => {
+    // 582 dos 7.142 abrigos do SEMOB vêm só com o CEP no endereço; o
+    // backend manda nome vazio em vez de exibir "CEP: 71596-265".
+    const semNome: LinhaDetalhada = {
+      ...LINHA_TESTE,
+      paradas: [{ nome: "", lat: -15.833, lng: -48.05 }],
+    };
+
+    render(<MapaInterativo linha={semNome} />);
+
+    expect(
+      screen.getAllByText("Parada sem nome cadastrado").length
+    ).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US #20 — itinerário origem → destino desenhado no mapa
+// ---------------------------------------------------------------------------
+
+const VIAGEM_COM_BALDEACAO: OpcaoViagem = {
+  pernas: [
+    {
+      numero: "0.186",
+      sentido: "IDA",
+      nome: "0.186 — Aeroporto / Rodoviária",
+      embarque: {
+        lat: -15.87,
+        lng: -47.92,
+        parada_nome: "Estrada Parque Aeroporto",
+        caminhada_metros: 395,
+      },
+      desembarque: {
+        lat: -15.794,
+        lng: -47.883,
+        parada_nome: "Eixo W Central, Setor Bancário Sul",
+        caminhada_metros: 99,
+      },
+      distancia_km: 12.4,
+      paradas_no_trecho: 26,
+      trajeto: [
+        [-15.87, -47.92],
+        [-15.794, -47.883],
+      ],
+    },
+    {
+      numero: "0.110",
+      sentido: "CIRCULAR",
+      nome: "0.110 — Circular Rodoviária / UnB",
+      embarque: {
+        lat: -15.793,
+        lng: -47.882,
+        parada_nome: "Eixo Rodoviário, Setor Bancário Sul",
+        caminhada_metros: 16,
+      },
+      desembarque: {
+        lat: -15.763,
+        lng: -47.87,
+        parada_nome: "L3 Norte, SQN 408",
+        caminhada_metros: 212,
+      },
+      distancia_km: 5.9,
+      paradas_no_trecho: 10,
+      trajeto: [
+        [-15.793, -47.882],
+        [-15.763, -47.87],
+      ],
+    },
+  ],
+  baldeacoes: 1,
+  distancia_km: 18.3,
+  caminhada_metros: 722,
+  duracao_estimada_min: 65,
+};
+
+describe("MapaInterativo — itinerário da viagem (US #20)", () => {
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+    });
+  });
+
+  it("desenha uma polilinha por perna, com cores diferentes", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
+
+    const linhas = screen.getAllByTestId("polyline");
+    expect(linhas).toHaveLength(2);
+    expect(linhas[0].getAttribute("data-cor")).not.toBe(
+      linhas[1].getAttribute("data-cor")
+    );
+  });
+
+  it("marca embarque, baldeação e desembarque", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
+
+    expect(
+      screen.getByTestId("marcador-mapa-icone-viagem embarque")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("marcador-mapa-icone-viagem baldeacao")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("marcador-mapa-icone-viagem desembarque")
+    ).toBeInTheDocument();
+  });
+
+  it("marca origem e destino informados pelo usuário", () => {
+    render(
+      <MapaInterativo
+        viagem={VIAGEM_COM_BALDEACAO}
+        origemViagem={{ nome: "Aeroporto JK", lat: -15.87, lng: -47.92 }}
+        destinoViagem={{ nome: "UnB", lat: -15.763, lng: -47.87 }}
+      />
+    );
+
+    expect(
+      screen.getByTestId("marcador-mapa-icone-viagem origem")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Aeroporto JK")).toBeInTheDocument();
+    expect(screen.getByText("UnB")).toBeInTheDocument();
+  });
+
+  it("no modo escolher ponto, o clique no mapa devolve a coordenada", () => {
+    const onCliqueNoMapa = jest.fn();
+    render(
+      <MapaInterativo escolhendoNoMapa onCliqueNoMapa={onCliqueNoMapa} />
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Toque no mapa para escolher o ponto."
+    );
+
+    handlersDeMapa.click?.({ latlng: { lat: -15.8, lng: -48.1 } });
+
+    expect(onCliqueNoMapa).toHaveBeenCalledWith(-15.8, -48.1);
+  });
+
+  it("fora do modo escolher ponto, o clique no mapa é ignorado", () => {
+    const onCliqueNoMapa = jest.fn();
+    render(<MapaInterativo onCliqueNoMapa={onCliqueNoMapa} />);
+
+    handlersDeMapa.click?.({ latlng: { lat: -15.8, lng: -48.1 } });
+
+    expect(onCliqueNoMapa).not.toHaveBeenCalled();
   });
 });

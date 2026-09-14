@@ -336,6 +336,124 @@ export async function sugerirLinhas(termo: string): Promise<LinhaResumo[]> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// US #20 — Rota de origem até destino
+// ---------------------------------------------------------------------------
+
+export interface Lugar {
+  nome: string;
+  endereco: string;
+  lat: number;
+  lng: number;
+}
+
+export interface PontoEmbarque {
+  lat: number;
+  lng: number;
+  /** Vazio quando não há parada cadastrada perto — a UI mostra o ponto no mapa. */
+  parada_nome: string;
+  caminhada_metros: number;
+}
+
+export interface PernaViagem {
+  numero: string;
+  sentido: string;
+  nome: string;
+  embarque: PontoEmbarque;
+  desembarque: PontoEmbarque;
+  distancia_km: number;
+  paradas_no_trecho: number;
+  trajeto: [number, number][];
+}
+
+export interface OpcaoViagem {
+  pernas: PernaViagem[];
+  baldeacoes: number;
+  distancia_km: number;
+  caminhada_metros: number;
+  duracao_estimada_min: number;
+}
+
+/**
+ * US #20 — Autocomplete de origem/destino por ponto de referência
+ * ("Rodoviária", "UnB", "Shopping Taguatinga").
+ *
+ * Existe porque os nomes de parada do SEMOB são endereços de rua, que
+ * ninguém digita. Resolvido no backend via OpenStreetMap/Nominatim.
+ *
+ * Nunca lança: sem geocodificação o usuário ainda tem "usar minha
+ * localização" e o clique no mapa.
+ */
+export async function buscarLugares(termo: string): Promise<Lugar[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/lugares?q=${encodeURIComponent(termo)}`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * US #20 — Nome legível de um ponto, pra "usar minha localização" e pro
+ * clique no mapa não deixarem o campo mostrando coordenada crua.
+ * Retorna null quando o ponto não tem nome conhecido.
+ */
+export async function nomearLugar(
+  lat: number,
+  lng: number
+): Promise<Lugar | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/lugares/reverso?lat=${lat}&lng=${lng}`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export class CalcularRotaError extends Error {}
+
+/**
+ * US #20 — Opções de viagem entre dois pontos, diretas primeiro e com
+ * uma baldeação quando não há linha direta.
+ *
+ * Lista vazia é resposta válida (Cenário 3 da US: nenhuma rota
+ * disponível), não erro. Falha de rede/servidor lança CalcularRotaError
+ * — aqui, diferente do autocomplete, o usuário precisa saber que não
+ * deu certo.
+ */
+export async function calcularRotas(
+  origem: { lat: number; lng: number },
+  destino: { lat: number; lng: number }
+): Promise<OpcaoViagem[]> {
+  const params = new URLSearchParams({
+    origem_lat: String(origem.lat),
+    origem_lng: String(origem.lng),
+    destino_lat: String(destino.lat),
+    destino_lng: String(destino.lng),
+  });
+
+  const response = await fetch(`${API_URL}/api/mobilidade/rotas?${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new CalcularRotaError(
+      "Não foi possível calcular a rota. Tente novamente."
+    );
+  }
+
+  return response.json();
+}
+
 /**
  * US #17 — Busca os detalhes de uma linha (trajeto, paradas, sentido)
  * pra desenhar no mapa. Usa o mesmo endpoint da US #15

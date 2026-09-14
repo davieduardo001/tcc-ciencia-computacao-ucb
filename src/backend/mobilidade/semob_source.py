@@ -45,6 +45,11 @@ PRIORIDADE_SENTIDO = {"CIRCULAR": 0, "IDA": 1, "VOLTA": 2}
 
 _ARQUIVO_NOMES = Path(__file__).parent / "dados" / "nomes_linhas.json"
 
+# "CEP: 70384-000" em qualquer posição do endereço, com a vírgula que o
+# antecede quando houver. Casa tanto ", CEP: x" no fim quanto o endereço
+# que é só o CEP.
+_SO_CEP = re.compile(r",?\s*CEP:?\s*\d{5}-?\d{0,3}", re.IGNORECASE)
+
 # Raio de busca da junção espacial entre o traçado da linha e os abrigos
 # de parada. 40 m cobre o afastamento normal entre o eixo da via (onde
 # fica a geometria) e a calçada (onde fica o abrigo).
@@ -82,12 +87,26 @@ def nome_da_parada(endereco: str) -> str:
     Encurta o endereço do abrigo pra virar nome de parada exibível.
 
     "W3 Sul, SQS 315, Brasília, CEP: 70384-000" -> "W3 Sul, SQS 315"
+
+    Devolve string vazia quando não sobra nada útil. Isso acontece de
+    verdade: 596 dos 7.142 abrigos do /pontos vêm só com o CEP, sem rua
+    nenhuma, e outros só com "Brasília". Exibir "CEP: 71596-265" como
+    nome de parada é pior do que não exibir nome — nesses casos a UI
+    mostra um rótulo neutro e o ponto no mapa. O `abrigo_nome` não
+    ajuda: é o tipo do abrigo ("Ponto Habitual", "Abrigo Tipo C"), não
+    o lugar.
     """
-    limpo = endereco.split(", CEP:")[0]
+    limpo = _SO_CEP.sub("", endereco)
+    limpo = limpo.strip().strip(",").strip()
+
     for sufixo in (", Brasília", ", Brasilia"):
         if limpo.endswith(sufixo):
-            limpo = limpo[: -len(sufixo)]
-    return limpo.strip() or endereco.strip()
+            limpo = limpo[: -len(sufixo)].strip()
+
+    if limpo in ("Brasília", "Brasilia"):
+        return ""
+
+    return limpo
 
 
 # O SEMOB publica a denominação em CAIXA ALTA ("CIRCULAR - RODOVIÁRIA DO
