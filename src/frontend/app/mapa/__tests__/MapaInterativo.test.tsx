@@ -366,6 +366,7 @@ describe("MapaInterativo — itinerário da viagem (US #20)", () => {
 // ---------------------------------------------------------------------------
 
 const VEICULO: VeiculoAoVivo = {
+  linha: "0.110",
   prefixo: "446475",
   lat: -15.80459,
   lng: -47.92445,
@@ -457,6 +458,69 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
   });
 
   it("sem linha selecionada não busca posição nenhuma", async () => {
+    render(<MapaInterativo />);
+    await act(async () => {});
+
+    expect(buscarPosicoesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaInterativo — rastreio das linhas do itinerário (US #16 + #20)", () => {
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+    });
+    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("rastreia todas as linhas do itinerário, não só uma", async () => {
+    // Sem isso, quem planejava "Taguatinga → UCB" via a linha no
+    // resultado e não tinha como ver onde o ônibus estava — precisava
+    // buscar a linha pelo número numa segunda busca.
+    buscarPosicoesMock.mockResolvedValue([]);
+
+    render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
+
+    await waitFor(() => {
+      expect(buscarPosicoesMock).toHaveBeenCalledTimes(2);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.186");
+    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.110");
+  });
+
+  it("desenha os ônibus das duas pernas no mapa", async () => {
+    buscarPosicoesMock
+      .mockResolvedValueOnce([{ ...VEICULO, linha: "0.186", prefixo: "A1" }])
+      .mockResolvedValueOnce([{ ...VEICULO, linha: "0.110", prefixo: "B1" }]);
+
+    render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("marcador-mapa-icone-onibus")).toHaveLength(2);
+    });
+  });
+
+  it("repassa os ônibus rastreados para quem desenha o painel", async () => {
+    const onVeiculos = jest.fn();
+    buscarPosicoesMock.mockResolvedValue([
+      { ...VEICULO, linha: "0.186", prefixo: "A1" },
+    ]);
+
+    render(
+      <MapaInterativo viagem={VIAGEM_COM_BALDEACAO} onVeiculos={onVeiculos} />
+    );
+
+    await waitFor(() => {
+      const ultimo = onVeiculos.mock.calls.at(-1)?.[0];
+      expect(ultimo).toHaveLength(2);
+    });
+  });
+
+  it("não rastreia nada quando não há linha nem itinerário", async () => {
     render(<MapaInterativo />);
     await act(async () => {});
 

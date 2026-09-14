@@ -489,6 +489,10 @@ export async function buscarLinha(
   };
 }
 export interface VeiculoAoVivo {
+  /** Número da linha que o veículo está fazendo. Necessário porque o
+   * mapa rastreia várias linhas ao mesmo tempo quando o usuário escolhe
+   * um itinerário com baldeação (US #20). */
+  linha: string;
   prefixo: string;
   lat: number;
   lng: number;
@@ -528,6 +532,7 @@ export async function buscarPosicoesDaLinha(
         atualizado_em: string;
         operadora: string;
       }) => ({
+        linha: data.numero ?? numero,
         prefixo: v.prefixo,
         lat: v.lat,
         lng: v.lng,

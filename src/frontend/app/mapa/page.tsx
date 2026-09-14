@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Navigation } from "lucide-react";
 import AppShell from "./AppShell";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
@@ -15,6 +16,7 @@ import {
   nomearLugar,
   OpcaoViagem,
   sugerirLinhas,
+  VeiculoAoVivo,
 } from "@/lib/api";
 
 const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
@@ -29,7 +31,20 @@ interface Coordenadas {
   lng: number;
 }
 
+/**
+ * `useSearchParams` obriga o componente a ser renderizado no cliente. A
+ * página inteira é estática, então o Suspense isola essa parte — sem
+ * ele o `next build` falha na geração estática.
+ */
 export default function MapaPage() {
+  return (
+    <Suspense fallback={<p className="mapa-carregando">Carregando mapa...</p>}>
+      <MapaConteudo />
+    </Suspense>
+  );
+}
+
+function MapaConteudo() {
   const [linha, setLinha] = useState<LinhaDetalhada | null>(null);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
   const [buscandoLinha, setBuscandoLinha] = useState(false);
@@ -47,6 +62,24 @@ export default function MapaPage() {
   const [erroRota, setErroRota] = useState<string | null>(null);
   const [escolhendoNoMapa, setEscolhendoNoMapa] = useState<Extremo | null>(null);
   const [localizacao, setLocalizacao] = useState<Coordenadas | null>(null);
+  const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
+  const [focarBusca, setFocarBusca] = useState(0);
+
+  // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
+  // página, só que com o painel certo já aberto — as duas
+  // funcionalidades vivem no mapa, não em páginas separadas.
+  const painel = useSearchParams().get("painel");
+
+  useEffect(() => {
+    if (painel === "rotas") {
+      setPlanejadorAberto(true);
+    } else if (painel === "linhas") {
+      setPlanejadorAberto(false);
+      // Nonce em vez de booleano: clicar em "Linhas de Ônibus" duas
+      // vezes seguidas tem que focar o campo nas duas.
+      setFocarBusca((n) => n + 1);
+    }
+  }, [painel]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -219,6 +252,16 @@ export default function MapaPage() {
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
+  // US #16 no painel da US #20: quantos ônibus estão rodando cada linha
+  // do itinerário escolhido.
+  const veiculosPorLinha = (veiculos ?? []).reduce<Record<string, number>>(
+    (acc, veiculo) => {
+      acc[veiculo.linha] = (acc[veiculo.linha] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
   return (
     <AppShell
       active="mapa"
@@ -227,6 +270,7 @@ export default function MapaPage() {
       onDigitarBuscaLinha={handleDigitarBuscaLinha}
       sugestoesLinha={sugestoesLinha}
       onSelecionarSugestaoLinha={handleSelecionarSugestaoLinha}
+      focarBusca={focarBusca}
     >
       <MapaInterativo
         linha={linha}
@@ -238,6 +282,7 @@ export default function MapaPage() {
         escolhendoNoMapa={escolhendoNoMapa !== null}
         onCliqueNoMapa={handleCliqueNoMapa}
         onLocalizacao={setLocalizacao}
+        onVeiculos={setVeiculos}
       />
 
       {planejadorAberto ? (
@@ -257,6 +302,8 @@ export default function MapaPage() {
           calculando={calculandoRota}
           erro={erroRota}
           onFechar={handleFecharPlanejador}
+          veiculosPorLinha={veiculosPorLinha}
+          rastreando={veiculos !== null}
         />
       ) : (
         <button

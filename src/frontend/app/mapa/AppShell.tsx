@@ -27,10 +27,31 @@ function iniciais(nome: string): string {
   return (primeira + ultima).toUpperCase();
 }
 
+// "Linhas de Ônibus" e "Rotas" não são páginas separadas: as duas
+// funcionalidades vivem dentro do mapa (busca de linha na barra de
+// cima, planejador no painel lateral). Marcá-las como "em breve" dizia
+// ao usuário que não existiam, sendo que estão entregues — as US #15,
+// #17 e #20 estão em produção. Os links abrem o mapa já com o painel
+// certo, via ?painel=.
+//
+// "Perfil" saiu daqui: já existe o botão de perfil na barra de cima, e
+// ter os dois duplicava a mesma entrada.
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
-  { id: "linhas", href: "/linhas", label: "Linhas de Ônibus", Icone: Bus, disponivel: false },
-  { id: "rotas", href: "/rotas", label: "Rotas", Icone: Navigation, disponivel: false },
+  {
+    id: "linhas",
+    href: "/mapa?painel=linhas",
+    label: "Linhas de Ônibus",
+    Icone: Bus,
+    disponivel: true,
+  },
+  {
+    id: "rotas",
+    href: "/mapa?painel=rotas",
+    label: "Rotas",
+    Icone: Navigation,
+    disponivel: true,
+  },
   { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: false },
   {
     id: "ocorrencias",
@@ -40,7 +61,6 @@ const NAV_ITEMS = [
     disponivel: false,
   },
   { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: false },
-  { id: "perfil", href: "/perfil", label: "Perfil", Icone: User, disponivel: false },
 ] as const;
 
 interface AppShellProps {
@@ -55,6 +75,9 @@ interface AppShellProps {
   onDigitarBuscaLinha?: (termo: string) => void;
   sugestoesLinha?: LinhaResumo[];
   onSelecionarSugestaoLinha?: (numero: string) => void;
+  /** Nonce: quando muda, o campo de busca recebe foco. Usado pelo item
+   * "Linhas de Ônibus" da navegação, que aponta pra esta mesma página. */
+  focarBusca?: number;
 }
 
 function ItemNav({
@@ -95,6 +118,7 @@ export default function AppShell({
   onDigitarBuscaLinha,
   sugestoesLinha,
   onSelecionarSugestaoLinha,
+  focarBusca,
 }: AppShellProps) {
   const router = useRouter();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
@@ -102,6 +126,13 @@ export default function AppShell({
   const [saindo, setSaindo] = useState(false);
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
   const fecharSugestoesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buscaRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (focarBusca) {
+      buscaRef.current?.focus();
+    }
+  }, [focarBusca]);
 
   function fecharSugestoesComAtraso() {
     // Atraso pequeno pra permitir o onClick da sugestão disparar antes
@@ -217,6 +248,7 @@ export default function AppShell({
         >
           <Search size={17} className="ms-search-icon" />
           <input
+            ref={buscaRef}
             name="busca-linha"
             placeholder="Buscar linha ou destino (ex: 0.110 ou Ceilândia)"
             disabled={buscandoLinha}

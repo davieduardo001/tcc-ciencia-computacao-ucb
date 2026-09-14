@@ -152,6 +152,9 @@ interface MapaInterativoProps {
   onCliqueNoMapa?: (lat: number, lng: number) => void;
   /** Reporta a posição do usuário pra fora (o planejador usa em "minha localização"). */
   onLocalizacao?: (coordenadas: Coordenadas | null) => void;
+  /** US #16 + #20 — repassa os ônibus rastreados pra que o painel do
+   * itinerário possa mostrar quantos estão rodando em cada perna. */
+  onVeiculos?: (veiculos: VeiculoAoVivo[]) => void;
 }
 
 export default function MapaInterativo({
@@ -164,6 +167,7 @@ export default function MapaInterativo({
   escolhendoNoMapa = false,
   onCliqueNoMapa,
   onLocalizacao,
+  onVeiculos,
 }: MapaInterativoProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const [status, setStatus] = useState<StatusLocalizacao>("carregando");
@@ -218,6 +222,12 @@ export default function MapaInterativo({
     onLocalizacao?.(status === "ok" ? coordenadas : null);
   }, [status, coordenadas, onLocalizacao]);
 
+  // Mesma ideia para os ônibus rastreados: quem faz o polling é este
+  // componente, e o painel do itinerário precisa do resultado.
+  useEffect(() => {
+    onVeiculos?.(veiculos);
+  }, [veiculos, onVeiculos]);
+
   // US #20 — enquadra o itinerário inteiro ao escolher uma opção.
   useEffect(() => {
     if (!viagem || !mapRef.current) return;
@@ -240,34 +250,54 @@ export default function MapaInterativo({
     }
   }, [linha]);
 
-  // US #16 — enquanto uma linha estiver selecionada, busca a posição
-  // dos ônibus dela e repete a cada INTERVALO_POSICOES_MS. Sem linha
-  // selecionada, não há o que rastrear.
+  // US #16 — linhas a rastrear: a que foi buscada pelo número, ou as
+  // que compõem o itinerário escolhido no planejador (US #20).
+  //
+  // Rastrear o itinerário também é o que faz o recurso ter serventia na
+  // prática: quem planeja "Taguatinga → UCB" quer saber onde está o
+  // ônibus que vai pegar, e antes só dava pra ver isso buscando a linha
+  // pelo número numa segunda busca.
+  //
+  // `join` em vez do array para a dependência do efeito: um array novo
+  // a cada render reiniciaria o polling sem parar.
+  const linhasRastreadas = linha
+    ? [linha.numero]
+    : viagem
+      ? Array.from(new Set(viagem.pernas.map((p) => p.numero)))
+      : [];
+  const chaveRastreio = linhasRastreadas.join(",");
+
   useEffect(() => {
-    if (!linha) {
+    if (!chaveRastreio) {
       setVeiculos([]);
       setBuscouPosicoes(false);
       return;
     }
 
+    const numeros = chaveRastreio.split(",");
     let ativo = true;
 
-    async function atualizar(numero: string) {
-      const resultado = await buscarPosicoesDaLinha(numero);
-      if (ativo) {
-        setVeiculos(resultado);
-        setBuscouPosicoes(true);
-      }
+    async function atualizar() {
+      // Uma chamada por linha, em paralelo. O backend cacheia o feed do
+      // SEMOB, então isso não multiplica o download da origem.
+      const porLinha = await Promise.all(
+        // Arrow explícita: passar a função direto pro map mandaria
+        // índice e array como argumentos extras.
+        numeros.map((numero) => buscarPosicoesDaLinha(numero))
+      );
+      if (!ativo) return;
+      setVeiculos(porLinha.flat());
+      setBuscouPosicoes(true);
     }
 
-    atualizar(linha.numero);
-    const intervalo = setInterval(() => atualizar(linha.numero), INTERVALO_POSICOES_MS);
+    atualizar();
+    const intervalo = setInterval(atualizar, INTERVALO_POSICOES_MS);
 
     return () => {
       ativo = false;
       clearInterval(intervalo);
     };
-  }, [linha]);
+  }, [chaveRastreio]);
 
   function centralizarNaMinhaLocalizacao() {
     if (coordenadas && mapRef.current) {
@@ -422,20 +452,6 @@ export default function MapaInterativo({
               </Marker>
             ))}
 
-            {veiculos.map((veiculo) => (
-              <Marker
-                key={veiculo.prefixo}
-                position={[veiculo.lat, veiculo.lng]}
-                icon={iconeOnibus}
-              >
-                <Popup>
-                  <strong>Carro {veiculo.prefixo}</strong>
-                  <br />
-                  {veiculo.sentido ? `Sentido ${veiculo.sentido.toLowerCase()}` : "Em operação"}
-                  {veiculo.velocidade !== null && ` · ${Math.round(veiculo.velocidade)} km/h`}
-                </Popup>
-              </Marker>
-            ))}
 
             {marcadorSentido && (
               <Marker
@@ -446,6 +462,26 @@ export default function MapaInterativo({
             )}
           </>
         )}
+
+        {/* US #16 — fora do bloco da linha de propósito: os ônibus também
+            aparecem quando o que está na tela é um itinerário da US #20. */}
+        {veiculos.map((veiculo) => (
+          <Marker
+            key={`${veiculo.linha}-${veiculo.prefixo}`}
+            position={[veiculo.lat, veiculo.lng]}
+            icon={iconeOnibus}
+          >
+            <Popup>
+              <strong>{veiculo.linha}</strong> · carro {veiculo.prefixo}
+              <br />
+              {veiculo.sentido
+                ? `Sentido ${veiculo.sentido.toLowerCase()}`
+                : "Em operação"}
+              {veiculo.velocidade !== null &&
+                ` · ${Math.round(veiculo.velocidade)} km/h`}
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
       <div className="mapa-controles">

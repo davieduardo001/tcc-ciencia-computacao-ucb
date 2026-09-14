@@ -9,7 +9,13 @@ import {
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
+  // A página lê ?painel= pra abrir o planejador quando o usuário chega
+  // pelo item "Rotas" da navegação.
+  useSearchParams: () => new URLSearchParams(parametrosDaUrl),
 }));
+
+/** Query string simulada; os testes sobrescrevem quando precisam. */
+let parametrosDaUrl = "";
 
 // O mapa em si depende de Leaflet/DOM real. O dublê expõe um botão que
 // simula "usuário permitiu a localização", pra testar o atalho de
