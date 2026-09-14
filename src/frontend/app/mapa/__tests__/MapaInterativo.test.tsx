@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import MapaInterativo from "../MapaInterativo";
+import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
 import { LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
 import { buscarPosicoesDaLinha } from "@/lib/api";
 
@@ -16,8 +16,21 @@ jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="map-container">{children}</div>
   ),
-  TileLayer: ({ url, attribution }: { url?: string; attribution?: string }) => (
-    <div data-testid="tile-layer" data-url={url} data-attribution={attribution} />
+  TileLayer: ({
+    url,
+    attribution,
+    subdomains,
+  }: {
+    url?: string;
+    attribution?: string;
+    subdomains?: string;
+  }) => (
+    <div
+      data-testid="tile-layer"
+      data-url={url}
+      data-attribution={attribution}
+      data-subdomains={subdomains}
+    />
   ),
   Marker: ({
     icon,
@@ -537,23 +550,50 @@ describe("MapaInterativo — base do mapa", () => {
     });
   });
 
-  it("usa o CARTO Voyager, com suporte a tela retina", () => {
+  /**
+   * Regressão que só apareceu na tela: a CARTO passou a exigir chave e,
+   * sem ela, responde 200 com um PNG válido — com "API KEY REQUIRED"
+   * estampado na imagem. Conferir status HTTP e tamanho em bytes não
+   * detecta isso.
+   */
+  it("sem chave da CARTO, usa o tile do OpenStreetMap", () => {
+    const base = escolherBaseDoMapa(undefined);
+
+    expect(base.url).toContain("tile.openstreetmap.org");
+    expect(base.url).not.toContain("cartocdn");
+    expect(base.atribuicao).toContain("OpenStreetMap");
+  });
+
+  it("chave vazia ou só espaços conta como ausente", () => {
+    expect(escolherBaseDoMapa("").url).toContain("tile.openstreetmap.org");
+    expect(escolherBaseDoMapa("   ").url).toContain("tile.openstreetmap.org");
+  });
+
+  it("com chave, usa o CARTO Voyager e manda a chave na URL", () => {
+    const base = escolherBaseDoMapa("abc123");
+
+    expect(base.url).toContain("basemaps.cartocdn.com/rastertiles/voyager");
+    expect(base.url).toContain("key=abc123");
+    // {r} vira "@2x" em tela retina; {s} varre os quatro subdomínios.
+    expect(base.url).toContain("{r}");
+    expect(base.subdominios).toBe("abcd");
+  });
+
+  it("a base da CARTO credita OpenStreetMap e CARTO — é obrigação de licença", () => {
+    // Os dados são do OpenStreetMap; a CARTO faz só o estilo. Omitir
+    // qualquer um dos dois viola os termos de uso das duas.
+    const base = escolherBaseDoMapa("abc123");
+
+    expect(base.atribuicao).toContain("OpenStreetMap");
+    expect(base.atribuicao).toContain("CARTO");
+    expect(base.atribuicao).toContain("carto.com/attributions");
+  });
+
+  it("o mapa renderiza a base escolhida, com atribuição", () => {
     render(<MapaInterativo />);
 
     const tiles = screen.getByTestId("tile-layer");
-    expect(tiles.getAttribute("data-url")).toBe(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-    );
-  });
-
-  it("credita OpenStreetMap e CARTO — é obrigação de licença", () => {
-    // Os dados são do OpenStreetMap; a CARTO faz só o estilo. Omitir
-    // qualquer um dos dois viola os termos de uso das duas.
-    render(<MapaInterativo />);
-
-    const atribuicao = screen.getByTestId("tile-layer").getAttribute("data-attribution") ?? "";
-    expect(atribuicao).toContain("OpenStreetMap");
-    expect(atribuicao).toContain("CARTO");
-    expect(atribuicao).toContain("carto.com/attributions");
+    expect(tiles.getAttribute("data-url")).toBeTruthy();
+    expect(tiles.getAttribute("data-attribution")).toContain("OpenStreetMap");
   });
 });
