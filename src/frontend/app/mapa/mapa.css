@@ -1268,6 +1268,67 @@
   border: none;
 }
 
+/* O ônibus desliza até a posição nova em vez de teleportar.
+
+   Medido no feed do SEMOB: em 140 s, 84% dos veículos mudaram de lugar,
+   andando 205 m por leitura na mediana. Sem transição, esses 205 m
+   viram um salto seco a cada 20 s e a tela passa a impressão de que
+   nada está acontecendo.
+
+   A duração é curta de propósito. Deslizar ao longo dos 20 s inteiros
+   deixaria o movimento contínuo, mas aí o mapa estaria afirmando, por
+   quase todo esse tempo, uma posição que ninguém reportou — e ainda em
+   linha reta, ignorando as ruas. Com ~3 s o marcador vai de um ponto
+   conhecido ao outro e descansa onde o GPS de fato disse que ele está.
+
+   A transição é desligada durante o zoom (ver .mapa-canvas.em-zoom):
+   o Leaflet reposiciona todos os marcadores nesse momento, e sem isso
+   a frota inteira sairia deslizando pela tela. */
+.mapa-icone-onibus {
+  transition: transform 3s linear;
+}
+
+.mapa-canvas.em-zoom .mapa-icone-onibus {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapa-icone-onibus { transition: none; }
+}
+
+/* Seta de rumo, a partir do campo `direcao` do feed (0 = norte).
+   Fica atrás do círculo, como um ponteiro saindo dele. */
+.mapa-icone-onibus-seta {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.mapa-icone-onibus-seta::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid var(--primary);
+  filter: drop-shadow(0 -1px 1px rgba(255, 255, 255, 0.9));
+}
+
+/* Parado não pulsa: o halo animado sugere movimento que não existe. */
+.mapa-icone-onibus.parado .mapa-icone-onibus-core::after {
+  animation: none;
+  background: rgba(122, 146, 156, 0.16);
+}
+
+.mapa-icone-onibus.parado .mapa-icone-onibus-core {
+  background: var(--muted);
+}
+
 .mapa-icone-onibus-core {
   display: block;
   width: 20px;

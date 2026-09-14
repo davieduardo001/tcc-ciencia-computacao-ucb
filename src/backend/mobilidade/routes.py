@@ -203,6 +203,7 @@ async def posicoes_da_linha(numero_linha: str):
                 lng=v.lng,
                 sentido=v.sentido,
                 velocidade=v.velocidade,
+                direcao=v.direcao,
                 atualizado_em=v.atualizado_em.isoformat(),
                 operadora=v.operadora,
             )
