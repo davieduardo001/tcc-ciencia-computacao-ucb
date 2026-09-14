@@ -198,3 +198,85 @@ def test_busca_com_provider_nao_mock_nao_chama_osrm():
         db.query(Linha).filter(Linha.numero == "9.001").delete()
         db.commit()
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Catálogo vindo do banco (linhas reais ingeridas do SEMOB)
+# ---------------------------------------------------------------------------
+
+NUMERO_CATALOGO = "9.996"
+
+
+class _SessaoVazia:
+    """Sessão que responde 'tabela vazia' — sem depender de banco real."""
+
+    def query(self, *_args, **_kwargs):
+        return self
+
+    def order_by(self, *_args):
+        return self
+
+    def all(self):
+        return []
+
+
+def _limpar_catalogo(db):
+    db.query(Linha).filter(Linha.numero == NUMERO_CATALOGO).delete()
+    db.commit()
+
+
+def _semear_catalogo(db):
+    db.add(
+        Linha(
+            numero=NUMERO_CATALOGO,
+            nome=f"{NUMERO_CATALOGO} — Circular Rodoviária / UNB",
+            sentido="Circular",
+            paradas=[{"nome": "Terminal Ceilândia", "lat": -15.81, "lng": -48.10}],
+            trajeto=[[-15.81, -48.10]],
+            horarios_previstos=["06:00"],
+        )
+    )
+    db.commit()
+
+
+def test_sugerir_usa_o_catalogo_do_banco_quando_ha_linhas_ingeridas():
+    db = SessionLocal()
+    try:
+        _limpar_catalogo(db)
+        _semear_catalogo(db)
+
+        service = LinhaService(_ProviderContador())
+        resultado = asyncio.run(service.sugerir("unb", db))
+
+        numeros = {r.numero for r in resultado}
+        assert NUMERO_CATALOGO in numeros
+        # "9.001" é do provider mock: não deve aparecer com o banco populado.
+        assert "9.001" not in numeros
+    finally:
+        _limpar_catalogo(db)
+        db.close()
+
+
+def test_sugerir_encontra_linha_do_banco_pelo_nome_da_parada():
+    db = SessionLocal()
+    try:
+        _limpar_catalogo(db)
+        _semear_catalogo(db)
+
+        service = LinhaService(_ProviderContador())
+        resultado = asyncio.run(service.sugerir("ceilandia", db))
+
+        assert NUMERO_CATALOGO in {r.numero for r in resultado}
+    finally:
+        _limpar_catalogo(db)
+        db.close()
+
+
+def test_sugerir_cai_pro_provider_quando_o_banco_esta_vazio():
+    # Banco novo / ambiente sem ingestão rodada: o catálogo real não
+    # existe ainda, então o mock é a rede de segurança.
+    service = LinhaService(_ProviderContador())
+
+    resultado = asyncio.run(service.sugerir("", _SessaoVazia()))
+
+    assert {r.numero for r in resultado} == {"9.001"}
