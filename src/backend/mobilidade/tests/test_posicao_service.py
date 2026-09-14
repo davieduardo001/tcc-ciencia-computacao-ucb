@@ -9,11 +9,17 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mobilidade.posicao_service import PosicaoService
+from mobilidade.posicao_service import FUSO_SEMOB, PosicaoService
 
 
 def _quando(minutos_atras: float) -> str:
-    return (datetime.now() - timedelta(minutes=minutos_atras)).strftime("%Y-%m-%d %H:%M:%S")
+    """
+    Timestamp no formato do SEMOB: horário de Brasília, sem fuso na
+    string. Gerar isso a partir do relógio local faria o teste passar
+    ou falhar conforme a máquina — o CI e os containers rodam em UTC.
+    """
+    momento = datetime.now(FUSO_SEMOB) - timedelta(minutes=minutos_atras)
+    return momento.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _veiculo(numero, prefixo="440000", minutos=1.0, lng=-47.88, lat=-15.79, sentido="IDA"):
@@ -252,3 +258,46 @@ def test_mantem_ultimo_feed_quando_o_semob_falha_depois():
         # Cache expirado + origem fora do ar: melhor a última posição
         # conhecida do que sumir com os ônibus da tela.
         assert len(asyncio.run(service.posicoes_da_linha("0.110"))) == 1
+
+
+def test_posicao_recente_vale_mesmo_com_o_processo_em_outro_fuso():
+    """
+    Regressão de produção: o `datalocal` do SEMOB vem sem fuso e é
+    horário de Brasília, mas o serviço comparava com o relógio local do
+    processo. Na máquina de desenvolvimento (UTC-3) batia; nos
+    containers do Fly.io, que rodam em UTC, toda posição parecia ter 3
+    horas de idade e o filtro de IDADE_MAXIMA_MINUTOS descartava a frota
+    inteira — a rota respondia 200 com zero veículos para todas as
+    linhas, o dia inteiro.
+    """
+    import os
+    import time as _time
+
+    service = PosicaoService()
+    payload = _feed(_veiculo("0.110", prefixo="446149", minutos=2))
+
+    tz_original = os.environ.get("TZ")
+    try:
+        os.environ["TZ"] = "UTC"
+        if hasattr(_time, "tzset"):
+            _time.tzset()
+
+        resultado = _rodar(service, "0.110", payload)
+        assert [v.prefixo for v in resultado] == ["446149"]
+    finally:
+        if tz_original is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = tz_original
+        if hasattr(_time, "tzset"):
+            _time.tzset()
+
+
+def test_data_do_semob_e_interpretada_como_horario_de_brasilia():
+    from mobilidade.posicao_service import _converter_data
+
+    convertida = _converter_data("2026-09-13 22:13:22")
+
+    assert convertida is not None
+    assert convertida.tzinfo is not None, "sem fuso, a comparação depende da máquina"
+    assert convertida.utcoffset() == timedelta(hours=-3)

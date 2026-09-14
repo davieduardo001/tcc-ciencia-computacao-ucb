@@ -22,7 +22,8 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -45,6 +46,32 @@ IDADE_MAXIMA_MINUTOS = 15.0
 TIMEOUT_SEGUNDOS = 25.0
 
 _FORMATO_DATA_SEMOB = "%Y-%m-%d %H:%M:%S"
+
+
+def _fuso_de_brasilia():
+    """
+    Fuso em que o SEMOB publica o `datalocal`.
+
+    O campo vem sem indicação de fuso ("2026-09-13 22:13:22") e está em
+    horário de Brasília. Comparar isso com o relógio do processo só
+    funciona por acidente quando a máquina também está em UTC-3: os
+    containers do Fly.io rodam em UTC, e lá toda posição parecia ter 3
+    horas de idade — o filtro de IDADE_MAXIMA_MINUTOS descartava a frota
+    inteira e o mapa nunca mostrava nenhum ônibus.
+
+    Cai para o deslocamento fixo quando a imagem não tem a base de fusos
+    instalada. O Brasil não usa horário de verão desde 2019, então
+    UTC-3 é exato hoje; o ZoneInfo é preferido para o caso de isso
+    mudar.
+    """
+    try:
+        return ZoneInfo("America/Sao_Paulo")
+    except ZoneInfoNotFoundError:  # pragma: no cover - depende da imagem
+        logger.warning("tzdata indisponível; usando UTC-3 fixo para o SEMOB")
+        return timezone(timedelta(hours=-3))
+
+
+FUSO_SEMOB = _fuso_de_brasilia()
 
 
 @dataclass(frozen=True)
@@ -92,7 +119,9 @@ class PosicaoService:
             return []
 
         feed = await self._obter_feed()
-        agora = datetime.now()
+        # Em UTC, não no relógio local do processo: o container não sabe
+        # em que fuso está e não deve precisar saber.
+        agora = datetime.now(timezone.utc)
         posicoes: list[PosicaoVeiculo] = []
 
         for operadora in feed:
@@ -186,10 +215,17 @@ class PosicaoService:
 
 
 def _converter_data(valor: str | None) -> datetime | None:
+    """
+    `datalocal` do SEMOB para datetime com fuso.
+
+    A string não traz fuso nenhum, mas é horário de Brasília — ver
+    FUSO_SEMOB. Devolver com fuso explícito evita que a comparação
+    dependa de onde o processo está rodando.
+    """
     if not valor:
         return None
     try:
-        return datetime.strptime(valor, _FORMATO_DATA_SEMOB)
+        return datetime.strptime(valor, _FORMATO_DATA_SEMOB).replace(tzinfo=FUSO_SEMOB)
     except ValueError:
         return None
 
