@@ -81,6 +81,7 @@ class PosicaoVeiculoResponse(BaseModel):
     lng: float
     sentido: str | None = None
     velocidade: float | None = None
+    direcao: float | None = None
     atualizado_em: str
     operadora: str
 

@@ -498,6 +498,8 @@ export interface VeiculoAoVivo {
   lng: number;
   sentido: string | null;
   velocidade: number | null;
+  /** Rumo em graus (0 = norte), pra apontar o ícone na direção da viagem. */
+  direcao: number | null;
   atualizadoEm: string;
   operadora: string;
 }
@@ -529,6 +531,7 @@ export async function buscarPosicoesDaLinha(
         lng: number;
         sentido: string | null;
         velocidade: number | null;
+        direcao: number | null;
         atualizado_em: string;
         operadora: string;
       }) => ({
@@ -538,6 +541,7 @@ export async function buscarPosicoesDaLinha(
         lng: v.lng,
         sentido: v.sentido,
         velocidade: v.velocidade,
+        direcao: v.direcao ?? null,
         atualizadoEm: v.atualizado_em,
         operadora: v.operadora,
       })

@@ -83,6 +83,10 @@ class PosicaoVeiculo:
     lng: float
     sentido: str | None
     velocidade: float | None
+    # Rumo em graus (0 = norte). Vem no feed como `direcao` e estava
+    # sendo descartado — é o que permite apontar o ícone do ônibus na
+    # direção em que ele está indo, em vez de um ponto sem orientação.
+    direcao: float | None
     atualizado_em: datetime
     operadora: str
 
@@ -151,7 +155,8 @@ class PosicaoService:
                         lat=lat,
                         lng=lng,
                         sentido=(veiculo.get("sentido") or None),
-                        velocidade=_converter_velocidade(propriedades.get("velocidade")),
+                        velocidade=_converter_numero(propriedades.get("velocidade")),
+                        direcao=_converter_numero(propriedades.get("direcao")),
                         atualizado_em=registrado_em,
                         operadora=nome_operadora,
                     )
@@ -230,8 +235,11 @@ def _converter_data(valor: str | None) -> datetime | None:
         return None
 
 
-def _converter_velocidade(valor: object) -> float | None:
-    """O SEMOB manda velocidade como string, às vezes com vírgula."""
+def _converter_numero(valor: object) -> float | None:
+    """
+    O SEMOB manda velocidade e direção como string decimal com vírgula
+    ("41", "218,72"). Vale para os dois campos.
+    """
     if valor is None:
         return None
     try:

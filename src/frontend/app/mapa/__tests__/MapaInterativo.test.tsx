@@ -36,10 +36,14 @@ jest.mock("react-leaflet", () => ({
     icon,
     children,
   }: {
-    icon?: { className?: string };
+    icon?: { className?: string; html?: string };
     children?: React.ReactNode;
   }) => (
-    <div data-testid={`marcador-${icon?.className ?? "generico"}`}>
+    <div
+      data-testid={`marcador-${icon?.className ?? "generico"}`}
+      data-classe={icon?.className}
+      data-html={icon?.html}
+    >
       {children}
     </div>
   ),
@@ -59,16 +63,17 @@ jest.mock("react-leaflet", () => ({
       data-pontos={JSON.stringify(positions)}
     />
   ),
-  // US #20 — usado pelo modo "escolher ponto no mapa". Guarda o handler
-  // pra que os testes possam simular o clique sem um mapa real.
-  useMapEvents: (handlers: { click?: (e: unknown) => void }) => {
-    handlersDeMapa.click = handlers.click;
+  // Vários componentes chamam useMapEvents (clique pra escolher ponto,
+  // aviso de zoom). Acumula em vez de sobrescrever — do contrário o
+  // último a montar apagaria os handlers dos outros.
+  useMapEvents: (handlers: Record<string, (e?: unknown) => void>) => {
+    Object.assign(handlersDeMapa, handlers);
     return null;
   },
 }));
 
 /** Handlers registrados via useMapEvents, pra simular eventos do mapa. */
-const handlersDeMapa: { click?: (evento: unknown) => void } = {};
+const handlersDeMapa: Record<string, ((evento?: unknown) => void) | undefined> = {};
 
 jest.mock("leaflet", () => ({
   __esModule: true,
@@ -383,6 +388,7 @@ describe("MapaInterativo — itinerário da viagem (US #20)", () => {
 const VEICULO: VeiculoAoVivo = {
   linha: "0.110",
   prefixo: "446475",
+  direcao: 218.72,
   lat: -15.80459,
   lng: -47.92445,
   sentido: "VOLTA",
@@ -595,5 +601,92 @@ describe("MapaInterativo — base do mapa", () => {
     const tiles = screen.getByTestId("tile-layer");
     expect(tiles.getAttribute("data-url")).toBeTruthy();
     expect(tiles.getAttribute("data-attribution")).toContain("OpenStreetMap");
+  });
+});
+
+describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+    });
+    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+  });
+
+  it("aponta a seta na direção que o ônibus está indo", async () => {
+    // O feed traz `direcao` em graus e a gente ignorava. Sem ela o
+    // ônibus é um ponto sem orientação no mapa.
+    buscarPosicoesMock.mockResolvedValue([
+      { ...VEICULO, velocidade: 41, direcao: 218.72 },
+    ]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      const marcador = screen.getByTestId("marcador-mapa-icone-onibus");
+      expect(marcador.getAttribute("data-html")).toContain("rotate(218.72deg)");
+    });
+  });
+
+  it("ônibus parado não ganha seta nem pulso", async () => {
+    // Apontar rumo em quem está a 0 km/h mostraria a direção da última
+    // vez que andou — informação errada apresentada como atual.
+    buscarPosicoesMock.mockResolvedValue([
+      { ...VEICULO, velocidade: 0, direcao: 218.72 },
+    ]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      const marcador = screen.getByTestId("marcador-mapa-icone-onibus parado");
+      expect(marcador.getAttribute("data-html")).not.toContain("seta");
+    });
+  });
+
+  it("velocidade abaixo do limiar conta como parado", async () => {
+    buscarPosicoesMock.mockResolvedValue([
+      { ...VEICULO, velocidade: 1.2, direcao: 90 },
+    ]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("marcador-mapa-icone-onibus parado")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("mostra há quanto tempo a posição foi reportada", async () => {
+    // O SEMOB renova cada veículo a cada ~28s e consultamos a cada 20s,
+    // então a mesma posição às vezes aparece duas vezes. Sem essa linha
+    // o usuário lê isso como "o mapa travou".
+    const haQuarentaSegundos = new Date(Date.now() - 40_000).toISOString();
+    buscarPosicoesMock.mockResolvedValue([
+      { ...VEICULO, velocidade: 30, atualizadoEm: haQuarentaSegundos },
+    ]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Posição de 4\ds atrás/)).toBeInTheDocument();
+    });
+  });
+
+  it("desliga a transição durante o zoom, pra frota não sair escorregando", async () => {
+    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    const { container } = render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const canvas = container.querySelector(".mapa-canvas") as HTMLElement;
+    expect(canvas.className).not.toContain("em-zoom");
+
+    await act(async () => {
+      handlersDeMapa.zoomstart?.();
+    });
+    expect(canvas.className).toContain("em-zoom");
+
+    await act(async () => {
+      handlersDeMapa.zoomend?.();
+    });
+    expect(canvas.className).not.toContain("em-zoom");
   });
 });

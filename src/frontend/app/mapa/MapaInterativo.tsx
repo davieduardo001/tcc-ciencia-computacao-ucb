@@ -21,8 +21,6 @@ import type { PontoEscolhido } from "./PlanejadorViagem";
 import "leaflet/dist/leaflet.css";
 import "./mapa.css";
 
-// Ponto padrão: área-piloto Taguatinga/Ceilândia (DF), usada quando o
-// navegador não consegue obter a posição real do usuário.
 // Base do mapa.
 //
 // O tile padrão do OpenStreetMap é denso e saturado — rodovia vermelha,
@@ -79,6 +77,8 @@ export function escolherBaseDoMapa(chaveCarto?: string): BaseDoMapa {
 
 const BASE_MAPA = escolherBaseDoMapa(process.env.NEXT_PUBLIC_CARTO_API_KEY);
 
+// Área-piloto Taguatinga/Ceilândia (DF), usada quando o navegador não
+// consegue obter a posição real do usuário.
 const PONTO_PADRAO = { lat: -15.8305, lng: -48.0425 };
 const ZOOM_PADRAO = 14;
 const ZOOM_LOCALIZADO = 16;
@@ -95,14 +95,52 @@ const iconePosicaoAtual = L.divIcon({
   iconAnchor: [10, 10],
 });
 
-// US #16 — ônibus ao vivo. Ícone maior que o da parada porque é o
-// elemento que o usuário está procurando na tela.
-const iconeOnibus = L.divIcon({
-  className: "mapa-icone-onibus",
-  html: '<span class="mapa-icone-onibus-core"></span>',
-  iconSize: [26, 26],
-  iconAnchor: [13, 13],
-});
+// US #16 — ônibus ao vivo.
+//
+// Abaixo disso o ônibus é tratado como parado. Medido no feed: dos
+// veículos que não mudaram de posição em 140 s, a grande maioria
+// reportava velocidade ~0 — estão mesmo parados, não é dado velho.
+const LIMIAR_PARADO_KMH = 3;
+
+/**
+ * "atualizado há 12s". O feed do SEMOB renova a posição de cada veículo
+ * a cada ~28 s (medido), e a gente consulta a cada 20 s — então de vez
+ * em quando a mesma posição aparece duas vezes seguidas. Mostrar a
+ * idade do dado transforma isso de "o mapa travou" em informação.
+ */
+function descreverIdade(atualizadoEm: string): string {
+  const quando = new Date(atualizadoEm).getTime();
+  if (Number.isNaN(quando)) return "";
+
+  const segundos = Math.max(0, Math.round((Date.now() - quando) / 1000));
+  if (segundos < 60) return `Posição de ${segundos}s atrás`;
+
+  const minutos = Math.round(segundos / 60);
+  return `Posição de ${minutos} min atrás`;
+}
+
+/**
+ * Ícone do ônibus, apontando para onde ele está indo.
+ *
+ * O feed do SEMOB traz `direcao` em graus (0 = norte) e a gente estava
+ * descartando. Sem ela o ônibus é um ponto sem orientação; com ela dá
+ * pra ver o sentido mesmo quando o carro está parado no semáforo.
+ *
+ * Veículo parado não ganha seta: apontar rumo em quem está com 0 km/h
+ * mostraria a direção da última vez que andou, o que engana.
+ */
+function criarIconeOnibus(direcao: number | null, parado: boolean) {
+  const seta =
+    direcao !== null && !parado
+      ? `<span class="mapa-icone-onibus-seta" style="transform: rotate(${direcao}deg)"></span>`
+      : "";
+  return L.divIcon({
+    className: "mapa-icone-onibus" + (parado ? " parado" : ""),
+    html: `${seta}<span class="mapa-icone-onibus-core"></span>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
 
 const iconeParada = L.divIcon({
   className: "mapa-icone-parada",
@@ -178,6 +216,22 @@ interface Coordenadas {
   lng: number;
 }
 
+/**
+ * Avisa quando o mapa está em zoom.
+ *
+ * O Leaflet reposiciona todos os marcadores ao dar zoom. Como o ícone
+ * do ônibus tem `transition: transform` pra deslizar entre uma leitura
+ * de GPS e a seguinte, sem desligar isso a frota inteira sairia
+ * escorregando pela tela a cada zoom.
+ */
+function AvisaZoom({ onZoom }: { onZoom: (emZoom: boolean) => void }) {
+  useMapEvents({
+    zoomstart: () => onZoom(true),
+    zoomend: () => onZoom(false),
+  });
+  return null;
+}
+
 /** US #20 — captura o clique no mapa quando o usuário está escolhendo um ponto. */
 function CapturaCliqueNoMapa({
   ativo,
@@ -229,6 +283,7 @@ export default function MapaInterativo({
   const [status, setStatus] = useState<StatusLocalizacao>("carregando");
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[]>([]);
   const [buscouPosicoes, setBuscouPosicoes] = useState(false);
+  const [emZoom, setEmZoom] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const jaCentralizouRef = useRef(false);
 
@@ -379,7 +434,13 @@ export default function MapaInterativo({
   }
 
   return (
-    <div className={`mapa-canvas${escolhendoNoMapa ? " escolhendo-ponto" : ""}`}>
+    <div
+      className={
+        "mapa-canvas" +
+        (escolhendoNoMapa ? " escolhendo-ponto" : "") +
+        (emZoom ? " em-zoom" : "")
+      }
+    >
       {escolhendoNoMapa && (
         <div className="mapa-aviso destaque" role="status">
           Toque no mapa para escolher o ponto.
@@ -415,6 +476,7 @@ export default function MapaInterativo({
           ativo={escolhendoNoMapa}
           onClique={(lat, lng) => onCliqueNoMapa?.(lat, lng)}
         />
+        <AvisaZoom onZoom={setEmZoom} />
 
         {coordenadas && (
           <Marker
@@ -523,23 +585,35 @@ export default function MapaInterativo({
 
         {/* US #16 — fora do bloco da linha de propósito: os ônibus também
             aparecem quando o que está na tela é um itinerário da US #20. */}
-        {veiculos.map((veiculo) => (
-          <Marker
-            key={`${veiculo.linha}-${veiculo.prefixo}`}
-            position={[veiculo.lat, veiculo.lng]}
-            icon={iconeOnibus}
-          >
-            <Popup>
-              <strong>{veiculo.linha}</strong> · carro {veiculo.prefixo}
-              <br />
-              {veiculo.sentido
-                ? `Sentido ${veiculo.sentido.toLowerCase()}`
-                : "Em operação"}
-              {veiculo.velocidade !== null &&
-                ` · ${Math.round(veiculo.velocidade)} km/h`}
-            </Popup>
-          </Marker>
-        ))}
+        {veiculos.map((veiculo) => {
+          const parado = (veiculo.velocidade ?? 0) < LIMIAR_PARADO_KMH;
+          return (
+            <Marker
+              // Chave estável por veículo: é o que preserva o elemento no
+              // DOM entre as atualizações, e sem isso a transição CSS que
+              // faz o ônibus deslizar não teria de onde partir.
+              key={`${veiculo.linha}-${veiculo.prefixo}`}
+              position={[veiculo.lat, veiculo.lng]}
+              icon={criarIconeOnibus(veiculo.direcao, parado)}
+            >
+              <Popup>
+                <strong>{veiculo.linha}</strong> · carro {veiculo.prefixo}
+                <br />
+                {veiculo.sentido
+                  ? `Sentido ${veiculo.sentido.toLowerCase()}`
+                  : "Em operação"}
+                {veiculo.velocidade !== null && (
+                  <>
+                    {" · "}
+                    {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
+                  </>
+                )}
+                <br />
+                <small>{descreverIdade(veiculo.atualizadoEm)}</small>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
 
       <div className="mapa-controles">
