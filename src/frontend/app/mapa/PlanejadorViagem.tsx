@@ -330,7 +330,18 @@ export default function PlanejadorViagem({
         <div className="plan-resultados">
           <div className="plan-resultados-titulo">
             {opcoes.length} {opcoes.length === 1 ? "opção" : "opções"}
-            {opcoes[0].baldeacoes > 0 && " (com baldeação)"}
+            {(() => {
+              // A lista mistura diretas e baldeações, ordenadas por
+              // tempo — às vezes a baldeação é a mais rápida. Um rótulo
+              // baseado só na primeira opção mentiria sobre o resto.
+              const diretas = opcoes.filter((o) => o.baldeacoes === 0).length;
+              const comTroca = opcoes.length - diretas;
+              if (diretas && comTroca) {
+                return ` · ${diretas} direta${diretas > 1 ? "s" : ""}, ${comTroca} com baldeação`;
+              }
+              if (comTroca) return " · todas com baldeação";
+              return ` · direta${diretas > 1 ? "s" : ""}`;
+            })()}
           </div>
 
           <ul className="plan-opcoes">

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from dataclasses import dataclass
 
 from sqlalchemy import tuple_ as sql_tuple
@@ -40,9 +41,26 @@ MAX_CANDIDATAS = 25
 # nome do que apontar a parada errada.
 DISTANCIA_MAXIMA_NOME_PARADA = 250.0
 
-# Quantas opções o serviço devolve em cada modalidade.
-MAX_DIRETAS = 8
-MAX_BALDEACOES = 5
+# Quantas opções o serviço devolve em cada modalidade, e no total. As
+# duas cotas são separadas de propósito: com um teto único, um trajeto
+# servido por muitas linhas diretas encheria a lista e nenhuma opção com
+# baldeação apareceria — mesmo sendo às vezes a mais rápida.
+MAX_DIRETAS = 6
+MAX_BALDEACOES = 4
+MAX_OPCOES = 10
+
+# Quão mais lenta que a melhor direta uma baldeação pode ser e ainda
+# valer a pena mostrar.
+FATOR_BALDEACAO_COMPETITIVA = 1.6
+
+# Quantas baldeações são montadas internamente antes do corte de
+# competitividade. Maior que MAX_BALDEACOES pra que o filtro tenha de
+# onde escolher em vez de ficar sem nenhuma.
+POOL_BALDEACOES = 10
+
+# Em quantas opções com baldeação a mesma linha pode aparecer. Segura a
+# lista de virar variações da mesma viagem.
+MAX_REPETICAO_DE_LINHA = 2
 
 # Velocidade média usada para estimar duração. É um ônibus urbano em
 # trânsito misto do DF: não é promessa de horário, é ordem de grandeza.
@@ -132,7 +150,16 @@ class RotaService:
         raio_metros: float = RAIO_CAMINHADA_METROS,
     ) -> list[OpcaoViagem]:
         """
-        Opções de viagem entre dois pontos, diretas primeiro.
+        Opções de viagem entre dois pontos: diretas e com baldeação.
+
+        As duas modalidades são sempre calculadas. A primeira versão
+        deste método parava na primeira direta encontrada
+        (`if diretas: return diretas`), e o efeito medido nos dados reais
+        foi ruim: em 30 de 90 pares entre pontos conhecidos do DF a busca
+        devolvia no máximo 2 opções, e em 23 deles exatamente **uma** —
+        sempre sem nenhuma alternativa com baldeação. Existir uma direta
+        não quer dizer que ela é a melhor, nem que o usuário não quer
+        comparar.
 
         Devolve lista vazia quando não há nenhuma — Cenário 3 da US.
         """
@@ -147,13 +174,30 @@ class RotaService:
         if not perto_origem or not perto_destino:
             return []
 
-        diretas = self._diretas(db, perto_origem, perto_destino, origem, destino, raio_metros)
-        if diretas:
-            return diretas[:MAX_DIRETAS]
+        diretas = self._diretas(
+            db, perto_origem, perto_destino, origem, destino, raio_metros
+        )[:MAX_DIRETAS]
 
-        return self._com_baldeacao(
+        baldeacoes = self._com_baldeacao(
             db, perto_origem, perto_destino, origem, destino, raio_metros
         )
+
+        if diretas and baldeacoes:
+            # Baldeação que demora muito mais que a melhor direta não é
+            # alternativa, é ruído: ninguém troca de ônibus pra chegar
+            # bem mais tarde. O corte deixa passar a que é competitiva.
+            limite = diretas[0].duracao_estimada_min * FATOR_BALDEACAO_COMPETITIVA
+            baldeacoes = [o for o in baldeacoes if o.duracao_estimada_min <= limite]
+
+        opcoes = diretas + baldeacoes[:MAX_BALDEACOES]
+
+        # Empate no tempo: menos baldeação primeiro, depois menos
+        # caminhada. Trocar de ônibus tem um custo que o relógio não
+        # mede (chuva, bagagem, insegurança no ponto).
+        opcoes.sort(
+            key=lambda o: (o.duracao_estimada_min, o.baldeacoes, o.caminhada_metros)
+        )
+        return opcoes[:MAX_OPCOES]
 
     # -- índice espacial ---------------------------------------------------
 
@@ -285,13 +329,21 @@ class RotaService:
             return []
 
         pares.sort(key=lambda p: p[0])
-        pares = pares[: MAX_BALDEACOES * 4]
+        pares = pares[: POOL_BALDEACOES * 3]
 
         necessarias = {a for _, a, _, _ in pares} | {b for _, _, b, _ in pares}
         rotas = {(r.numero, r.sentido): r for r in self._carregar(db, sorted(necessarias))}
 
         opcoes: list[OpcaoViagem] = []
         vistos: set[tuple[str, str, str, str]] = set()
+        # Quantas opções já usam cada linha como primeira ou segunda
+        # perna. Sem esse limite a lista enche de variações da mesma
+        # viagem — medindo UnB → Taguatinga Sul, três das opções eram
+        # "pegue 0.339 / 0.370 / 0.371, baldeie pra 0.394", todas com o
+        # mesmo tempo e a mesma distância. É uma viagem só ocupando três
+        # cards, e empurrava pra fora itinerários de verdade diferentes.
+        usos_perna: Counter[tuple[str, str]] = Counter()
+
         for _, a, b, cel in pares:
             rota_a, rota_b = rotas.get(a), rotas.get(b)
             if rota_a is None or rota_b is None:
@@ -299,6 +351,11 @@ class RotaService:
 
             assinatura = (a[0], a[1], b[0], b[1])
             if assinatura in vistos:
+                continue
+            if (
+                usos_perna[a] >= MAX_REPETICAO_DE_LINHA
+                or usos_perna[b] >= MAX_REPETICAO_DE_LINHA
+            ):
                 continue
 
             troca = self._centro_da_celula(cel)
@@ -316,8 +373,10 @@ class RotaService:
                 continue
 
             vistos.add(assinatura)
+            usos_perna[a] += 1
+            usos_perna[b] += 1
             opcoes.append(OpcaoViagem(pernas=[perna_a, perna_b]))
-            if len(opcoes) >= MAX_BALDEACOES:
+            if len(opcoes) >= POOL_BALDEACOES:
                 break
 
         opcoes.sort(key=lambda o: (o.duracao_estimada_min, o.caminhada_metros))

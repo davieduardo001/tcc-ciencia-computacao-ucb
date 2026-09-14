@@ -7,12 +7,18 @@ nessa ordem", e um traçado inventado deixa cada asserção verificável na
 mão. A junção com os dados reais já é coberta por test_semob_source.py.
 """
 
+from collections import Counter
+
 import pytest
 from sqlalchemy import text
 
 from mobilidade.ingestao_semob import _celulas_do_trajeto
 from mobilidade.models.rota import Rota, RotaCelula
-from mobilidade.rota_service import RotaService
+from mobilidade.rota_service import (
+    MAX_OPCOES,
+    MAX_REPETICAO_DE_LINHA,
+    RotaService,
+)
 from shared.database import SessionLocal
 
 # Trecho leste-oeste na altura de Taguatinga, um ponto a cada ~110 m.
@@ -206,3 +212,76 @@ def test_monta_baldeacao_quando_nao_existe_linha_direta(db, servico):
 
 def test_sem_nenhuma_rota_cadastrada_devolve_lista_vazia(db, servico):
     assert servico.calcular(db, OESTE, LESTE) == []
+
+
+def test_oferece_baldeacao_mesmo_existindo_linha_direta(db, servico):
+    """
+    Regressão: o método parava na primeira direta encontrada
+    (`if diretas: return diretas`). Medido nos dados reais do SEMOB, isso
+    deixava 30 de 90 pares entre pontos conhecidos do DF com no máximo 2
+    opções — 23 deles com exatamente uma, e nenhuma alternativa com
+    baldeação.
+
+    Pior: existir uma direta não quer dizer que ela é a melhor. Em
+    Taguatinga Sul → Universidade Católica, a melhor opção real é uma
+    baldeação de ~56 min, enquanto a direta leva ~63 min. Com o
+    comportamento antigo, o usuário nunca via a mais rápida.
+    """
+    # Direta, mas dando uma volta longa pelo sul antes de chegar ao leste.
+    desvio = (
+        [(LAT, LNG_INICIO + PASSO * i) for i in range(40)]
+        + [(LAT - PASSO * i, LNG_INICIO + PASSO * 40) for i in range(1, 80)]
+        + [(LAT - PASSO * 79, LNG_INICIO + PASSO * (40 + i)) for i in range(1, 120)]
+        + [(LAT - PASSO * (79 - i), LESTE[1]) for i in range(1, 80)]
+    )
+    _semear(db, f"{PREFIXO}010", "IDA", desvio)
+
+    # E duas linhas que fazem o mesmo caminho pela reta, com baldeação.
+    _semear(db, f"{PREFIXO}011", "IDA", _trajeto()[:120])
+    _semear(db, f"{PREFIXO}012", "IDA", _trajeto()[100:])
+    db.commit()
+
+    opcoes = servico.calcular(db, OESTE, LESTE)
+
+    numeros = {p.numero for o in opcoes for p in o.pernas}
+    assert f"{PREFIXO}010" in numeros, "a direta tem que continuar aparecendo"
+    assert any(o.baldeacoes == 1 for o in opcoes), (
+        "a baldeação tem que ser oferecida mesmo havendo direta"
+    )
+
+
+def test_nao_repete_a_mesma_linha_em_muitas_baldeacoes(db, servico):
+    """
+    Sem limite de repetição, a lista enche de variações da mesma viagem:
+    medindo UnB → Taguatinga Sul, três opções eram "pegue 0.339 / 0.370 /
+    0.371, baldeie pra 0.394" — mesmo tempo, mesma distância, três cards.
+    """
+    subida = [(LAT + PASSO * i, MEIO[1]) for i in range(200)]
+    _semear(db, f"{PREFIXO}020", "IDA", subida)
+
+    # Cinco linhas diferentes levam da origem até o ponto de troca.
+    for i in range(5):
+        _semear(db, f"{PREFIXO}03{i}", "IDA", _trajeto()[: 110 + i])
+    db.commit()
+
+    opcoes = servico.calcular(db, OESTE, subida[-1])
+
+    assert opcoes, "esperava opções com baldeação"
+    usos = Counter(p.numero for o in opcoes for p in o.pernas)
+    assert usos[f"{PREFIXO}020"] <= MAX_REPETICAO_DE_LINHA, (
+        f"a mesma linha apareceu em {usos[f'{PREFIXO}020']} opções"
+    )
+
+
+def test_nao_devolve_mais_opcoes_que_o_teto(db, servico):
+    for i in range(12):
+        # Traçados levemente deslocados, todos servindo a mesma viagem.
+        _semear(
+            db,
+            f"{PREFIXO}1{i:02d}",
+            "IDA",
+            [(LAT + PASSO * i * 0.01, LNG_INICIO + PASSO * j) for j in range(QTD_PONTOS)],
+        )
+    db.commit()
+
+    assert len(servico.calcular(db, OESTE, LESTE)) <= MAX_OPCOES
