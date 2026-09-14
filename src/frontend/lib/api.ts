@@ -488,3 +488,56 @@ export async function buscarLinha(
     horariosPrevistos: data.horarios_previstos,
   };
 }
+export interface VeiculoAoVivo {
+  prefixo: string;
+  lat: number;
+  lng: number;
+  sentido: string | null;
+  velocidade: number | null;
+  atualizadoEm: string;
+  operadora: string;
+}
+
+/**
+ * US #16 — posição ao vivo dos ônibus de uma linha, do feed de GPS do
+ * SEMOB (a mesma fonte do app oficial DF no Ponto).
+ *
+ * Lista vazia é situação normal: significa que nenhum veículo dessa
+ * linha está reportando posição agora (Cenário 3 da US). Falha de rede
+ * também devolve lista vazia — o trajeto continua no mapa, só sem os
+ * ônibus; não faz sentido derrubar a tela por causa disso.
+ */
+export async function buscarPosicoesDaLinha(
+  numero: string
+): Promise<VeiculoAoVivo[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return (data.veiculos ?? []).map(
+      (v: {
+        prefixo: string;
+        lat: number;
+        lng: number;
+        sentido: string | null;
+        velocidade: number | null;
+        atualizado_em: string;
+        operadora: string;
+      }) => ({
+        prefixo: v.prefixo,
+        lat: v.lat,
+        lng: v.lng,
+        sentido: v.sentido,
+        velocidade: v.velocidade,
+        atualizadoEm: v.atualizado_em,
+        operadora: v.operadora,
+      })
+    );
+  } catch {
+    return [];
+  }
+}

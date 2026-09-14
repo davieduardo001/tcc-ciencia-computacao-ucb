@@ -1,6 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaInterativo from "../MapaInterativo";
-import { LinhaDetalhada, OpcaoViagem } from "@/lib/api";
+import { LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
+import { buscarPosicoesDaLinha } from "@/lib/api";
+
+// US #16: o componente busca a posição ao vivo sozinho e repete a cada
+// 20s. Só `buscarPosicoesDaLinha` precisa de dublê — o resto do módulo
+// que ele importa são tipos, apagados na compilação.
+jest.mock("@/lib/api", () => ({
+  buscarPosicoesDaLinha: jest.fn().mockResolvedValue([]),
+}));
+
+const buscarPosicoesMock = buscarPosicoesDaLinha as jest.Mock;
 
 jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -348,5 +358,108 @@ describe("MapaInterativo — itinerário da viagem (US #20)", () => {
     handlersDeMapa.click?.({ latlng: { lat: -15.8, lng: -48.1 } });
 
     expect(onCliqueNoMapa).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US #16 — posição do ônibus em tempo real
+// ---------------------------------------------------------------------------
+
+const VEICULO: VeiculoAoVivo = {
+  prefixo: "446475",
+  lat: -15.80459,
+  lng: -47.92445,
+  sentido: "VOLTA",
+  velocidade: 41,
+  atualizadoEm: "2026-09-13T22:13:22",
+  operadora: "VIAÇÃO PIRACICABANA - BACIA 01",
+};
+
+describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+    });
+    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("cenário 1: desenha um marcador por ônibus em operação", async () => {
+    buscarPosicoesMock.mockResolvedValue([
+      VEICULO,
+      { ...VEICULO, prefixo: "446149", lat: -15.81 },
+    ]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("marcador-mapa-icone-onibus")).toHaveLength(2);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledWith(LINHA_TESTE.numero);
+  });
+
+  it("cenário 2: atualiza sozinho, sem recarregar a página", async () => {
+    jest.useFakeTimers();
+    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await act(async () => {});
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("cenário 3: avisa quando nenhum ônibus está em operação", async () => {
+    buscarPosicoesMock.mockResolvedValue([]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Nenhum ônibus desta linha em operação no momento/)
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("marcador-mapa-icone-onibus")).not.toBeInTheDocument();
+  });
+
+  it("para de consultar ao fechar a linha, sem vazar o intervalo", async () => {
+    jest.useFakeTimers();
+    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+
+    const { rerender, unmount } = render(<MapaInterativo linha={LINHA_TESTE} />);
+    await act(async () => {});
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(1);
+
+    // Linha fechada: nada mais a rastrear.
+    rerender(<MapaInterativo linha={null} />);
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+    expect(buscarPosicoesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sem linha selecionada não busca posição nenhuma", async () => {
+    render(<MapaInterativo />);
+    await act(async () => {});
+
+    expect(buscarPosicoesMock).not.toHaveBeenCalled();
   });
 });

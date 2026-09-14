@@ -10,8 +10,13 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
-import { Crosshair, Layers, X } from "lucide-react";
-import { LinhaDetalhada, OpcaoViagem } from "@/lib/api";
+import { Bus, Crosshair, Layers, X } from "lucide-react";
+import {
+  buscarPosicoesDaLinha,
+  LinhaDetalhada,
+  OpcaoViagem,
+  VeiculoAoVivo,
+} from "@/lib/api";
 import type { PontoEscolhido } from "./PlanejadorViagem";
 import "leaflet/dist/leaflet.css";
 import "./mapa.css";
@@ -22,11 +27,25 @@ const PONTO_PADRAO = { lat: -15.8305, lng: -48.0425 };
 const ZOOM_PADRAO = 14;
 const ZOOM_LOCALIZADO = 16;
 
+// De quanto em quanto tempo recarregamos a posição dos ônibus. O feed do
+// SEMOB atualiza a cada poucos segundos e o backend já faz cache de 20s,
+// então pedir mais rápido que isso só gastaria rede à toa.
+const INTERVALO_POSICOES_MS = 20000;
+
 const iconePosicaoAtual = L.divIcon({
   className: "mapa-icone-usuario",
   html: '<span class="mapa-icone-usuario-core"></span>',
   iconSize: [20, 20],
   iconAnchor: [10, 10],
+});
+
+// US #16 — ônibus ao vivo. Ícone maior que o da parada porque é o
+// elemento que o usuário está procurando na tela.
+const iconeOnibus = L.divIcon({
+  className: "mapa-icone-onibus",
+  html: '<span class="mapa-icone-onibus-core"></span>',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
 });
 
 const iconeParada = L.divIcon({
@@ -148,6 +167,8 @@ export default function MapaInterativo({
 }: MapaInterativoProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const [status, setStatus] = useState<StatusLocalizacao>("carregando");
+  const [veiculos, setVeiculos] = useState<VeiculoAoVivo[]>([]);
+  const [buscouPosicoes, setBuscouPosicoes] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const jaCentralizouRef = useRef(false);
 
@@ -217,6 +238,35 @@ export default function MapaInterativo({
         padding: [48, 48],
       });
     }
+  }, [linha]);
+
+  // US #16 — enquanto uma linha estiver selecionada, busca a posição
+  // dos ônibus dela e repete a cada INTERVALO_POSICOES_MS. Sem linha
+  // selecionada, não há o que rastrear.
+  useEffect(() => {
+    if (!linha) {
+      setVeiculos([]);
+      setBuscouPosicoes(false);
+      return;
+    }
+
+    let ativo = true;
+
+    async function atualizar(numero: string) {
+      const resultado = await buscarPosicoesDaLinha(numero);
+      if (ativo) {
+        setVeiculos(resultado);
+        setBuscouPosicoes(true);
+      }
+    }
+
+    atualizar(linha.numero);
+    const intervalo = setInterval(() => atualizar(linha.numero), INTERVALO_POSICOES_MS);
+
+    return () => {
+      ativo = false;
+      clearInterval(intervalo);
+    };
   }, [linha]);
 
   function centralizarNaMinhaLocalizacao() {
@@ -372,6 +422,21 @@ export default function MapaInterativo({
               </Marker>
             ))}
 
+            {veiculos.map((veiculo) => (
+              <Marker
+                key={veiculo.prefixo}
+                position={[veiculo.lat, veiculo.lng]}
+                icon={iconeOnibus}
+              >
+                <Popup>
+                  <strong>Carro {veiculo.prefixo}</strong>
+                  <br />
+                  {veiculo.sentido ? `Sentido ${veiculo.sentido.toLowerCase()}` : "Em operação"}
+                  {veiculo.velocidade !== null && ` · ${Math.round(veiculo.velocidade)} km/h`}
+                </Popup>
+              </Marker>
+            ))}
+
             {marcadorSentido && (
               <Marker
                 position={marcadorSentido.posicao}
@@ -416,6 +481,29 @@ export default function MapaInterativo({
           </div>
 
           <div className="mapa-painel-corpo">
+            {/* US #16 — cenários 1 e 3 */}
+            <div className="mapa-painel-aovivo" role="status">
+              {veiculos.length > 0 ? (
+                <>
+                  <span className="mapa-pulso" />
+                  <Bus size={15} />
+                  <span>
+                    <strong>
+                      {veiculos.length}{" "}
+                      {veiculos.length === 1 ? "ônibus" : "ônibus"}
+                    </strong>{" "}
+                    em operação agora
+                  </span>
+                </>
+              ) : (
+                <span className="mapa-painel-sem-veiculo">
+                  {buscouPosicoes
+                    ? "Nenhum ônibus desta linha em operação no momento."
+                    : "Procurando ônibus em operação..."}
+                </span>
+              )}
+            </div>
+
             <div className="mapa-painel-titulo">Trajeto e paradas</div>
             <div className="mapa-timeline">
               {linha.paradas.map((parada, indice) => (
