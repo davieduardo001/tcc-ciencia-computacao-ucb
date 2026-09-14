@@ -2,10 +2,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from mobilidade.main import app
 from mobilidade.models.linha import Linha
-from shared.database import SessionLocal
+from mobilidade.routes import _linha_service
+from shared.database import SessionLocal, engine
 
 client = TestClient(app)
 
@@ -63,6 +65,12 @@ LINHA_SEM_CEILANDIA = "9.991"
 
 @pytest.fixture
 def catalogo_semeado():
+    # O LinhaService guarda o catálogo em memória (CATALOGO_CACHE_SEGUNDOS)
+    # e é um singleton de módulo em routes.py — sem invalidar, um teste
+    # veria as linhas semeadas pelo anterior e o resultado passaria a
+    # depender da ordem de execução.
+    _linha_service.invalidar_catalogo()
+
     db = SessionLocal()
     db.query(Linha).filter(
         Linha.numero.in_([LINHA_COM_CEILANDIA, LINHA_SEM_CEILANDIA])
@@ -94,6 +102,7 @@ def catalogo_semeado():
     ).delete(synchronize_session=False)
     db.commit()
     db.close()
+    _linha_service.invalidar_catalogo()
 
 
 def test_sugerir_linhas_sem_termo_lista_todas(catalogo_semeado):
@@ -133,6 +142,58 @@ def test_sugerir_linhas_sem_combinacao_retorna_lista_vazia(catalogo_semeado):
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_autocomplete_nao_carrega_a_geometria_do_trajeto(catalogo_semeado):
+    """
+    Regressão: o autocomplete usava `db.query(Linha)`, que traz a coluna
+    `trajeto` junto. Com as 923 linhas reais do SEMOB isso são ~930 mil
+    coordenadas (~30 MB) lidas e desserializadas a cada tecla digitada —
+    em produção a rota passou a responder 502 depois de 57s. Com o mock
+    de 2 linhas o custo era invisível, por isso nenhum teste pegou.
+    """
+    consultas: list[str] = []
+
+    def registrar(conn, cursor, statement, parameters, context, executemany):
+        consultas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", registrar)
+    try:
+        response = client.get("/mobilidade/linhas", params={"q": "ceilandia"})
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar)
+
+    assert response.status_code == 200
+
+    consultas_na_linha = [c for c in consultas if "linha" in c.lower()]
+    assert consultas_na_linha, "esperava ao menos uma consulta à tabela linha"
+    for consulta in consultas_na_linha:
+        assert "trajeto" not in consulta.lower(), (
+            f"autocomplete não deve ler a coluna trajeto: {consulta}"
+        )
+
+
+def test_autocomplete_reaproveita_o_catalogo_em_memoria(catalogo_semeado):
+    """
+    A segunda sugestão seguida não deve reconsultar o banco: o catálogo
+    só muda quando a ingestão do SEMOB roda, e o autocomplete dispara a
+    cada tecla digitada.
+    """
+    client.get("/mobilidade/linhas", params={"q": "ceilandia"})
+
+    consultas: list[str] = []
+
+    def registrar(conn, cursor, statement, parameters, context, executemany):
+        consultas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", registrar)
+    try:
+        response = client.get("/mobilidade/linhas", params={"q": "sobradinho"})
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar)
+
+    assert response.status_code == 200
+    assert [c for c in consultas if "linha" in c.lower()] == []
 
 
 def test_segunda_busca_usa_cache_do_banco():
