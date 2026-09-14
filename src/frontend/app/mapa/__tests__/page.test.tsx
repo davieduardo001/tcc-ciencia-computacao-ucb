@@ -1,26 +1,55 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaPage from "../page";
-import { sugerirLinhas } from "@/lib/api";
+import {
+  buscarLugares,
+  calcularRotas,
+  nomearLugar,
+  sugerirLinhas,
+} from "@/lib/api";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-// O mapa em si depende de Leaflet/DOM real — aqui só interessa a busca.
+// O mapa em si depende de Leaflet/DOM real. O dublê expõe um botão que
+// simula "usuário permitiu a localização", pra testar o atalho de
+// "minha localização" do planejador (US #20) sem mexer em Geolocation.
 jest.mock("../MapaInterativo", () => ({
   __esModule: true,
-  default: () => <div data-testid="mapa-interativo" />,
+  default: ({
+    onLocalizacao,
+    viagem,
+  }: {
+    onLocalizacao?: (c: { lat: number; lng: number } | null) => void;
+    viagem?: { pernas: { numero: string }[] } | null;
+  }) => (
+    <div data-testid="mapa-interativo" data-viagem={viagem ? "sim" : "nao"}>
+      <button
+        type="button"
+        onClick={() => onLocalizacao?.({ lat: -15.83, lng: -48.04 })}
+      >
+        simular-localizacao
+      </button>
+    </div>
+  ),
 }));
 
 jest.mock("@/lib/api", () => ({
   sugerirLinhas: jest.fn(),
   buscarLinha: jest.fn(),
+  buscarLugares: jest.fn().mockResolvedValue([]),
+  nomearLugar: jest.fn().mockResolvedValue(null),
+  calcularRotas: jest.fn().mockResolvedValue([]),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
   BuscarLinhaError: class BuscarLinhaError extends Error {},
+  CalcularRotaError: class CalcularRotaError extends Error {},
 }));
 
 const sugerirLinhasMock = sugerirLinhas as jest.Mock;
+const buscarLugaresMock = buscarLugares as jest.Mock;
+const calcularRotasMock = calcularRotas as jest.Mock;
+const nomearLugarMock = nomearLugar as jest.Mock;
 const PLACEHOLDER = "Buscar linha ou destino (ex: 0.110 ou Ceilândia)";
 
 const LINHA = {
@@ -131,5 +160,215 @@ describe("MapaPage — sugestões de busca", () => {
     });
 
     expect(screen.queryByText(LINHA.nome)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US #20 — planejamento de viagem origem → destino
+// ---------------------------------------------------------------------------
+
+const LUGAR_ORIGEM = {
+  nome: "Terminal Ceilândia",
+  endereco: "Terminal Ceilândia, Ceilândia, DF",
+  lat: -15.8195,
+  lng: -48.1096,
+};
+
+const LUGAR_DESTINO = {
+  nome: "Rodoviária do Plano Piloto",
+  endereco: "Rodoviária do Plano Piloto, Brasília, DF",
+  lat: -15.7939,
+  lng: -47.8828,
+};
+
+const VIAGEM_DIRETA = {
+  pernas: [
+    {
+      numero: "0.382",
+      sentido: "IDA",
+      nome: "0.382 — Ceilândia / Rodoviária",
+      embarque: {
+        lat: -15.819,
+        lng: -48.109,
+        parada_nome: "Avenida Hélio Prates, Ceilândia",
+        caminhada_metros: 119,
+      },
+      desembarque: {
+        lat: -15.794,
+        lng: -47.883,
+        parada_nome: "Eixo L Central, Setor Bancário Sul",
+        caminhada_metros: 58,
+      },
+      distancia_km: 27,
+      paradas_no_trecho: 33,
+      trajeto: [
+        [-15.819, -48.109],
+        [-15.794, -47.883],
+      ],
+    },
+  ],
+  baldeacoes: 0,
+  distancia_km: 27,
+  caminhada_metros: 177,
+  duracao_estimada_min: 76,
+};
+
+async function abrirPlanejador() {
+  render(<MapaPage />);
+  await act(async () => {
+    fireEvent.click(screen.getByText("Para onde você vai?"));
+  });
+}
+
+/** Preenche um dos campos escolhendo a primeira sugestão do autocomplete. */
+async function escolherLugar(rotulo: string, lugar: typeof LUGAR_ORIGEM) {
+  buscarLugaresMock.mockResolvedValueOnce([lugar]);
+
+  const campo = screen.getByLabelText(rotulo);
+  fireEvent.change(campo, { target: { value: lugar.nome.slice(0, 6) } });
+
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+  });
+
+  await act(async () => {
+    fireEvent.click(screen.getByText(lugar.endereco));
+  });
+}
+
+describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
+  beforeEach(() => {
+    buscarLugaresMock.mockReset().mockResolvedValue([]);
+    calcularRotasMock.mockReset().mockResolvedValue([]);
+    nomearLugarMock.mockReset().mockResolvedValue(null);
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("o botão de buscar só habilita com origem E destino definidos", async () => {
+    await abrirPlanejador();
+
+    const botao = screen.getByRole("button", { name: /ver opções de ônibus/i });
+    expect(botao).toBeDisabled();
+
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    expect(botao).toBeDisabled();
+
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+    expect(botao).toBeEnabled();
+  });
+
+  it("calcula a rota com as coordenadas dos dois pontos escolhidos", async () => {
+    calcularRotasMock.mockResolvedValue([VIAGEM_DIRETA]);
+    await abrirPlanejador();
+
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /ver opções de ônibus/i }));
+    });
+
+    expect(calcularRotasMock).toHaveBeenCalledWith(
+      { nome: LUGAR_ORIGEM.nome, lat: LUGAR_ORIGEM.lat, lng: LUGAR_ORIGEM.lng },
+      { nome: LUGAR_DESTINO.nome, lat: LUGAR_DESTINO.lat, lng: LUGAR_DESTINO.lng }
+    );
+
+    // A linha aparece duas vezes: no resumo da opção e no passo
+    // expandido logo abaixo (a primeira opção abre já expandida).
+    expect(screen.getAllByText("0.382")).toHaveLength(2);
+    expect(screen.getByText("~76 min")).toBeInTheDocument();
+    expect(screen.getByText(/Avenida Hélio Prates/)).toBeInTheDocument();
+    expect(screen.getByText(/Eixo L Central/)).toBeInTheDocument();
+    expect(screen.getByText(/33 paradas/)).toBeInTheDocument();
+    // E o itinerário chega ao mapa.
+    expect(screen.getByTestId("mapa-interativo")).toHaveAttribute(
+      "data-viagem",
+      "sim"
+    );
+  });
+
+  it("mostra a mensagem do Cenário 3 quando não há rota possível", async () => {
+    calcularRotasMock.mockResolvedValue([]);
+    await abrirPlanejador();
+
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /ver opções de ônibus/i }));
+    });
+
+    expect(screen.getByText(/Nenhuma linha liga esses dois pontos/)).toBeInTheDocument();
+  });
+
+  it("inverter troca origem e destino de lugar", async () => {
+    await abrirPlanejador();
+
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle("Inverter origem e destino"));
+    });
+
+    expect(screen.getByLabelText("De onde")).toHaveValue(LUGAR_DESTINO.nome);
+    expect(screen.getByLabelText("Para onde")).toHaveValue(LUGAR_ORIGEM.nome);
+  });
+
+  it("'minha localização' só habilita quando o mapa reporta a posição", async () => {
+    await abrirPlanejador();
+
+    const atalhos = screen.getAllByText("Minha localização");
+    expect(atalhos[0].closest("button")).toBeDisabled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("simular-localizacao"));
+    });
+
+    expect(
+      screen.getAllByText("Minha localização")[0].closest("button")
+    ).toBeEnabled();
+  });
+
+  it("usar minha localização preenche a origem com a posição do mapa", async () => {
+    nomearLugarMock.mockResolvedValue({
+      nome: "QNM 18, Ceilândia",
+      endereco: "QNM 18, Ceilândia, DF",
+      lat: -15.83,
+      lng: -48.04,
+    });
+
+    await abrirPlanejador();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("simular-localizacao"));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByText("Minha localização")[0]);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("De onde")).toHaveValue("QNM 18, Ceilândia");
+    });
+    expect(nomearLugarMock).toHaveBeenCalledWith(-15.83, -48.04);
+  });
+
+  it("não consulta o geocodificador com menos de 3 caracteres", async () => {
+    await abrirPlanejador();
+
+    fireEvent.change(screen.getByLabelText("De onde"), {
+      target: { value: "ro" },
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(buscarLugaresMock).not.toHaveBeenCalled();
   });
 });

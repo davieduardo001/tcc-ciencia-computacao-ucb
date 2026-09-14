@@ -644,6 +644,523 @@
   }
 }
 
+/* ===== Planejador de viagem origem → destino (US #20) ===== */
+
+/* Fica à esquerda pra não brigar com o painel de linha, que é à direita —
+   dá pra ter o itinerário e o trajeto de uma linha abertos ao mesmo tempo. */
+.plan-abrir {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: 0.14s;
+}
+
+.plan-abrir:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.plan-painel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  bottom: 20px;
+  width: 370px;
+  max-width: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  overflow: auto;
+  z-index: 1001;
+}
+
+.plan-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.plan-cabecalho strong {
+  font-size: 16px;
+}
+
+.plan-formulario {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-campo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-campo-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.plan-bolinha {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.plan-bolinha.origem {
+  background: #1aa05a;
+}
+
+.plan-bolinha.destino {
+  background: var(--primary);
+}
+
+.plan-campo-linha {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm, 10px);
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.plan-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.plan-campo.escolhendo .plan-input {
+  border-color: var(--primary);
+  background: var(--bg-soft);
+}
+
+.plan-botao-campo {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+
+.plan-botao-campo:hover {
+  color: var(--text);
+}
+
+.plan-girando {
+  animation: plan-girar 0.9s linear infinite;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+@keyframes plan-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.plan-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-atalho {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.14s;
+}
+
+.plan-atalho:hover:not(:disabled),
+.plan-atalho.ativo {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.plan-atalho:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.plan-inverter {
+  align-self: flex-end;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-2);
+  background: #fff;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  margin: -4px 0;
+}
+
+.plan-inverter:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.plan-inverter:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.plan-sugestoes {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm, 10px);
+  box-shadow: var(--shadow);
+  max-height: 240px;
+  overflow: auto;
+}
+
+.plan-sugestoes button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.plan-sugestoes button:hover {
+  background: var(--bg-soft);
+}
+
+.plan-sugestoes strong {
+  display: block;
+  font-size: 13.5px;
+}
+
+.plan-sugestoes span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-buscar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-sm, 10px);
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.plan-buscar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.plan-erro,
+.plan-vazio {
+  margin: 0 18px 18px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm, 10px);
+  font-size: 13px;
+}
+
+.plan-erro {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.plan-vazio {
+  background: var(--bg-soft);
+  color: var(--text-2);
+}
+
+.plan-resultados {
+  border-top: 1px solid var(--border-2);
+  padding: 14px 18px 18px;
+}
+
+.plan-resultados-titulo {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.plan-opcoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-opcao {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm, 10px);
+  background: #fff;
+  cursor: pointer;
+  transition: 0.14s;
+}
+
+.plan-opcao:hover {
+  border-color: var(--primary);
+}
+
+.plan-opcao.selecionada {
+  border-color: var(--primary);
+  background: var(--bg-soft);
+}
+
+.plan-opcao-resumo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.plan-opcao-linhas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-opcao-linhas > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-opcao-troca {
+  color: var(--muted);
+}
+
+.plan-badge-linha {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--accent, #1aa0ad);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.plan-opcao-metricas {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plan-opcao-metricas strong {
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.plan-opcao-metricas span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.plan-passos {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px dashed var(--border-2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-passo-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.plan-passo-nome {
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-passo-detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  padding-left: 4px;
+}
+
+.plan-passo-detalhe strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.plan-passo-detalhe em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.plan-passo-meio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11.5px;
+  padding: 2px 0;
+}
+
+.plan-ressalva {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ===== Marcadores do itinerário (US #20) ===== */
+.mapa-icone-viagem {
+  background: transparent;
+  border: none;
+}
+
+.mapa-icone-viagem span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid #fff;
+  box-shadow: 0 6px 16px rgba(16, 40, 48, 0.22);
+}
+
+.mapa-icone-viagem.origem span {
+  background: #1aa05a;
+}
+
+.mapa-icone-viagem.destino span {
+  background: #d6453d;
+}
+
+.mapa-icone-viagem.embarque span,
+.mapa-icone-viagem.baldeacao span {
+  background: #2f72e8;
+}
+
+.mapa-icone-viagem.desembarque span {
+  background: #1a2b33;
+}
+
+.mapa-aviso.destaque {
+  background: var(--primary);
+  color: #fff;
+}
+
+.mapa-canvas.escolhendo-ponto .mapa-leaflet {
+  cursor: crosshair;
+}
+
+@media (max-width: 920px) {
+  .plan-abrir {
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    justify-content: center;
+  }
+
+  .plan-painel {
+    top: auto;
+    bottom: calc(var(--bottomnav-h, 64px) + 14px);
+    left: 14px;
+    right: 14px;
+    width: auto;
+    max-width: none;
+    max-height: 62vh;
+  }
+}
+
 /* ===== Navegação inferior (mobile) ===== */
 .ms-bottomnav {
   display: none;

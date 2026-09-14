@@ -2,12 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
+import { Navigation } from "lucide-react";
 import AppShell from "./AppShell";
+import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import {
   buscarLinha,
   BuscarLinhaError,
+  calcularRotas,
+  CalcularRotaError,
   LinhaDetalhada,
   LinhaResumo,
+  nomearLugar,
+  OpcaoViagem,
   sugerirLinhas,
 } from "@/lib/api";
 
@@ -18,6 +24,11 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 
 const DEBOUNCE_SUGESTOES_MS = 250;
 
+interface Coordenadas {
+  lat: number;
+  lng: number;
+}
+
 export default function MapaPage() {
   const [linha, setLinha] = useState<LinhaDetalhada | null>(null);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
@@ -25,6 +36,17 @@ export default function MapaPage() {
   const [sugestoesLinha, setSugestoesLinha] = useState<LinhaResumo[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sequenciaBuscaRef = useRef(0);
+
+  // US #20 — planejamento de viagem origem → destino.
+  const [planejadorAberto, setPlanejadorAberto] = useState(false);
+  const [origem, setOrigem] = useState<PontoEscolhido | null>(null);
+  const [destino, setDestino] = useState<PontoEscolhido | null>(null);
+  const [opcoes, setOpcoes] = useState<OpcaoViagem[] | null>(null);
+  const [opcaoSelecionada, setOpcaoSelecionada] = useState<number | null>(null);
+  const [calculandoRota, setCalculandoRota] = useState(false);
+  const [erroRota, setErroRota] = useState<string | null>(null);
+  const [escolhendoNoMapa, setEscolhendoNoMapa] = useState<Extremo | null>(null);
+  const [localizacao, setLocalizacao] = useState<Coordenadas | null>(null);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -93,6 +115,110 @@ export default function MapaPage() {
     setErroBusca(null);
   }, []);
 
+  // -- US #20 ---------------------------------------------------------------
+
+  const definirPonto = useCallback(
+    (extremo: Extremo, ponto: PontoEscolhido | null) => {
+      (extremo === "origem" ? setOrigem : setDestino)(ponto);
+      // Mudou uma das pontas: o resultado anterior não vale mais.
+      setOpcoes(null);
+      setOpcaoSelecionada(null);
+      setErroRota(null);
+    },
+    []
+  );
+
+  const handleInverter = useCallback(() => {
+    setOrigem(destino);
+    setDestino(origem);
+    setOpcoes(null);
+    setOpcaoSelecionada(null);
+  }, [origem, destino]);
+
+  const handleUsarMinhaLocalizacao = useCallback(
+    async (extremo: Extremo) => {
+      if (!localizacao) return;
+
+      // Mostra a coordenada na hora e troca pelo nome quando chegar —
+      // esperar o Nominatim pra preencher o campo daria a impressão de
+      // que o botão não funcionou.
+      definirPonto(extremo, {
+        nome: "Minha localização",
+        lat: localizacao.lat,
+        lng: localizacao.lng,
+      });
+
+      const lugar = await nomearLugar(localizacao.lat, localizacao.lng);
+      if (lugar) {
+        definirPonto(extremo, {
+          nome: lugar.nome,
+          lat: localizacao.lat,
+          lng: localizacao.lng,
+        });
+      }
+    },
+    [localizacao, definirPonto]
+  );
+
+  const handleEscolherNoMapa = useCallback((extremo: Extremo) => {
+    setEscolhendoNoMapa((atual) => (atual === extremo ? null : extremo));
+  }, []);
+
+  const handleCliqueNoMapa = useCallback(
+    async (lat: number, lng: number) => {
+      const extremo = escolhendoNoMapa;
+      if (!extremo) return;
+
+      setEscolhendoNoMapa(null);
+      definirPonto(extremo, {
+        nome: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        lat,
+        lng,
+      });
+
+      const lugar = await nomearLugar(lat, lng);
+      if (lugar) {
+        definirPonto(extremo, { nome: lugar.nome, lat, lng });
+      }
+    },
+    [escolhendoNoMapa, definirPonto]
+  );
+
+  const handleCalcularRota = useCallback(async () => {
+    if (!origem || !destino) return;
+
+    setCalculandoRota(true);
+    setErroRota(null);
+    setOpcoes(null);
+    setOpcaoSelecionada(null);
+    // O trajeto de uma linha buscada por número atrapalharia a leitura
+    // do itinerário — são duas coisas diferentes no mesmo mapa.
+    setLinha(null);
+
+    try {
+      const resultado = await calcularRotas(origem, destino);
+      setOpcoes(resultado);
+      // Abre a primeira opção já expandida: quase sempre é a escolhida.
+      setOpcaoSelecionada(resultado.length > 0 ? 0 : null);
+    } catch (err) {
+      setErroRota(
+        err instanceof CalcularRotaError
+          ? err.message
+          : "Não foi possível calcular a rota. Tente novamente."
+      );
+    } finally {
+      setCalculandoRota(false);
+    }
+  }, [origem, destino]);
+
+  const handleFecharPlanejador = useCallback(() => {
+    setPlanejadorAberto(false);
+    setEscolhendoNoMapa(null);
+  }, []);
+
+  const viagem =
+    opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
+
   return (
     <AppShell
       active="mapa"
@@ -106,7 +232,42 @@ export default function MapaPage() {
         linha={linha}
         erroBusca={erroBusca}
         onFecharLinha={handleFecharLinha}
+        viagem={viagem}
+        origemViagem={origem}
+        destinoViagem={destino}
+        escolhendoNoMapa={escolhendoNoMapa !== null}
+        onCliqueNoMapa={handleCliqueNoMapa}
+        onLocalizacao={setLocalizacao}
       />
+
+      {planejadorAberto ? (
+        <PlanejadorViagem
+          origem={origem}
+          destino={destino}
+          onDefinir={definirPonto}
+          onInverter={handleInverter}
+          onBuscar={handleCalcularRota}
+          onEscolherNoMapa={handleEscolherNoMapa}
+          escolhendoNoMapa={escolhendoNoMapa}
+          onUsarMinhaLocalizacao={handleUsarMinhaLocalizacao}
+          temLocalizacao={localizacao !== null}
+          opcoes={opcoes}
+          opcaoSelecionada={opcaoSelecionada}
+          onSelecionarOpcao={setOpcaoSelecionada}
+          calculando={calculandoRota}
+          erro={erroRota}
+          onFechar={handleFecharPlanejador}
+        />
+      ) : (
+        <button
+          type="button"
+          className="plan-abrir"
+          onClick={() => setPlanejadorAberto(true)}
+        >
+          <Navigation size={16} />
+          Para onde você vai?
+        </button>
+      )}
     </AppShell>
   );
 }
