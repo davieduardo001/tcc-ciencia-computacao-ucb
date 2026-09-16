@@ -14,7 +14,7 @@ from models.base import Base
 from gateway.models import TestLog
 from auth.models import TestUser, Usuario, Sessao, TokenResetSenha
 from mobilidade.models import TestLinha, Linha, Rota, RotaCelula
-from colaboracao.models import TestReporte
+from colaboracao.models import TestReporte, PreferenciaNotificacao
 
 config = context.config
 
