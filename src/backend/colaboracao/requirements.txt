@@ -2,3 +2,12 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.0
 pydantic-settings>=2.0
+# O Dockerfile deste serviço instala SÓ este arquivo, enquanto o CI
+# instala o requirements combinado da raiz — então dependência que falta
+# aqui passa no CI e derruba o container no boot. Foi assim que a US #29
+# (PR #127) tirou o colaboracao do ar: ela trouxe o primeiro código do
+# serviço que fala com o banco.
+#
+# Mesmo erro que o PR #102 corrigiu no mobilidade, em agosto.
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
