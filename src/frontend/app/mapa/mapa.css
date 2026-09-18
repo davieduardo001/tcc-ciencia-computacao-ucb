@@ -26,6 +26,14 @@
   --sidebar-w: 256px;
   --topbar-h: 68px;
   --bottomnav-h: 64px;
+
+  /* Pilha de camadas da tela (issue #132): o mapa é o fundo, a folha é o
+     meio e a navegação é o topo. Quem for sobrepor algo declara aqui em
+     vez de inventar um z-index no meio do arquivo. */
+  --z-mapa: 1;
+  --z-folha: 1001;
+  --z-nav: 1200;
+  --z-fab: 1250;
   --font: var(--mc-fonte);
 
   display: grid;
@@ -694,7 +702,12 @@
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
   overflow: auto;
-  z-index: 1001;
+  z-index: var(--z-folha);
+}
+
+/* A alça só existe no mobile: no desktop o painel é uma coluna fixa. */
+.plan-alca {
+  display: none;
 }
 
 .plan-cabecalho {
@@ -1175,14 +1188,71 @@
     justify-content: center;
   }
 
+  /* ===== Folha de rotas (issue #132) =====
+     Camada do meio da pilha: sobre o mapa, sob a navegação. Encosta na
+     barra de baixo em vez de flutuar acima dela — assim a folha nunca
+     cobre a navegação, e recolhida deixa a alça no alcance do polegar. */
   .plan-painel {
     top: auto;
-    bottom: calc(var(--bottomnav-h, 64px) + 14px);
-    left: 14px;
-    right: 14px;
+    bottom: var(--bottomnav-h, 64px);
+    left: 0;
+    right: 0;
     width: auto;
     max-width: none;
-    max-height: 62vh;
+    height: 62vh;
+    max-height: calc(100vh - var(--topbar-h) - var(--bottomnav-h, 64px) - 12px);
+    border: none;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -16px 40px -18px rgba(14, 42, 63, 0.55);
+    padding-top: 0;
+    transition: height 0.5s cubic-bezier(0.3, 1, 0.35, 1);
+  }
+
+  /* Recolhida: sobra a faixa da alça e do cabeçalho, para ver o trajeto
+     no mapa e puxar de volta quando for escolher. */
+  .plan-painel.recolhida {
+    height: 96px;
+  }
+
+  /* Durante o arrasto a altura vem do inline style; manter a transição
+     faria a folha perseguir o dedo com atraso. */
+  .plan-painel.arrastando {
+    transition: none;
+  }
+
+  .plan-alca {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 26px;
+    flex: none;
+    border: none;
+    background: none;
+    cursor: grab;
+    touch-action: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .plan-alca:active {
+    cursor: grabbing;
+  }
+
+  .plan-alca-traco {
+    width: 44px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-2);
+  }
+
+  .plan-alca:focus-visible .plan-alca-traco {
+    background: var(--primary);
+  }
+
+  .plan-abrir {
+    bottom: auto;
   }
 }
 
@@ -1228,43 +1298,169 @@
     bottom: calc(var(--bottomnav-h, 64px) + 18px);
   }
 
+  /* ===== Navegação inferior v3 (issue #132) =====
+     Barra escura sobre o mapa, com o botão de ação no centro. A altura
+     continua vindo de --bottomnav-h porque .mapa-controles, .plan-painel
+     e o painel ao vivo se posicionam a partir dela. */
   .ms-bottomnav {
     grid-area: bottom;
+    position: relative;
     display: flex;
     align-items: stretch;
-    background: #fff;
-    border-top: 1px solid var(--border);
+    background: var(--mc-petroleo);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -10px 30px -14px rgba(14, 42, 63, 0.9);
     padding-bottom: env(safe-area-inset-bottom, 0);
+    z-index: var(--z-nav);
+  }
+
+  .ms-bottomnav-vao {
+    flex: 1;
   }
 
   .ms-bottomnav-item {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: var(--muted);
+    gap: 3px;
+    position: relative;
+    /* 44px de área de toque, mesmo com o rótulo pequeno. */
+    min-height: 44px;
+    padding: 6px 2px 10px;
+    border: none;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
     text-decoration: none;
-    padding: 8px 2px;
+    color: rgba(255, 255, 255, 0.5);
+    transition:
+      color 0.28s ease,
+      transform 0.28s cubic-bezier(0.3, 1, 0.4, 1.4);
+  }
+
+  .ms-bottomnav-rotulo {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   .ms-bottomnav-item.active {
-    color: var(--primary);
-    position: relative;
+    color: var(--mc-mint);
+    transform: translateY(-2px);
   }
 
-  .ms-bottomnav-item.active::after {
-    content: "";
+  .ms-bottomnav-ponto {
     position: absolute;
-    top: 4px;
-    width: 4px;
-    height: 4px;
+    bottom: 4px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    background: var(--primary);
+    background: var(--mc-mint);
+    opacity: 0;
+    transform: scale(0.4);
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s ease;
+  }
+
+  .ms-bottomnav-item.active .ms-bottomnav-ponto {
+    opacity: 1;
+    transform: scale(1);
   }
 
   .ms-bottomnav-item.indisponivel {
-    color: var(--border);
-    cursor: not-allowed;
+    color: rgba(255, 255, 255, 0.32);
+  }
+
+  /* ===== Botão de ação central e arco ===== */
+  .ms-fab-area {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 34px);
+    transform: translateX(-50%);
+    z-index: var(--z-fab);
+  }
+
+  .ms-fab {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    border: 5px solid var(--mc-petroleo);
+    background: var(--mc-teal);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 14px 26px -10px rgba(43, 166, 155, 0.9);
+    transition: transform 0.3s cubic-bezier(0.3, 1, 0.4, 1.4);
+  }
+
+  .ms-fab-area.aberto .ms-fab {
+    transform: rotate(135deg);
+  }
+
+  .ms-fab-acao {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 24px) scale(0.5);
+    transition:
+      transform 0.42s cubic-bezier(0.3, 1.2, 0.4, 1) var(--atraso),
+      opacity 0.3s ease var(--atraso);
+  }
+
+  .ms-fab-area.aberto .ms-fab-acao {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, 0) translate(var(--dx), var(--dy)) scale(1);
+  }
+
+  .ms-fab-acao-icone {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+    background: #fff;
+    color: var(--mc-petroleo);
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow);
+  }
+
+  .ms-fab-acao-rotulo {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(14, 42, 63, 0.82);
+    border-radius: var(--pill);
+    padding: 3px 9px;
+  }
+
+  .ms-fab-fundo {
+    position: fixed;
+    inset: 0;
+    border: none;
+    background: rgba(7, 33, 44, 0.35);
+    z-index: calc(var(--z-nav) - 1);
+    cursor: pointer;
+  }
+
+  /* Perfil passou a morar na barra de baixo; manter o ícone na barra de
+     cima duplicaria a mesma entrada na mesma tela. */
+  .ms-actions .ms-icon-btn[title="Perfil"] {
+    display: none;
   }
 }
 
@@ -1335,15 +1531,70 @@
   background: var(--muted);
 }
 
+.mapa-icone-onibus {
+  display: grid;
+  place-items: center;
+}
+
 .mapa-icone-onibus-core {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--primary);
-  border: 3px solid #fff;
+  border: 2.5px solid #fff;
   box-shadow: var(--shadow-sm);
   position: relative;
+}
+
+/* ===== Pílula do ônibus (issue #132) =====
+   Fica acima do ponto, não sobre ele: a pílula é larga e, ancorada no
+   centro, faria o veículo parecer deslocado da via. O ponto continua
+   marcando a posição real. */
+.mapa-onibus-pilula {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px 0 4px;
+  border-radius: var(--pill);
+  background: var(--mc-petroleo);
+  box-shadow: 0 10px 20px -10px rgba(14, 42, 63, 0.95);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mapa-onibus-glifo {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--mc-mint);
+  color: var(--mc-petroleo);
+  display: grid;
+  place-items: center;
+}
+
+.mapa-onibus-rotulo {
+  font-family: var(--mc-fonte-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+/* Veículo sem posição recente não se anuncia com a mesma força. */
+.mapa-icone-onibus.parado .mapa-onibus-pilula {
+  background: var(--text-2);
+}
+
+.mapa-icone-onibus.parado .mapa-onibus-glifo {
+  background: var(--border-2);
+  color: var(--text-2);
 }
 
 .mapa-icone-onibus-core::after {

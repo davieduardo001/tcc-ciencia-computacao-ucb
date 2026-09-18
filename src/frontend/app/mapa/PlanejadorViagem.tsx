@@ -233,6 +233,94 @@ function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
   );
 }
 
+/** Limites da folha, em pixels. O mínimo é a faixa que fica visível
+ *  quando ela está recolhida: alça mais o cabeçalho. */
+const ALTURA_MINIMA = 96;
+const LIMIAR_ARRASTO = 46;
+
+/**
+ * Folha arrastável do mobile (issue #132).
+ *
+ * A folha é a camada do meio da tela: fica sobre o mapa e sob a barra de
+ * navegação. Recolhida, deixa o trajeto visível e mantém a alça ao
+ * alcance do polegar; arrastada para cima, volta a mostrar as opções.
+ *
+ * O estado só muda se houve movimento de verdade (mais de 3 px). Sem
+ * isso, um toque na alça registraria como arrasto de zero pixel e a
+ * folha oscilaria sozinha.
+ */
+function useFolhaArrastavel() {
+  const ref = useRef<HTMLElement>(null);
+  const [recolhida, setRecolhida] = useState(false);
+  const [altura, setAltura] = useState<number | null>(null);
+  const [arrastando, setArrastando] = useState(false);
+  const arrasto = useRef<{ y0: number; altura0: number; moveu: boolean } | null>(
+    null
+  );
+  const suprimirClique = useRef(false);
+
+  const aoMover = useCallback((evento: PointerEvent) => {
+    const atual = arrasto.current;
+    if (!atual || !ref.current) return;
+
+    const dy = evento.clientY - atual.y0;
+    if (Math.abs(dy) > 3) atual.moveu = true;
+
+    const teto = window.innerHeight * 0.82;
+    setAltura(Math.max(ALTURA_MINIMA, Math.min(teto, atual.altura0 - dy)));
+  }, []);
+
+  const aoSoltar = useCallback(
+    (evento: PointerEvent) => {
+      const atual = arrasto.current;
+      window.removeEventListener("pointermove", aoMover);
+      window.removeEventListener("pointerup", aoSoltar);
+      window.removeEventListener("pointercancel", aoSoltar);
+      arrasto.current = null;
+      setArrastando(false);
+      setAltura(null);
+
+      if (!atual || !atual.moveu) return;
+
+      const dy = evento.clientY - atual.y0;
+      if (dy < -LIMIAR_ARRASTO) setRecolhida(false);
+      else if (dy > LIMIAR_ARRASTO) setRecolhida(true);
+
+      // O pointerup dispara um clique logo em seguida; sem isso, arrastar
+      // também alternaria o estado, desfazendo o que o arrasto acabou de
+      // decidir.
+      suprimirClique.current = true;
+      window.setTimeout(() => {
+        suprimirClique.current = false;
+      }, 60);
+    },
+    [aoMover]
+  );
+
+  const aoPressionar = useCallback(
+    (evento: React.PointerEvent) => {
+      if (!ref.current) return;
+      arrasto.current = {
+        y0: evento.clientY,
+        altura0: ref.current.offsetHeight,
+        moveu: false,
+      };
+      setArrastando(true);
+      window.addEventListener("pointermove", aoMover);
+      window.addEventListener("pointerup", aoSoltar);
+      window.addEventListener("pointercancel", aoSoltar);
+    },
+    [aoMover, aoSoltar]
+  );
+
+  const aoClicar = useCallback(() => {
+    if (suprimirClique.current) return;
+    setRecolhida((estava) => !estava);
+  }, []);
+
+  return { ref, recolhida, altura, arrastando, aoPressionar, aoClicar };
+}
+
 export default function PlanejadorViagem({
   origem,
   destino,
@@ -253,9 +341,29 @@ export default function PlanejadorViagem({
   rastreando,
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
+  const folha = useFolhaArrastavel();
 
   return (
-    <aside className="plan-painel">
+    <aside
+      ref={folha.ref}
+      className={`plan-painel${folha.recolhida ? " recolhida" : ""}${
+        folha.arrastando ? " arrastando" : ""
+      }`}
+      style={folha.altura !== null ? { height: `${folha.altura}px` } : undefined}
+    >
+      {/* Alça da folha (mobile). O botão existe porque arrastar não é
+          acessível por teclado — quem navega assim alterna por aqui. */}
+      <button
+        type="button"
+        className="plan-alca"
+        aria-expanded={!folha.recolhida}
+        aria-label={folha.recolhida ? "Abrir opções de viagem" : "Recolher opções de viagem"}
+        onPointerDown={folha.aoPressionar}
+        onClick={folha.aoClicar}
+      >
+        <span className="plan-alca-traco" aria-hidden="true" />
+      </button>
+
       <div className="plan-cabecalho">
         <strong>Para onde você vai?</strong>
         <button

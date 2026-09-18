@@ -423,6 +423,33 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
     expect(buscarPosicoesMock).toHaveBeenCalledWith(LINHA_TESTE.numero);
   });
 
+  it("issue #132: o marcador é uma pílula com o número da linha", async () => {
+    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    const html = marcador.getAttribute("data-html") ?? "";
+
+    expect(html).toContain("mapa-onibus-pilula");
+    expect(html).toContain("mapa-onibus-glifo");
+    expect(html).toContain(">0.110<");
+  });
+
+  it("issue #132: sem tempo estimado, a pílula não mostra separador nem minutos", async () => {
+    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    const html = marcador.getAttribute("data-html") ?? "";
+
+    // O ETA é a US #19 e ainda não existe no contrato. Enquanto não vier,
+    // a pílula não pode inventar um tempo aproximado.
+    expect(html).not.toContain("·");
+    expect(html).not.toContain("min<");
+  });
+
   it("cenário 2: atualiza sozinho, sem recarregar a página", async () => {
     jest.useFakeTimers();
     buscarPosicoesMock.mockResolvedValue([VEICULO]);

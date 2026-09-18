@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AppShell from "../AppShell";
 import { buscarUsuarioAtual, logoutUsuario } from "@/lib/api";
 
@@ -49,9 +49,12 @@ describe("AppShell", () => {
       screen.queryByRole("link", { name: "Rotas Salvas" })
     ).not.toBeInTheDocument();
 
-    screen.getAllByLabelText(/Rotas Salvas/i).forEach((item) => {
-      expect(item).toHaveAttribute("aria-disabled", "true");
-    });
+    // Na barra lateral o item é inerte.
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    const item = within(sidebar)
+      .getByText("Rotas Salvas")
+      .closest(".ms-nav-item");
+    expect(item).toHaveAttribute("aria-disabled", "true");
   });
 
   it("linhas e rotas navegam para o mapa com o painel certo", () => {
@@ -75,16 +78,70 @@ describe("AppShell", () => {
     rotas.forEach((l) => expect(l).toHaveAttribute("href", "/mapa?painel=rotas"));
   });
 
-  it("perfil não aparece na sidebar — já existe na barra de cima", () => {
+  it("perfil fica na navegação inferior, não na barra lateral", () => {
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>
       </AppShell>
     );
 
-    expect(screen.queryByText("Perfil")).not.toBeInTheDocument();
-    // O botão de perfil da topbar continua lá.
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    expect(within(sidebar).queryByText("Perfil")).not.toBeInTheDocument();
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    expect(within(inferior).getByText("Perfil")).toBeInTheDocument();
+
+    // O botão de perfil da topbar continua no DOM (o CSS o esconde no mobile).
     expect(screen.getByTitle("Perfil")).toBeInTheDocument();
+  });
+
+  it("marca o destino atual da navegação inferior com aria-current", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    const atual = within(inferior).getByRole("link", { name: /Mapa/ });
+    expect(atual).toHaveAttribute("aria-current", "page");
+  });
+
+  it("botão de ação central abre e fecha o arco de ações rápidas", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const fab = screen.getByRole("button", { name: "Ações rápidas" });
+    expect(fab).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(fab);
+    const aberto = screen.getByRole("button", { name: "Fechar ações rápidas" });
+    expect(aberto).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(aberto);
+    expect(
+      screen.getByRole("button", { name: "Ações rápidas" })
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("ação ainda não entregue explica que está em breve", async () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ações rápidas" }));
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    fireEvent.click(within(inferior).getByText("Ocorrências"));
+
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("Ocorrências")).toBeInTheDocument();
+    expect(within(dialogo).getByText("Em breve")).toBeInTheDocument();
   });
 
   it("mostra o selo 'Em breve' na sidebar para itens indisponíveis", () => {
