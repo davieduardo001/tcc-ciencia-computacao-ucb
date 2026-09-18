@@ -39,6 +39,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0e2a3f",
+  // Sem viewport-fit=cover o iOS devolve 0 em env(safe-area-inset-*), e o
+  // respiro que a navegação e o herói reservam para o entalhe e para a
+  // barra de gestos simplesmente não acontece.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
