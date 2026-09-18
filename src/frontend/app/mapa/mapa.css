@@ -659,7 +659,7 @@
 @media (max-width: 920px) {
   .mapa-painel-linha {
     top: auto;
-    bottom: calc(var(--nav-total) + 18px);
+    bottom: 18px;
     right: 16px;
     left: 16px;
     width: auto;
@@ -1204,13 +1204,19 @@
      cobre a navegação, e recolhida deixa a alça no alcance do polegar. */
   .plan-painel {
     top: auto;
-    bottom: var(--nav-total);
+    /* bottom: 0, e não a altura da navegação.
+       .ms-content é a linha do meio do grid e já termina onde a barra
+       começa — descontar a barra de novo abria um vão do tamanho dela
+       entre a folha e a navegação, com o mapa aparecendo no meio.
+       Com 0, a folha encosta na barra e parece sair de baixo dela. */
+    bottom: 0;
     left: 0;
     right: 0;
     width: auto;
     max-width: none;
     height: 62vh;
-    max-height: calc(100dvh - var(--topbar-total) - var(--nav-total) - 12px);
+    /* 100% de .ms-content: a área útil já exclui as duas barras. */
+    max-height: 100%;
     border: none;
     border-radius: 24px 24px 0 0;
     box-shadow: 0 -16px 40px -18px rgba(14, 42, 63, 0.55);
@@ -1305,13 +1311,15 @@
   }
 
   .mapa-controles {
-    bottom: calc(var(--nav-total) + 18px);
+    bottom: 18px;
   }
 
   /* ===== Navegação inferior v3 (issue #132) =====
-     Barra escura sobre o mapa, com o botão de ação no centro. A altura
-     continua vindo de --bottomnav-h porque .mapa-controles, .plan-painel
-     e o painel ao vivo se posicionam a partir dela. */
+     Barra escura sobre o mapa, com o botão de ação no centro.
+
+     A altura entra no grid como --nav-total (altura + área segura). Quem
+     fica dentro de .ms-content NÃO deve descontar essa altura de novo:
+     aquela área já termina onde a barra começa. */
   .ms-bottomnav {
     grid-area: bottom;
     position: relative;
