@@ -749,15 +749,62 @@ footer {
 
 /* --- Medidor de força da senha -------------------------------------------- */
 
-.auth-aviso {
-  margin: 0 2px 12px;
-  padding: 10px 14px;
-  border-radius: var(--mc-r-sm);
+/* --- Pop-up "em breve" ---------------------------------------------------- */
+
+.modal-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(7, 33, 44, 0.55);
+  backdrop-filter: blur(2px);
+  animation: mc-surge 0.2s ease both;
+}
+
+.modal-caixa {
+  width: 100%;
+  max-width: 340px;
+  background: var(--mc-superficie);
+  border-radius: var(--mc-r-xl);
+  padding: 24px 22px 20px;
+  box-shadow: var(--mc-sombra-lg);
+  text-align: center;
+  animation: mc-sobe 0.28s cubic-bezier(0.3, 1, 0.4, 1) both;
+}
+
+.modal-selo {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--mc-r-pill);
   background: var(--mc-alerta-fundo);
   color: var(--mc-alerta);
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.5;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.modal-caixa h2 {
+  margin: 12px 0 8px;
+  font-size: 1.125rem;
+}
+
+.modal-caixa p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--mc-texto-2);
+  margin-bottom: 18px;
+}
+
+@keyframes mc-surge {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .forca-senha {

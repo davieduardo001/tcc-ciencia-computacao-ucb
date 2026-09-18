@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import LayoutAuth from "../LayoutAuth";
 import CampoTexto from "../CampoTexto";
 import CampoSenha from "../CampoSenha";
+import AvisoEmBreve from "../AvisoEmBreve";
 import {
   loginUsuario,
   LoginError,
@@ -193,13 +194,6 @@ export default function Login() {
           </button>
         </div>
 
-        {avisoRecuperacao && (
-          <p className="auth-aviso" role="status">
-            A recuperação de senha ainda não está disponível no aplicativo — o
-            serviço existe no backend, mas falta a rota no Gateway (US #13).
-          </p>
-        )}
-
         {erros.geral && <p className="status-error">{erros.geral}</p>}
         {mensagemSucesso && (
           <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
@@ -220,6 +214,15 @@ export default function Login() {
           </svg>
         </button>
       </form>
+
+      <AvisoEmBreve
+        aberto={avisoRecuperacao}
+        onFechar={() => setAvisoRecuperacao(false)}
+        titulo="Recuperação de senha"
+      >
+        Essa parte ainda está sendo construída. Em breve você vai poder
+        redefinir sua senha por aqui.
+      </AvisoEmBreve>
 
       {vinculoPendente ? (
         <div className="vinculo-confirmacao">
