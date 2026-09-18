@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { CSSProperties, Fragment, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import {
   User,
 } from "lucide-react";
 import { buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
+import AvisoEmBreve from "../AvisoEmBreve";
 import "./mapa.css";
 
 function iniciais(nome: string): string {
@@ -61,6 +62,39 @@ const NAV_ITEMS = [
     disponivel: false,
   },
   { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: false },
+] as const;
+
+// Navegação inferior (mobile), conforme o protótipo v3: quatro destinos e
+// o botão de ação no centro. É uma lista própria, e não um recorte de
+// NAV_ITEMS, porque a barra lateral do desktop e a barra inferior do
+// celular respondem a perguntas diferentes — a lateral lista tudo que
+// existe, a inferior lista para onde se vai o tempo todo.
+const NAV_INFERIOR = [
+  { id: "mapa", href: "/mapa", label: "Mapa", Icone: MapIcon, disponivel: true },
+  {
+    id: "linhas",
+    href: "/mapa?painel=linhas",
+    label: "Linhas",
+    Icone: Bus,
+    disponivel: true,
+  },
+  {
+    id: "rotas",
+    href: "/mapa?painel=rotas",
+    label: "Rotas",
+    Icone: Navigation,
+    disponivel: true,
+  },
+  { id: "perfil", href: "/perfil", label: "Perfil", Icone: User, disponivel: false },
+] as const;
+
+// O arco que abre no botão central. São as três seções que o protótipo
+// tira da barra para caberem os quatro destinos principais. Nenhuma tem
+// tela ainda — todas abrem o aviso de "em breve".
+const ACOES_RAPIDAS = [
+  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54 },
+  { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84 },
+  { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54 },
 ] as const;
 
 interface AppShellProps {
@@ -124,6 +158,24 @@ export default function AppShell({
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
   const [saindo, setSaindo] = useState(false);
+  const [fabAberto, setFabAberto] = useState(false);
+  const [emBreve, setEmBreve] = useState<string | null>(null);
+
+  function avisar(label: string) {
+    setFabAberto(false);
+    setEmBreve(label);
+  }
+
+  // Escape fecha o arco: o fundo que o fecha por clique é decorativo, e
+  // quem navega por teclado precisa de uma saída.
+  useEffect(() => {
+    if (!fabAberto) return;
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key === "Escape") setFabAberto(false);
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, [fabAberto]);
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
   const fecharSugestoesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buscaRef = useRef<HTMLInputElement | null>(null);
@@ -305,32 +357,83 @@ export default function AppShell({
       <main className="ms-content">{children}</main>
 
       <nav className="ms-bottomnav" aria-label="Navegação principal">
-        {NAV_ITEMS.map(({ id, href, label, Icone, disponivel }) =>
-          disponivel ? (
-            <Link
+        {NAV_INFERIOR.map(({ id, href, label, Icone, disponivel }, indice) => (
+          <Fragment key={id}>
+            {indice === 2 && <span className="ms-bottomnav-vao" aria-hidden="true" />}
+            {disponivel ? (
+              <Link
+                href={href}
+                className={`ms-bottomnav-item${id === active ? " active" : ""}`}
+                aria-current={id === active ? "page" : undefined}
+              >
+                <Icone size={20} />
+                <span className="ms-bottomnav-rotulo">{label}</span>
+                <span className="ms-bottomnav-ponto" aria-hidden="true" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="ms-bottomnav-item indisponivel"
+                onClick={() => avisar(label)}
+              >
+                <Icone size={20} />
+                <span className="ms-bottomnav-rotulo">{label}</span>
+              </button>
+            )}
+          </Fragment>
+        ))}
+
+        <div className={`ms-fab-area${fabAberto ? " aberto" : ""}`}>
+          {ACOES_RAPIDAS.map(({ id, label, Icone, dx, dy }, indice) => (
+            <button
               key={id}
-              href={href}
-              className={`ms-bottomnav-item${id === active ? " active" : ""}`}
-              aria-label={label}
-              title={label}
+              type="button"
+              className="ms-fab-acao"
+              style={
+                {
+                  "--dx": `${dx}px`,
+                  "--dy": `${dy}px`,
+                  "--atraso": `${indice * 45}ms`,
+                } as CSSProperties
+              }
+              tabIndex={fabAberto ? 0 : -1}
+              aria-hidden={!fabAberto}
+              onClick={() => avisar(label)}
             >
-              <Icone size={20} />
-              <span className="sr-only">{label}</span>
-            </Link>
-          ) : (
-            <span
-              key={id}
-              className="ms-bottomnav-item indisponivel"
-              aria-disabled="true"
-              aria-label={`${label} — ainda não disponível`}
-              title={`${label} — ainda não disponível`}
-            >
-              <Icone size={20} />
-              <span className="sr-only">{label}</span>
-            </span>
-          )
-        )}
+              <span className="ms-fab-acao-icone">
+                <Icone size={17} />
+              </span>
+              <span className="ms-fab-acao-rotulo">{label}</span>
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="ms-fab"
+            aria-expanded={fabAberto}
+            aria-label={fabAberto ? "Fechar ações rápidas" : "Ações rápidas"}
+            onClick={() => setFabAberto((aberto) => !aberto)}
+          >
+            <Plus size={24} />
+          </button>
+        </div>
       </nav>
+
+      {fabAberto && (
+        <div
+          className="ms-fab-fundo"
+          aria-hidden="true"
+          onClick={() => setFabAberto(false)}
+        />
+      )}
+
+      <AvisoEmBreve
+        aberto={emBreve !== null}
+        onFechar={() => setEmBreve(null)}
+        titulo={emBreve ?? ""}
+      >
+        Essa seção ainda está sendo construída. Em breve ela aparece por aqui.
+      </AvisoEmBreve>
     </div>
   );
 }

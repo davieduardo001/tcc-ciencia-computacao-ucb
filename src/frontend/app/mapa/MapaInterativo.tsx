@@ -119,24 +119,62 @@ function descreverIdade(atualizadoEm: string): string {
   return `Posição de ${minutos} min atrás`;
 }
 
+/** O número da linha vem da API e entra em innerHTML — escapa. */
+function escaparHtml(texto: string): string {
+  return texto.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c] as string
+  );
+}
+
+const GLIFO_ONIBUS = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><rect x="4.5" y="3.5" width="15" height="12" rx="3"/><path d="M4.5 10.5h15"/><path d="M8 19.5v1M16 19.5v1"/><circle cx="8.5" cy="17.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="17.5" r="1.1" fill="currentColor" stroke="none"/></svg>`;
+
 /**
- * Ícone do ônibus, apontando para onde ele está indo.
+ * Ícone do ônibus: pílula com o número da linha, sobre o ponto exato.
  *
- * O feed do SEMOB traz `direcao` em graus (0 = norte) e a gente estava
- * descartando. Sem ela o ônibus é um ponto sem orientação; com ela dá
- * pra ver o sentido mesmo quando o carro está parado no semáforo.
+ * A pílula fica acima do ponto e o ponto continua marcando a posição
+ * real — a pílula é larga e, ancorada no centro, faria o veículo parecer
+ * deslocado da via.
  *
- * Veículo parado não ganha seta: apontar rumo em quem está com 0 km/h
- * mostraria a direção da última vez que andou, o que engana.
+ * O feed do SEMOB traz `direcao` em graus (0 = norte). Veículo parado não
+ * ganha seta: apontar rumo em quem está com 0 km/h mostraria a direção da
+ * última vez que andou, o que engana.
+ *
+ * `etaMinutos` ainda não vem do backend (é a US #19). Enquanto não vier, a
+ * pílula mostra só o número da linha — sem separador e sem tempo. Estimar
+ * aqui, por velocidade e distância em linha reta, seria inventar número.
  */
-function criarIconeOnibus(direcao: number | null, parado: boolean) {
+function criarIconeOnibus(
+  direcao: number | null,
+  parado: boolean,
+  numeroLinha: string,
+  etaMinutos?: number | null
+) {
   const seta =
     direcao !== null && !parado
       ? `<span class="mapa-icone-onibus-seta" style="transform: rotate(${direcao}deg)"></span>`
       : "";
+  const tempo =
+    typeof etaMinutos === "number" && Number.isFinite(etaMinutos)
+      ? ` · ${etaMinutos} min`
+      : "";
+  const rotulo = escaparHtml(numeroLinha) + tempo;
+
   return L.divIcon({
     className: "mapa-icone-onibus" + (parado ? " parado" : ""),
-    html: `${seta}<span class="mapa-icone-onibus-core"></span>`,
+    html:
+      `${seta}<span class="mapa-icone-onibus-core"></span>` +
+      `<span class="mapa-onibus-pilula">` +
+      `<span class="mapa-onibus-glifo">${GLIFO_ONIBUS}</span>` +
+      `<span class="mapa-onibus-rotulo">${rotulo}</span>` +
+      `</span>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
   });
@@ -594,7 +632,7 @@ export default function MapaInterativo({
               // faz o ônibus deslizar não teria de onde partir.
               key={`${veiculo.linha}-${veiculo.prefixo}`}
               position={[veiculo.lat, veiculo.lng]}
-              icon={criarIconeOnibus(veiculo.direcao, parado)}
+              icon={criarIconeOnibus(veiculo.direcao, parado, veiculo.linha)}
             >
               <Popup>
                 <strong>{veiculo.linha}</strong> · carro {veiculo.prefixo}
