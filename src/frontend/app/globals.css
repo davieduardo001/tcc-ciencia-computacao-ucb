@@ -77,6 +77,10 @@
   --mc-fonte-display: var(--font-sora), var(--font-manrope), system-ui,
     sans-serif;
 
+  /* --- Área segura do aparelho ------------------------------------------ */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
   /* --- Movimento -------------------------------------------------------- */
   --mc-transicao: 0.25s ease;
   --mc-transicao-folha: 0.55s cubic-bezier(0.3, 1, 0.35, 1);
@@ -317,7 +321,7 @@ footer {
 .auth-heroi {
   position: relative;
   overflow: hidden;
-  padding: 38px 28px 58px;
+  padding: calc(38px + var(--safe-top)) 28px 58px;
 }
 
 .auth-fundo {
@@ -1049,7 +1053,7 @@ footer {
   }
 
   .auth-heroi {
-    padding: 30px 22px 58px;
+    padding: calc(30px + var(--safe-top)) 22px 58px;
   }
 
   .auth-copy h1 {
@@ -1057,7 +1061,7 @@ footer {
   }
 
   .auth-conteudo {
-    padding: 18px 22px 30px;
+    padding: 18px 22px calc(30px + var(--safe-bottom));
   }
 }
 
