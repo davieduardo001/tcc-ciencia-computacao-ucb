@@ -12,9 +12,13 @@ import {
 import L from "leaflet";
 import { Bus, Crosshair, Layers, X } from "lucide-react";
 import {
+  buscarDetalhesParada,
   buscarPosicoesDaLinha,
+  BuscarParadaError,
+  DetalhesParada,
   LinhaDetalhada,
   OpcaoViagem,
+  ParadaLinha,
   VeiculoAoVivo,
 } from "@/lib/api";
 import type { PontoEscolhido } from "./PlanejadorViagem";
@@ -325,6 +329,14 @@ export default function MapaInterativo({
   const mapRef = useRef<L.Map | null>(null);
   const jaCentralizouRef = useRef(false);
 
+  // US #18 — detalhes da parada selecionada no mapa.
+  const [detalheParada, setDetalheParada] = useState<{
+    parada: ParadaLinha;
+    detalhes: DetalhesParada | null;
+    carregando: boolean;
+    erro: string | null;
+  } | null>(null);
+
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       setStatus("indisponivel");
@@ -399,6 +411,13 @@ export default function MapaInterativo({
     }
   }, [linha]);
 
+  // Uma nova busca de linha (ou o fechamento dela) invalida o painel de
+  // detalhes da parada que estava aberto — senão ele fica cobrindo o
+  // resultado novo, com dados de uma parada que já saiu do mapa.
+  useEffect(() => {
+    setDetalheParada(null);
+  }, [linha]);
+
   // US #16 — linhas a rastrear: a que foi buscada pelo número, ou as
   // que compõem o itinerário escolhido no planejador (US #20).
   //
@@ -452,6 +471,39 @@ export default function MapaInterativo({
     if (coordenadas && mapRef.current) {
       mapRef.current.setView([coordenadas.lat, coordenadas.lng], ZOOM_LOCALIZADO);
     }
+  }
+
+  // US #18 — Cenário 1: ao tocar numa parada, busca e exibe o painel de
+  // detalhes (linhas que passam por ela e próximos horários).
+  async function abrirDetalheParada(parada: ParadaLinha) {
+    setDetalheParada({ parada, detalhes: null, carregando: true, erro: null });
+
+    try {
+      const detalhes = await buscarDetalhesParada(parada.lat, parada.lng);
+      setDetalheParada({
+        parada,
+        detalhes,
+        carregando: false,
+        erro: detalhes
+          ? null
+          : "Não encontramos detalhes para esta parada no momento.",
+      });
+    } catch (err) {
+      setDetalheParada({
+        parada,
+        detalhes: null,
+        carregando: false,
+        erro:
+          err instanceof BuscarParadaError
+            ? err.message
+            : "Não foi possível carregar os detalhes da parada. Tente novamente.",
+      });
+    }
+  }
+
+  // US #18 — Cenário 3: fechar o painel e retornar ao mapa.
+  function fecharDetalheParada() {
+    setDetalheParada(null);
   }
 
   const corLinha = linha ? corDaLinha(linha.numero) : undefined;
@@ -604,10 +656,12 @@ export default function MapaInterativo({
                 key={`${parada.nome}-${indice}`}
                 position={[parada.lat, parada.lng]}
                 icon={iconeParada}
-              >
-                {/* Cenário 2 da US #17: nome da parada ao tocar/clicar */}
-                <Popup>{nomeDaParada(parada.nome)}</Popup>
-              </Marker>
+                eventHandlers={{
+                  // US #18, Cenário 1: tocar na parada abre o painel de
+                  // detalhes (linhas que passam por ela + próximos horários).
+                  click: () => abrirDetalheParada(parada),
+                }}
+              />
             ))}
 
 
@@ -669,66 +723,139 @@ export default function MapaInterativo({
         </button>
       </div>
 
-      {linha && (
+      {detalheParada ? (
         <aside className="mapa-painel-linha">
           <div className="mapa-painel-cabecalho">
             <button
               type="button"
               className="mapa-botao-icone"
               title="Fechar"
-              onClick={onFecharLinha}
+              onClick={fecharDetalheParada}
             >
               <X size={16} />
             </button>
             <div>
-              <strong>{linha.nome}</strong>
-              <span className="mapa-painel-sentido">{linha.sentido}</span>
+              <strong>
+                {detalheParada.detalhes?.nome ??
+                  nomeDaParada(detalheParada.parada.nome)}
+              </strong>
+              {detalheParada.detalhes && (
+                <span className="mapa-painel-sentido">
+                  Parada {detalheParada.detalhes.codigo}
+                </span>
+              )}
             </div>
           </div>
 
           <div className="mapa-painel-corpo">
-            {/* US #16 — cenários 1 e 3 */}
-            <div className="mapa-painel-aovivo" role="status">
-              {veiculos.length > 0 ? (
-                <>
-                  <span className="mapa-pulso" />
-                  <Bus size={15} />
-                  <span>
-                    <strong>
-                      {veiculos.length}{" "}
-                      {veiculos.length === 1 ? "ônibus" : "ônibus"}
-                    </strong>{" "}
-                    em operação agora
-                  </span>
-                </>
-              ) : (
-                <span className="mapa-painel-sem-veiculo">
-                  {buscouPosicoes
-                    ? "Nenhum ônibus desta linha em operação no momento."
-                    : "Procurando ônibus em operação..."}
-                </span>
-              )}
-            </div>
+            {detalheParada.carregando && (
+              <p className="mapa-painel-sem-veiculo">
+                Carregando detalhes da parada...
+              </p>
+            )}
 
-            <div className="mapa-painel-titulo">Trajeto e paradas</div>
-            <div className="mapa-timeline">
-              {linha.paradas.map((parada, indice) => (
-                <div className="mapa-timeline-passo" key={`${parada.nome}-${indice}`}>
-                  <span
-                    className={
-                      "mapa-timeline-no" +
-                      (indice === 0 ? " inicio" : "") +
-                      (indice === linha.paradas.length - 1 ? " fim" : "")
-                    }
-                  />
-                  <span className="mapa-timeline-rotulo">
-                    {nomeDaParada(parada.nome)}
-                  </span>
+            {detalheParada.erro && (
+              <div className="mapa-aviso" role="alert">
+                {detalheParada.erro}
+              </div>
+            )}
+
+            {detalheParada.detalhes && (
+              <>
+                <div className="mapa-painel-titulo">
+                  Linhas que passam por aqui ·{" "}
+                  {detalheParada.detalhes.linhas.length}
                 </div>
-              ))}
-            </div>
+                <div className="mapa-timeline">
+                  {detalheParada.detalhes.linhas.map((linhaNaParada) => (
+                    <div className="mapa-timeline-passo" key={linhaNaParada.numero}>
+                      <span className="mapa-timeline-no" />
+                      <span className="mapa-timeline-rotulo">
+                        <strong>{linhaNaParada.numero}</strong>{" "}
+                        {linhaNaParada.nome}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
+                  Próximos horários
+                </div>
+                {/* Cenário 2 da US #18: parada sem horário disponível */}
+                {detalheParada.detalhes.proximosHorarios.length > 0 ? (
+                  <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
+                ) : (
+                  <p className="mapa-painel-sem-veiculo">
+                    Nenhum horário previsto disponível para esta parada no
+                    momento.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </aside>
+      ) : (
+        linha && (
+          <aside className="mapa-painel-linha">
+            <div className="mapa-painel-cabecalho">
+              <button
+                type="button"
+                className="mapa-botao-icone"
+                title="Fechar"
+                onClick={onFecharLinha}
+              >
+                <X size={16} />
+              </button>
+              <div>
+                <strong>{linha.nome}</strong>
+                <span className="mapa-painel-sentido">{linha.sentido}</span>
+              </div>
+            </div>
+
+            <div className="mapa-painel-corpo">
+              {/* US #16 — cenários 1 e 3 */}
+              <div className="mapa-painel-aovivo" role="status">
+                {veiculos.length > 0 ? (
+                  <>
+                    <span className="mapa-pulso" />
+                    <Bus size={15} />
+                    <span>
+                      <strong>
+                        {veiculos.length}{" "}
+                        {veiculos.length === 1 ? "ônibus" : "ônibus"}
+                      </strong>{" "}
+                      em operação agora
+                    </span>
+                  </>
+                ) : (
+                  <span className="mapa-painel-sem-veiculo">
+                    {buscouPosicoes
+                      ? "Nenhum ônibus desta linha em operação no momento."
+                      : "Procurando ônibus em operação..."}
+                  </span>
+                )}
+              </div>
+
+              <div className="mapa-painel-titulo">Trajeto e paradas</div>
+              <div className="mapa-timeline">
+                {linha.paradas.map((parada, indice) => (
+                  <div className="mapa-timeline-passo" key={`${parada.nome}-${indice}`}>
+                    <span
+                      className={
+                        "mapa-timeline-no" +
+                        (indice === 0 ? " inicio" : "") +
+                        (indice === linha.paradas.length - 1 ? " fim" : "")
+                      }
+                    />
+                    <span className="mapa-timeline-rotulo">
+                      {nomeDaParada(parada.nome)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        )
       )}
     </div>
   );

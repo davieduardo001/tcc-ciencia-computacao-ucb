@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from mobilidade.geocode_service import GeocodeService
 from mobilidade.linha_service import LinhaService
+from mobilidade.parada_service import ParadaService
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
 from mobilidade.posicao_service import PosicaoService
@@ -12,6 +13,7 @@ from mobilidade.schemas import (
     LinhaResumoResponse,
     LugarResponse,
     OpcaoViagemResponse,
+    ParadaDetalheResponse,
     PosicaoVeiculoResponse,
     PosicoesLinhaResponse,
 )
@@ -40,6 +42,9 @@ _geocode_service = GeocodeService()
 # US #16 — uma instância só por processo: o cache do feed de GPS é
 # compartilhado entre todos os usuários (ver posicao_service.py).
 _posicao_service = PosicaoService()
+
+# US #18 — sem estado próprio, só lê a tabela `linha` sob demanda.
+_parada_service = ParadaService()
 
 
 @router.get("/hello")
@@ -151,6 +156,39 @@ def calcular_rotas(
         )
         for opcao in opcoes
     ]
+
+
+@router.get("/paradas", response_model=ParadaDetalheResponse)
+def obter_parada(lat: float, lng: float, db: Session = Depends(get_db)):
+    """
+    US #18 — Ver Detalhes de uma Parada.
+
+    Cenário 1: parada encontrada → nome, código, linhas que passam por
+               ela e os próximos horários previstos.
+    Cenário 2: parada sem horário previsto cadastrado → resposta normal
+               com `proximos_horarios` vazio; o front exibe o aviso.
+    Cenário 3 (fechar o painel) é responsabilidade só do front.
+
+    404 quando nenhuma linha cacheada tem parada perto de (lat, lng) —
+    só acontece se o front mandar uma coordenada que não veio do próprio
+    mapa (ex: chamada manual à API).
+    """
+    resultado = _parada_service.obter_por_coordenada(db, lat, lng)
+
+    if resultado is None:
+        raise HTTPException(status_code=404, detail="Parada não encontrada.")
+
+    return ParadaDetalheResponse(
+        nome=resultado.nome,
+        codigo=resultado.codigo,
+        lat=resultado.lat,
+        lng=resultado.lng,
+        linhas=[
+            {"numero": l.numero, "nome": l.nome, "sentido": l.sentido}
+            for l in resultado.linhas
+        ],
+        proximos_horarios=resultado.proximos_horarios,
+    )
 
 
 @router.get("/linhas/{numero_linha}", response_model=LinhaResponse)

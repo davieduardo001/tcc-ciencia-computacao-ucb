@@ -488,6 +488,68 @@ export async function buscarLinha(
     horariosPrevistos: data.horarios_previstos,
   };
 }
+
+// ---------------------------------------------------------------------------
+// US #18 — Detalhes de uma parada
+// ---------------------------------------------------------------------------
+
+export interface LinhaNaParada {
+  numero: string;
+  nome: string;
+  sentido: string;
+}
+
+export interface DetalhesParada {
+  nome: string;
+  codigo: string;
+  lat: number;
+  lng: number;
+  linhas: LinhaNaParada[];
+  /** Cenário 2 da US #18: vazio quando não há horário previsto — o
+   * painel mostra um aviso em vez de uma lista vazia sem explicação. */
+  proximosHorarios: string[];
+}
+
+export class BuscarParadaError extends Error {}
+
+/**
+ * US #18 — Detalhes de uma parada: nome, código, linhas que passam por
+ * ela e os próximos horários previstos.
+ *
+ * Retorna null quando nenhuma linha cacheada tem parada perto da
+ * coordenada (404) — não deveria acontecer ao clicar num marcador que o
+ * próprio mapa desenhou, mas o painel trata isso como "sem dados" em vez
+ * de quebrar. Outras falhas lançam BuscarParadaError.
+ */
+export async function buscarDetalhesParada(
+  lat: number,
+  lng: number
+): Promise<DetalhesParada | null> {
+  const response = await fetch(
+    `${API_URL}/api/mobilidade/paradas?lat=${lat}&lng=${lng}`,
+    { credentials: "include", cache: "no-store" }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new BuscarParadaError(
+      "Não foi possível carregar os detalhes da parada. Tente novamente."
+    );
+  }
+
+  const data = await response.json();
+  return {
+    nome: data.nome,
+    codigo: data.codigo,
+    lat: data.lat,
+    lng: data.lng,
+    linhas: data.linhas,
+    proximosHorarios: data.proximos_horarios,
+  };
+}
+
 export interface VeiculoAoVivo {
   /** Número da linha que o veículo está fazendo. Necessário porque o
    * mapa rastreia várias linhas ao mesmo tempo quando o usuário escolhe

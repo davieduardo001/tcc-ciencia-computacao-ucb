@@ -1,16 +1,21 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
-import { LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
-import { buscarPosicoesDaLinha } from "@/lib/api";
+import { DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
+import { buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
 
-// US #16: o componente busca a posição ao vivo sozinho e repete a cada
-// 20s. Só `buscarPosicoesDaLinha` precisa de dublê — o resto do módulo
-// que ele importa são tipos, apagados na compilação.
+// US #16 e #18: o componente busca posição ao vivo e detalhes de parada
+// sozinho — precisam de dublê. `BuscarParadaError` é uma classe usada em
+// `instanceof` no catch, então precisa existir de verdade no mock (não
+// só um jest.fn()). O resto do módulo que o componente importa são
+// tipos, apagados na compilação.
 jest.mock("@/lib/api", () => ({
   buscarPosicoesDaLinha: jest.fn().mockResolvedValue([]),
+  buscarDetalhesParada: jest.fn().mockResolvedValue(null),
+  BuscarParadaError: class BuscarParadaError extends Error {},
 }));
 
 const buscarPosicoesMock = buscarPosicoesDaLinha as jest.Mock;
+const buscarDetalhesParadaMock = buscarDetalhesParada as jest.Mock;
 
 jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -35,14 +40,17 @@ jest.mock("react-leaflet", () => ({
   Marker: ({
     icon,
     children,
+    eventHandlers,
   }: {
     icon?: { className?: string; html?: string };
     children?: React.ReactNode;
+    eventHandlers?: { click?: () => void };
   }) => (
     <div
       data-testid={`marcador-${icon?.className ?? "generico"}`}
       data-classe={icon?.className}
       data-html={icon?.html}
+      onClick={eventHandlers?.click}
     >
       {children}
     </div>
@@ -121,6 +129,7 @@ describe("MapaInterativo", () => {
     mockGeolocation({
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
+    buscarDetalhesParadaMock.mockClear().mockResolvedValue(null);
   });
 
   it("centraliza o mapa e exibe o marcador quando a localização é concedida", async () => {
@@ -247,6 +256,96 @@ describe("MapaInterativo", () => {
     expect(
       screen.getAllByText("Parada sem nome cadastrado").length
     ).toBeGreaterThan(0);
+  });
+
+  // ---------------------------------------------------------------------
+  // US #18 — Detalhes de uma parada
+  // ---------------------------------------------------------------------
+
+  const DETALHE_PARADA_TESTE: DetalhesParada = {
+    nome: "W3 Sul — 502",
+    codigo: "PR-12345",
+    lat: -15.8,
+    lng: -47.9,
+    linhas: [
+      {
+        numero: "0.110",
+        nome: "0.110 — Taguatinga / Rodoviária",
+        sentido: "Taguatinga → Rodoviária do Plano Piloto",
+      },
+    ],
+    proximosHorarios: ["06:20", "06:40", "07:00"],
+  };
+
+  it("abre o painel de detalhes ao tocar na parada, com linhas e horários (cenário 1)", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("06:20 · 06:40 · 07:00")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Parada PR-12345")).toBeInTheDocument();
+    expect(
+      screen.getByText(/0\.110 — Taguatinga \/ Rodoviária/)
+    ).toBeInTheDocument();
+    expect(buscarDetalhesParadaMock).toHaveBeenCalledWith(
+      LINHA_TESTE.paradas[0].lat,
+      LINHA_TESTE.paradas[0].lng
+    );
+  });
+
+  it("avisa quando a parada não tem horário previsto disponível (cenário 2)", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue({
+      ...DETALHE_PARADA_TESTE,
+      proximosHorarios: [],
+    });
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Nenhum horário previsto disponível para esta parada no momento."
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("fecha o painel de detalhes e volta ao painel da linha (cenário 3)", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Parada PR-12345")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle("Fechar"));
+
+    expect(screen.queryByText("Parada PR-12345")).not.toBeInTheDocument();
+    expect(screen.getByText(LINHA_TESTE.nome)).toBeInTheDocument();
+  });
+
+  it("exibe aviso quando a busca de detalhes da parada falha", async () => {
+    buscarDetalhesParadaMock.mockRejectedValue(
+      new BuscarParadaError(
+        "Não foi possível carregar os detalhes da parada. Tente novamente."
+      )
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Não foi possível carregar os detalhes da parada. Tente novamente."
+      );
+    });
   });
 });
 

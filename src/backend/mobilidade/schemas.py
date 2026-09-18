@@ -96,3 +96,31 @@ class PosicoesLinhaResponse(BaseModel):
 
     numero: str
     veiculos: list[PosicaoVeiculoResponse]
+
+
+# ---------------------------------------------------------------------------
+# US #18 — Detalhes de uma parada
+# ---------------------------------------------------------------------------
+
+
+class ParadaLinhaResponse(BaseModel):
+    """Uma das linhas que passam pela parada consultada."""
+
+    numero: str
+    nome: str
+    sentido: str
+
+
+class ParadaDetalheResponse(BaseModel):
+    """
+    Cenário 1: `proximos_horarios` traz os horários previstos mais
+    próximos. Cenário 2 (parada sem horário disponível) é a lista vazia —
+    o front trata isso como aviso, não erro.
+    """
+
+    nome: str
+    codigo: str
+    lat: float
+    lng: float
+    linhas: list[ParadaLinhaResponse]
+    proximos_horarios: list[str]
