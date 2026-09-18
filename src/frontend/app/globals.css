@@ -40,6 +40,11 @@
   --mc-borda-3: #cbd5d8;
 
   /* --- Estado ----------------------------------------------------------- */
+  --mc-abas-fundo: #eae5dd; /* trilho do controle segmentado */
+  --mc-forca-1: #f4603e; /* fraca */
+  --mc-forca-2: #e8a33d; /* razoável */
+  --mc-forca-3: #3fb6a6; /* boa */
+  --mc-forca-4: #1f8f7f; /* forte */
   --mc-sucesso: #1f8f7f;
   --mc-sucesso-fundo: #dce5d6;
   --mc-alerta: #c77f1e;
@@ -54,6 +59,7 @@
   --mc-r-md: 16px;
   --mc-r-lg: 20px;
   --mc-r-xl: 24px;
+  --mc-r-botao: 22px;
   --mc-r-folha: 34px; /* topo das bottom sheets */
   --mc-r-pill: 999px;
 
@@ -492,35 +498,35 @@ footer {
   border-radius: var(--mc-r-sm);
 }
 
-.form-cadastro button,
+.form-cadastro button[type="submit"],
 .vinculo-confirmacao button {
-  height: 56px;
+  height: 58px;
   padding: 0 1.25rem;
   border: none;
-  border-radius: var(--mc-r-lg);
+  border-radius: var(--mc-r-botao);
   background-color: var(--mc-petroleo);
   color: var(--mc-texto-invertido);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   cursor: pointer;
-  box-shadow: var(--mc-sombra-md);
+  box-shadow: 0 18px 32px -16px rgba(14, 42, 63, 0.9);
   transition:
-    transform 0.16s ease,
+    transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1),
     background-color var(--mc-transicao);
 }
 
-.form-cadastro button {
+.form-cadastro button[type="submit"] {
   margin-top: 0.5rem;
 }
 
-.form-cadastro button:hover:not(:disabled),
+.form-cadastro button[type="submit"]:hover:not(:disabled),
 .vinculo-confirmacao button:hover:not(:disabled) {
   background-color: var(--mc-petroleo-meio);
   transform: translateY(-2px);
 }
 
-.form-cadastro button:disabled,
+.form-cadastro button[type="submit"]:disabled,
 .vinculo-confirmacao button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -541,14 +547,12 @@ footer {
 .divisor {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 12px;
   max-width: 420px;
-  margin: 1.5rem auto;
-  color: var(--mc-texto-3);
-  font-size: 0.75rem;
+  margin: 1.25rem auto;
+  color: var(--mc-placeholder);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .divisor::before,
@@ -556,7 +560,7 @@ footer {
   content: "";
   flex: 1;
   height: 1px;
-  background-color: var(--mc-borda-2);
+  background-color: rgba(14, 42, 63, 0.1);
 }
 
 .google-login-button {
@@ -596,6 +600,171 @@ footer {
 .vinculo-confirmacao button.botao-secundario:hover:not(:disabled) {
   background-color: var(--mc-superficie-2);
   color: var(--mc-petroleo);
+}
+
+/* --- Alternador Entrar / Criar conta -------------------------------------- */
+
+.abas-auth {
+  display: flex;
+  gap: 0;
+  background: var(--mc-abas-fundo);
+  border-radius: 18px;
+  padding: 4px;
+  margin: 0 auto 18px;
+  max-width: 420px;
+}
+
+.aba {
+  flex: 1;
+  height: 42px;
+  border-radius: var(--mc-r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #7d8c93;
+  cursor: pointer;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.aba:hover {
+  color: var(--mc-petroleo);
+}
+
+.aba.ativa {
+  font-weight: 800;
+  color: var(--mc-petroleo);
+  background: var(--mc-superficie);
+  box-shadow: 0 4px 12px -6px rgba(14, 42, 63, 0.5);
+  cursor: default;
+}
+
+/* --- Campo de senha com mostrar/ocultar ----------------------------------- */
+
+.campo-senha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 10px 0 16px;
+  background: var(--mc-superficie);
+  border: 1.5px solid var(--mc-borda);
+  border-radius: var(--mc-r-lg);
+  box-shadow: var(--mc-sombra-xs);
+  transition:
+    border-color var(--mc-transicao),
+    box-shadow var(--mc-transicao);
+}
+
+.campo-senha:focus-within {
+  border-color: var(--mc-teal);
+  box-shadow: var(--mc-foco);
+}
+
+.campo-senha input {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--mc-texto);
+}
+
+.campo-senha input:focus {
+  outline: none;
+}
+
+.botao-olho {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: none;
+  border-radius: var(--mc-r-sm);
+  background: transparent;
+  color: var(--mc-texto-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.botao-olho:hover {
+  background: var(--mc-superficie-3);
+  color: var(--mc-petroleo);
+}
+
+/* --- Medidor de força da senha -------------------------------------------- */
+
+.forca-senha {
+  margin-top: 10px;
+}
+
+.forca-barras {
+  display: flex;
+  gap: 6px;
+}
+
+.forca-barra {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--mc-borda-2);
+  transition: background 0.35s ease;
+}
+
+.forca-senha[data-nivel="1"] .forca-barra.ativa {
+  background: var(--mc-forca-1);
+}
+.forca-senha[data-nivel="2"] .forca-barra.ativa {
+  background: var(--mc-forca-2);
+}
+.forca-senha[data-nivel="3"] .forca-barra.ativa {
+  background: var(--mc-forca-3);
+}
+.forca-senha[data-nivel="4"] .forca-barra.ativa {
+  background: var(--mc-forca-4);
+}
+
+.forca-rotulo {
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mc-texto-3);
+}
+
+.forca-criterios {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+  margin-top: 6px;
+}
+
+.forca-criterios li {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--mc-placeholder);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.forca-criterios li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.forca-criterios li.ok {
+  color: var(--mc-teal-escuro);
 }
 
 /* ===========================================================================

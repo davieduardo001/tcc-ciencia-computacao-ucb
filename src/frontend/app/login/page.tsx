@@ -2,8 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
+import AbasAuth from "../AbasAuth";
+import CampoSenha from "../CampoSenha";
 import {
   loginUsuario,
   LoginError,
@@ -159,6 +160,8 @@ export default function Login() {
       </header>
 
       <main>
+        <AbasAuth ativa="login" />
+
         <form className="form-cadastro" onSubmit={handleSubmit} noValidate>
           <div className="campo">
             <label htmlFor="email">E-mail</label>
@@ -171,16 +174,14 @@ export default function Login() {
             {erros.email && <span className="erro-campo">{erros.email}</span>}
           </div>
 
-          <div className="campo">
-            <label htmlFor="senha">Senha</label>
-            <input
-              id="senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
-            {erros.senha && <span className="erro-campo">{erros.senha}</span>}
-          </div>
+          <CampoSenha
+            id="senha"
+            label="Senha"
+            value={senha}
+            onChange={setSenha}
+            erro={erros.senha}
+            autoComplete="current-password"
+          />
 
           {erros.geral && <p className="status-error">{erros.geral}</p>}
           {mensagemSucesso && (
@@ -191,9 +192,6 @@ export default function Login() {
             {enviando ? "Entrando..." : "Entrar"}
           </button>
 
-          <p className="link-alternativo">
-            Ainda não tem conta? <Link href="/cadastro">Cadastre-se</Link>
-          </p>
         </form>
 
         {vinculoPendente ? (
@@ -220,16 +218,18 @@ export default function Login() {
             </button>
           </div>
         ) : (
-          <>
-            <div className="divisor">
-              <span>ou</span>
-            </div>
-            <GoogleLoginButton
-              clientId={GOOGLE_CLIENT_ID}
-              onCredential={handleGoogleCredential}
-              disabled={enviandoGoogle}
-            />
-          </>
+          GOOGLE_CLIENT_ID && (
+            <>
+              <div className="divisor">
+                <span>ou continue com</span>
+              </div>
+              <GoogleLoginButton
+                clientId={GOOGLE_CLIENT_ID}
+                onCredential={handleGoogleCredential}
+                disabled={enviandoGoogle}
+              />
+            </>
+          )
         )}
       </main>
 
