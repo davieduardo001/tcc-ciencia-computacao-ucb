@@ -76,9 +76,13 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - Gateway seta cookies httpOnly (access + refresh) — proteção contra XSS
 - Gateway roteia requests para serviços backend via proxy
 - Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
-- Leaflet + OSM evita custos de mapa em apresentações
-- Fly.io para deploy simples via Docker
-- Neon free tier suficiente para escala do TCC
+- Cookies com `SameSite=None` + `Secure`: frontend (Vercel) e Gateway (Fly) são cross-site
+- Leaflet com base CARTO Voyager, recuando pro tile padrão do OSM sem a chave
+- Fly.io com **4 apps independentes** (gateway, auth, mobilidade, colaboracao)
+- Neon free tier suficiente para escala do TCC — **sem PostGIS**: geometria em colunas JSON
+- SEMOB copiado pro banco por ingestão em lote (GitHub Action mensal); posição lida ao vivo, nunca persistida
+- Integrações externas atrás de `typing.Protocol` (provider mock + real)
+- Registro completo das decisões da sprint: `docs/documento_arquitetura.md`, seção 10
 
 **Endpoints do Gateway:**
 
