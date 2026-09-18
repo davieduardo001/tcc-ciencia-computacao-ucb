@@ -1,28 +1,32 @@
 .app-shell {
-  --primary: #006d77;
-  --primary-700: #015862;
-  --grad-2: #06aab6;
-  --accent: #1aa0ad;
-  --amber: #c9760a;
-  --amber-bg: #fdf0e1;
+  /* Identidade v3: os tokens locais do shell passam a apontar para os
+     tokens de marca definidos em globals.css. As cores de marcador do mapa
+     (--blue, e os verdes/vermelhos mais abaixo) continuam como estão: ali
+     a cor carrega significado de navegação — "você está aqui", origem,
+     destino —, não identidade visual. */
+  --primary: var(--mc-teal);
+  --primary-700: var(--mc-teal-escuro);
+  --grad-2: var(--mc-mint);
+  --accent: var(--mc-mint);
+  --amber: var(--mc-alerta);
+  --amber-bg: var(--mc-alerta-fundo);
   --blue: #2f72e8;
-  --bg: #eef3f4;
-  --bg-soft: #f5f8f9;
-  --text: #16262d;
-  --text-2: #46606a;
-  --muted: #7a929c;
-  --border: #e2eaec;
-  --border-2: #eaf0f1;
-  --radius: 14px;
-  --pill: 999px;
-  --shadow-xs: 0 1px 2px rgba(16, 40, 48, 0.06);
-  --shadow-sm: 0 2px 8px rgba(16, 40, 48, 0.07);
-  --shadow: 0 10px 30px rgba(16, 40, 48, 0.1);
+  --bg: var(--mc-areia);
+  --bg-soft: var(--mc-areia-clara);
+  --text: var(--mc-texto);
+  --text-2: var(--mc-texto-2);
+  --muted: var(--mc-texto-3);
+  --border: var(--mc-borda);
+  --border-2: var(--mc-superficie-3);
+  --radius: var(--mc-r-md);
+  --pill: var(--mc-r-pill);
+  --shadow-xs: 0 1px 2px rgba(14, 42, 63, 0.06);
+  --shadow-sm: var(--mc-sombra-xs);
+  --shadow: 0 10px 30px rgba(14, 42, 63, 0.1);
   --sidebar-w: 256px;
   --topbar-h: 68px;
   --bottomnav-h: 64px;
-  --font: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  --font: var(--mc-fonte);
 
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
@@ -59,7 +63,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  box-shadow: 0 6px 14px rgba(0, 109, 119, 0.3);
+  box-shadow: 0 6px 14px rgba(43, 166, 155, 0.3);
   flex-shrink: 0;
 }
 
@@ -71,6 +75,8 @@
 
 .ms-brand strong {
   display: block;
+  font-family: var(--mc-fonte-display);
+  font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.02em;
 }
@@ -113,7 +119,7 @@
 .ms-nav-item.active {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 6px 14px rgba(0, 109, 119, 0.25);
+  box-shadow: 0 6px 14px rgba(43, 166, 155, 0.25);
 }
 
 /* ===== Itens ainda não disponíveis ("Em breve") ===== */
@@ -153,7 +159,7 @@
   font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 6px 16px rgba(0, 109, 119, 0.25);
+  box-shadow: 0 6px 16px rgba(43, 166, 155, 0.25);
   transition: 0.16s;
 }
 
@@ -479,7 +485,7 @@
   border-radius: 50%;
   background: #2f72e8;
   border: 3px solid #fff;
-  box-shadow: 0 10px 30px rgba(16, 40, 48, 0.1);
+  box-shadow: 0 10px 30px rgba(14, 42, 63, 0.1);
   position: relative;
 }
 
@@ -532,7 +538,7 @@
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
   border-bottom: 14px solid var(--primary);
-  filter: drop-shadow(0 1px 2px rgba(16, 40, 48, 0.35));
+  filter: drop-shadow(0 1px 2px rgba(14, 42, 63, 0.35));
 }
 
 /* ===== Painel de trajeto e paradas de uma linha (US #17) ===== */
@@ -1132,7 +1138,7 @@
   font-size: 12px;
   font-weight: 700;
   border: 2px solid #fff;
-  box-shadow: 0 6px 16px rgba(16, 40, 48, 0.22);
+  box-shadow: 0 6px 16px rgba(14, 42, 63, 0.22);
 }
 
 .mapa-icone-viagem.origem span {
@@ -1345,7 +1351,7 @@
   position: absolute;
   inset: -8px;
   border-radius: 50%;
-  background: rgba(0, 109, 119, 0.18);
+  background: rgba(43, 166, 155, 0.18);
   animation: mapa-pulso 2s infinite;
 }
 

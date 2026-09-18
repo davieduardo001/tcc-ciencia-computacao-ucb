@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { registrarUsuario, RegistroError } from "@/lib/api";
 
 const SENHA_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -75,10 +76,25 @@ export default function Cadastro() {
   }
 
   return (
-    <div className="container">
+    <div className="container tela-auth">
       <header>
+        <div className="marca">
+          <span className="marca-simbolo">
+            <Image
+              src="/movecity-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              priority
+            />
+          </span>
+          <span className="marca-texto">
+            <strong>MoveCity</strong>
+            <small>Mobilidade DF</small>
+          </span>
+        </div>
         <h1>Criar conta</h1>
-        <p className="subtitle">Movecity — Mobilidade Urbana Colaborativa</p>
+        <p className="subtitle">Sua conta, em 1 minuto.</p>
       </header>
 
       <main>

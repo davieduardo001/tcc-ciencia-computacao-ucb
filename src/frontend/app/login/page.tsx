@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   loginUsuario,
   LoginError,
@@ -136,10 +137,25 @@ export default function Login() {
   }
 
   return (
-    <div className="container">
+    <div className="container tela-auth">
       <header>
+        <div className="marca">
+          <span className="marca-simbolo">
+            <Image
+              src="/movecity-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              priority
+            />
+          </span>
+          <span className="marca-texto">
+            <strong>MoveCity</strong>
+            <small>Mobilidade DF</small>
+          </span>
+        </div>
         <h1>Entrar</h1>
-        <p className="subtitle">Movecity — Mobilidade Urbana Colaborativa</p>
+        <p className="subtitle">A cidade no seu tempo.</p>
       </header>
 
       <main>
