@@ -27,6 +27,13 @@
   --topbar-h: 68px;
   --bottomnav-h: 64px;
 
+  /* Área segura do aparelho: entalhe em cima, barra de gestos embaixo.
+     Só vale algo diferente de zero com viewport-fit=cover no layout —
+     sem isso o iOS devolve 0 e o padding não faz nada. No desktop é 0,
+     então --topbar-total e --nav-total viram as alturas de sempre. */
+  --topbar-total: calc(var(--topbar-h) + var(--safe-top));
+  --nav-total: calc(var(--bottomnav-h) + var(--safe-bottom));
+
   /* Pilha de camadas da tela (issue #132): o mapa é o fundo, a folha é o
      meio e a navegação é o topo. Quem for sobrepor algo declara aqui em
      vez de inventar um z-index no meio do arquivo. */
@@ -40,7 +47,8 @@
   grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: var(--topbar-h) 1fr;
   grid-template-areas: "side top" "side main";
-  height: 100vh;
+  height: 100vh; /* fallback para quem não tem dvh */
+  height: 100dvh;
   overflow: hidden;
   font-family: var(--font);
   color: var(--text);
@@ -262,7 +270,8 @@
      linha nao estica de forma confiavel so com align-self stretch —
      sem isso, a barra encolhia pro tamanho do conteudo (~36px) e a
      busca/os icones (45px/42px) transbordavam por cima e por baixo. */
-  height: var(--topbar-h);
+  height: var(--topbar-total);
+  padding-top: var(--safe-top);
   background: #fff;
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -477,6 +486,7 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   color: var(--muted, #7a929c);
 }
 
@@ -649,7 +659,7 @@
 @media (max-width: 920px) {
   .mapa-painel-linha {
     top: auto;
-    bottom: calc(var(--bottomnav-h, 64px) + 18px);
+    bottom: calc(var(--nav-total) + 18px);
     right: 16px;
     left: 16px;
     width: auto;
@@ -1194,13 +1204,13 @@
      cobre a navegação, e recolhida deixa a alça no alcance do polegar. */
   .plan-painel {
     top: auto;
-    bottom: var(--bottomnav-h, 64px);
+    bottom: var(--nav-total);
     left: 0;
     right: 0;
     width: auto;
     max-width: none;
     height: 62vh;
-    max-height: calc(100vh - var(--topbar-h) - var(--bottomnav-h, 64px) - 12px);
+    max-height: calc(100dvh - var(--topbar-total) - var(--nav-total) - 12px);
     border: none;
     border-radius: 24px 24px 0 0;
     box-shadow: 0 -16px 40px -18px rgba(14, 42, 63, 0.55);
@@ -1276,7 +1286,7 @@
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--topbar-h) 1fr var(--bottomnav-h, 64px);
+    grid-template-rows: var(--topbar-total) 1fr var(--nav-total);
     grid-template-areas: "top" "main" "bottom";
   }
 
@@ -1285,7 +1295,7 @@
   }
 
   .ms-topbar {
-    padding: 0 14px;
+    padding: var(--safe-top) 14px 0;
     gap: 10px;
   }
 
@@ -1295,7 +1305,7 @@
   }
 
   .mapa-controles {
-    bottom: calc(var(--bottomnav-h, 64px) + 18px);
+    bottom: calc(var(--nav-total) + 18px);
   }
 
   /* ===== Navegação inferior v3 (issue #132) =====
@@ -1310,7 +1320,7 @@
     background: var(--mc-petroleo);
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -10px 30px -14px rgba(14, 42, 63, 0.9);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: var(--safe-bottom);
     z-index: var(--z-nav);
   }
 
