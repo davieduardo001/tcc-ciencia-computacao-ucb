@@ -2,7 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import LayoutAuth from "../LayoutAuth";
+import CampoTexto from "../CampoTexto";
+import CampoSenha from "../CampoSenha";
+import AvisoEmBreve from "../AvisoEmBreve";
 import {
   loginUsuario,
   LoginError,
@@ -36,6 +39,8 @@ export default function Login() {
   const [enviando, setEnviando] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [enviandoGoogle, setEnviandoGoogle] = useState(false);
+  const [lembrar, setLembrar] = useState(true);
+  const [avisoRecuperacao, setAvisoRecuperacao] = useState(false);
   const [vinculoPendente, setVinculoPendente] =
     useState<VinculoPendente | null>(null);
 
@@ -136,77 +141,118 @@ export default function Login() {
   }
 
   return (
-    <div className="container">
-      <header>
-        <h1>Entrar</h1>
-        <p className="subtitle">Movecity — Mobilidade Urbana Colaborativa</p>
-      </header>
+    <LayoutAuth ativa="login" titulo={"A cidade\nno seu tempo."}>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <CampoTexto
+          id="email"
+          label="E-mail"
+          icone="email"
+          tipo="email"
+          value={email}
+          onChange={setEmail}
+          erro={erros.email}
+          autoComplete="email"
+        />
 
-      <main>
-        <form className="form-cadastro" onSubmit={handleSubmit} noValidate>
-          <div className="campo">
-            <label htmlFor="email">E-mail</label>
+        <CampoSenha
+          id="senha"
+          label="Senha"
+          value={senha}
+          onChange={setSenha}
+          erro={erros.senha}
+          autoComplete="current-password"
+        />
+
+        <div className="auth-opcoes">
+          <label className="caixa-marcavel">
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="checkbox"
+              checked={lembrar}
+              onChange={(e) => setLembrar(e.target.checked)}
             />
-            {erros.email && <span className="erro-campo">{erros.email}</span>}
-          </div>
+            <span className="caixa-marca" aria-hidden="true">
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+              >
+                <path d="M5 13l4.5 4.5L19 7" />
+              </svg>
+            </span>
+            Lembrar de mim
+          </label>
 
-          <div className="campo">
-            <label htmlFor="senha">Senha</label>
-            <input
-              id="senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
-            {erros.senha && <span className="erro-campo">{erros.senha}</span>}
-          </div>
-
-          {erros.geral && <p className="status-error">{erros.geral}</p>}
-          {mensagemSucesso && (
-            <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
-          )}
-
-          <button type="submit" disabled={enviando}>
-            {enviando ? "Entrando..." : "Entrar"}
+          <button
+            type="button"
+            className="auth-link-discreto"
+            onClick={() => setAvisoRecuperacao(true)}
+          >
+            Esqueci a senha
           </button>
+        </div>
 
-          <p className="link-alternativo">
-            Ainda não tem conta? <Link href="/cadastro">Cadastre-se</Link>
+        {erros.geral && <p className="status-error">{erros.geral}</p>}
+        {mensagemSucesso && (
+          <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
+        )}
+
+        <button type="submit" className="botao-primario" disabled={enviando}>
+          {enviando ? "Entrando..." : "Entrar"}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            aria-hidden="true"
+          >
+            <path d="M5 12h13M13 6l6 6-6 6" />
+          </svg>
+        </button>
+      </form>
+
+      <AvisoEmBreve
+        aberto={avisoRecuperacao}
+        onFechar={() => setAvisoRecuperacao(false)}
+        titulo="Recuperação de senha"
+      >
+        Essa parte ainda está sendo construída. Em breve você vai poder
+        redefinir sua senha por aqui.
+      </AvisoEmBreve>
+
+      {vinculoPendente ? (
+        <div className="vinculo-confirmacao">
+          <p>
+            Já existe uma conta com senha para{" "}
+            <strong>{vinculoPendente.email}</strong>. Confirma vincular essa
+            conta ao seu login do Google? Você poderá entrar com o Google a
+            partir de agora.
           </p>
-        </form>
-
-        {vinculoPendente ? (
-          <div className="vinculo-confirmacao">
-            <p>
-              Já existe uma conta com senha para <strong>{vinculoPendente.email}</strong>.
-              Confirma vincular essa conta ao seu login do Google? Você poderá
-              entrar com o Google a partir de agora.
-            </p>
-            <button
-              type="button"
-              onClick={handleConfirmarVinculo}
-              disabled={enviandoGoogle}
-            >
-              {enviandoGoogle ? "Vinculando..." : "Confirmar vínculo com o Google"}
-            </button>
-            <button
-              type="button"
-              className="botao-secundario"
-              onClick={() => setVinculoPendente(null)}
-              disabled={enviandoGoogle}
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
+          <button
+            type="button"
+            onClick={handleConfirmarVinculo}
+            disabled={enviandoGoogle}
+          >
+            {enviandoGoogle ? "Vinculando..." : "Confirmar vínculo com o Google"}
+          </button>
+          <button
+            type="button"
+            className="botao-secundario"
+            onClick={() => setVinculoPendente(null)}
+            disabled={enviandoGoogle}
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        GOOGLE_CLIENT_ID && (
           <>
             <div className="divisor">
-              <span>ou</span>
+              <span>ou continue com</span>
             </div>
             <GoogleLoginButton
               clientId={GOOGLE_CLIENT_ID}
@@ -214,12 +260,8 @@ export default function Login() {
               disabled={enviandoGoogle}
             />
           </>
-        )}
-      </main>
-
-      <footer>
-        <p>Movecity — TCC Grupo Segurança UCB</p>
-      </footer>
-    </div>
+        )
+      )}
+    </LayoutAuth>
   );
 }
