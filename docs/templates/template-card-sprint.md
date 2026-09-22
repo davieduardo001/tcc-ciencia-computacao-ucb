@@ -49,17 +49,19 @@ Use este template ao criar cards no GitHub Projects para cada sprint.
 ## Após o Desenvolvimento
 
 ### Review
-- [ ] 1 reviewer aprovou o PR
+- [ ] 1 reviewer aprovou o PR (formal — botão "Approve", não comentário)
 - [ ] Testes passando no CI
 - [ ] Lint passando
 - [ ] Branch naming correta
 
-### Deploy
-- [ ] Merge para `homolog` → deploy automático (Vercel)
-- [ ] Testes de integração em homolog
-- [ ] Merge para `main` → deploy (Vercel + Fly.io)
+### DoD-Sprint (conta como feita na sprint)
+- [ ] Merge para `homolog` → deploy automático
+- [ ] Critérios de aceite (BDD) validados em homolog
+- [ ] Comentário na issue registrando o DoD-Sprint
 
-### Finalização
+### DoD-Release (conta como entregue de verdade)
+- [ ] PR `homolog` → `main` aprovado e mergeado → deploy (Vercel + Fly.io)
+- [ ] Validado em produção (endpoint/tela real)
 - [ ] Issue fechada
 - [ ] Documentação atualizada (se aplicável)
 

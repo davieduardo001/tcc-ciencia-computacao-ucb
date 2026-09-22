@@ -14,5 +14,8 @@ Este projeto utiliza **Agentic Workflows** (Fluxos Agênticos) para auxiliar no 
 ## 🛠️ Como Colaborar
 Para agentes de IA, as instruções detalhadas e diretrizes de atuação estão consolidadas no arquivo `AGENT.md`.
 
+## 📌 Decisões Técnicas
+- [Integração com dados de linhas e GPS de ônibus do DF](docs/pesquisa-integracao-onibus-df.md) — não há API oficial do GDF/SEMOB; abordagem adotada para as US #15, #16 e #17.
+
 ## 📄 Licença
 A definir conforme o desenvolvimento do projeto.
