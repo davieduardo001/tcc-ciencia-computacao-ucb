@@ -101,10 +101,40 @@ describe("Login", () => {
     });
   });
 
-  it("exibe link para a página de cadastro", () => {
+  it("exibe a aba que leva para a página de cadastro", () => {
     render(<Login />);
-    const link = screen.getByRole("link", { name: "Cadastre-se" });
+    const link = screen.getByRole("link", { name: "Criar conta" });
     expect(link).toHaveAttribute("href", "/cadastro");
+  });
+
+  it("avisa que a recuperação de senha ainda não está disponível", async () => {
+    render(<Login />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Esqueci a senha" }));
+
+    const dialogo = screen.getByRole("dialog");
+    expect(dialogo).toBeInTheDocument();
+    expect(screen.getByText("Recuperação de senha")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("alterna a visibilidade da senha", () => {
+    render(<Login />);
+    const senha = screen.getByLabelText("Senha");
+    expect(senha).toHaveAttribute("type", "password");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar senha" }));
+    expect(senha).toHaveAttribute("type", "text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ocultar senha" }));
+    expect(senha).toHaveAttribute("type", "password");
   });
 
   it("bloqueia envio quando os campos não são preenchidos", async () => {
