@@ -6,11 +6,16 @@ from gateway.jwt_validator import decodificar_token_jwt
 
 
 class AutenticacaoMiddleware(BaseHTTPMiddleware):
+    # Rotas que passam sem sessão. Toda entrada aqui precisa corresponder a
+    # uma rota que existe de verdade — entrada que não bate com nada não
+    # protege nem libera nada, só dá impressão de cobertura.
+    #
+    # Os caminhos de documentação são os padrões do FastAPI: /docs (Swagger),
+    # /redoc e /openapi.json, servidos na raiz da aplicação. Não têm o
+    # prefixo /api, que é do router de proxy.
     ROTAS_PUBLICAS = [
-        "/gateway/hello",
-        "/gateway/health",
-        "/health",
         "/",
+        "/health",
         "/api/hello",
         "/api/status",
         "/api/auth/login",
@@ -19,10 +24,7 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
         "/api/auth/registrar",
         "/api/auth/refresh",
         "/api/auth/logout",
-        "/api/doc",
-        "/api/redoc",
-        "/api/openapi.json",
-        "/doc",
+        "/docs",
         "/redoc",
         "/openapi.json",
     ]
