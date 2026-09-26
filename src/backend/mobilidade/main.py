@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
 from mobilidade.routes import router as mobilidade_router
+from mobilidade.workers.monitoramento import criar_worker
+from mobilidade.services.servico_rastreamento import ServicoRastreamento
+from mobilidade.services.servico_notificacoes import NotificadorNulo
+from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 
 settings = get_settings()
 
@@ -21,6 +25,22 @@ app.add_middleware(
 )
 
 app.include_router(mobilidade_router, prefix="/mobilidade", tags=["mobilidade"])
+
+
+@app.on_event("startup")
+def startup():
+    servico = ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
+    intervalo = int(getattr(settings, "WORKER_INTERVAL_MINUTES", 5))
+    scheduler = criar_worker(servico, intervalo_minutos=intervalo)
+    scheduler.start()
+    app.state.scheduler = scheduler
+
+
+@app.on_event("shutdown")
+def shutdown():
+    scheduler = getattr(app.state, "scheduler", None)
+    if scheduler:
+        scheduler.shutdown(wait=False)
 
 
 @app.get("/")

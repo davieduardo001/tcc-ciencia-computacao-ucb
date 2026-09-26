@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
     GOOGLE_CLIENT_ID: str = ""
+    WORKER_INTERVAL_MINUTES: int = 5
 
     class Config:
         env_file = ".env"

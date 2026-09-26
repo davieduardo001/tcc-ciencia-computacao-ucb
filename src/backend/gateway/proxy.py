@@ -2,22 +2,25 @@ import httpx
 from fastapi import Request, Response
 
 
-async def proxy_request(service_url: str, path: str, request: Request) -> Response:
+async def proxy_request(service_url: str, path: str, request: Request, extra_headers: dict = None) -> Response:
     """Proxy genérico para serviços backend.
 
     Recebe a request do frontend, encaminha para o serviço backend
     e retorna a response para o frontend.
+
+    extra_headers: headers internos adicionais (ex.: X-User-Id derivado
+    da identidade autenticada pelo gateway middleware). Usado pelo
+    gateway para encaminhar a identidade do usuário aos serviços de
+    domínio. Esse header NÃO deve ser enviado diretamente pelo cliente.
     """
     body = await request.body()
 
     headers = dict(request.headers)
     headers.pop("host", None)
-    # Não repassar o Accept-Encoding do cliente: o navegador anuncia
-    # codecs (ex.: zstd, br) que o httpx do Gateway não sabe
-    # descomprimir sem pacotes extras. Deixar o httpx negociar sua
-    # própria compressão com o serviço de destino evita receber bytes
-    # comprimidos que ele não consegue decodificar.
     headers.pop("accept-encoding", None)
+
+    if extra_headers:
+        headers.update(extra_headers)
 
     try:
         async with httpx.AsyncClient() as client:

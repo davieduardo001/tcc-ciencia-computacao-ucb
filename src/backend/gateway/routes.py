@@ -133,11 +133,22 @@ async def logout(request: Request):
     methods=["GET", "POST", "PUT", "DELETE"],
 )
 async def mobilidade_proxy(path: str, request: Request):
-    """Proxy para Mobilidade Service."""
+    """Proxy para Mobilidade Service.
+
+    Encaminha X-User-Id baseado na identidade autenticada pelo
+    gateway middleware (request.state.usuario_id). Esse header é
+    derivado internamente e não deve ser enviado pelo cliente.
+    Dependência técnica do #31 (Gateway como Proxy).
+    """
+    usuario_id = getattr(request.state, "usuario_id", None)
+    extra = {}
+    if usuario_id:
+        extra["X-User-Id"] = str(usuario_id)
     return await proxy_request(
         settings.MOBILIDADE_SERVICE_URL,
         f"/mobilidade/{path}",
         request,
+        extra_headers=extra,
     )
 
 
