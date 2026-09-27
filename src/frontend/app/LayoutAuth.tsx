@@ -15,12 +15,14 @@ interface LayoutAuthProps {
   /** Título do herói. A quebra de linha é preservada (white-space: pre-line). */
   titulo: string;
   children: React.ReactNode;
+  mostrarAbas?: boolean;
 }
 
 export default function LayoutAuth({
   ativa,
   titulo,
   children,
+  mostrarAbas = true,
 }: LayoutAuthProps) {
   return (
     <div className="auth">
@@ -79,7 +81,7 @@ export default function LayoutAuth({
         </svg>
 
         <div className="auth-conteudo">
-          <AbasAuth ativa={ativa} />
+          {mostrarAbas && <AbasAuth ativa={ativa} />}
           {children}
           <p className="auth-assinatura">MoveCity — TCC Grupo Segurança UCB</p>
         </div>
