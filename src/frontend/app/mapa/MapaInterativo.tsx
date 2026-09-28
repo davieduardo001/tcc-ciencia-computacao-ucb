@@ -147,9 +147,10 @@ const GLIFO_ONIBUS = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none
  * ganha seta: apontar rumo em quem está com 0 km/h mostraria a direção da
  * última vez que andou, o que engana.
  *
- * `etaMinutos` ainda não vem do backend (é a US #19). Enquanto não vier, a
- * pílula mostra só o número da linha — sem separador e sem tempo. Estimar
- * aqui, por velocidade e distância em linha reta, seria inventar número.
+ * `etaMinutos` vem do backend (US #19), calculado a partir da posição do
+ * usuário. `null`/`undefined` faz a pílula mostrar só o número da linha —
+ * sem separador e sem tempo (Cenário 5): estimar no cliente, por
+ * velocidade e distância em linha reta, seria inventar número.
  */
 function criarIconeOnibus(
   direcao: number | null,
@@ -321,9 +322,19 @@ export default function MapaInterativo({
   const [status, setStatus] = useState<StatusLocalizacao>("carregando");
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[]>([]);
   const [buscouPosicoes, setBuscouPosicoes] = useState(false);
+  // US #19, Cenário 3 — horário teórico quando a linha buscada não tem
+  // nenhum veículo com GPS reportando.
+  const [proximoHorarioPrevisto, setProximoHorarioPrevisto] = useState<
+    string | null
+  >(null);
   const [emZoom, setEmZoom] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const jaCentralizouRef = useRef(false);
+  // US #19 — a posição do usuário entra no polling sem reiniciar o
+  // intervalo a cada atualização do GPS (watchPosition dispara com
+  // frequência bem maior que o polling de posições dos ônibus).
+  const coordenadasRef = useRef<Coordenadas | null>(null);
+  coordenadasRef.current = coordenadas;
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -420,6 +431,7 @@ export default function MapaInterativo({
     if (!chaveRastreio) {
       setVeiculos([]);
       setBuscouPosicoes(false);
+      setProximoHorarioPrevisto(null);
       return;
     }
 
@@ -432,10 +444,16 @@ export default function MapaInterativo({
       const porLinha = await Promise.all(
         // Arrow explícita: passar a função direto pro map mandaria
         // índice e array como argumentos extras.
-        numeros.map((numero) => buscarPosicoesDaLinha(numero))
+        numeros.map((numero) =>
+          buscarPosicoesDaLinha(numero, coordenadasRef.current)
+        )
       );
       if (!ativo) return;
-      setVeiculos(porLinha.flat());
+      setVeiculos(porLinha.flatMap((resultado) => resultado.veiculos));
+      setProximoHorarioPrevisto(
+        porLinha.find((resultado) => resultado.proximoHorarioPrevisto)
+          ?.proximoHorarioPrevisto ?? null
+      );
       setBuscouPosicoes(true);
     }
 
@@ -632,7 +650,12 @@ export default function MapaInterativo({
               // faz o ônibus deslizar não teria de onde partir.
               key={`${veiculo.linha}-${veiculo.prefixo}`}
               position={[veiculo.lat, veiculo.lng]}
-              icon={criarIconeOnibus(veiculo.direcao, parado, veiculo.linha)}
+              icon={criarIconeOnibus(
+                veiculo.direcao,
+                parado,
+                veiculo.linha,
+                veiculo.etaMinutos
+              )}
             >
               <Popup>
                 <strong>{veiculo.linha}</strong> · carro {veiculo.prefixo}
@@ -704,7 +727,9 @@ export default function MapaInterativo({
               ) : (
                 <span className="mapa-painel-sem-veiculo">
                   {buscouPosicoes
-                    ? "Nenhum ônibus desta linha em operação no momento."
+                    ? proximoHorarioPrevisto
+                      ? `Nenhum ônibus em operação no momento. Próximo horário previsto: ${proximoHorarioPrevisto}.`
+                      : "Nenhum ônibus desta linha em operação no momento."
                     : "Procurando ônibus em operação..."}
                 </span>
               )}
