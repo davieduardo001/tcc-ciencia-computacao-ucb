@@ -567,29 +567,48 @@ export interface VeiculoAoVivo {
   direcao: number | null;
   atualizadoEm: string;
   operadora: string;
+  /** US #19 — minutos até chegar na posição do usuário. `null` quando não
+   * informamos localização, ou quando o veículo está parado/sem
+   * velocidade confiável (Cenário 5: pílula sem tempo). */
+  etaMinutos: number | null;
+}
+
+/** US #19 — resultado de uma busca de posições, com o fallback do Cenário 3. */
+export interface PosicoesDaLinha {
+  veiculos: VeiculoAoVivo[];
+  /** Só preenchido quando `veiculos` está vazio e a localização do
+   * usuário foi informada: próximo horário previsto da tabela teórica. */
+  proximoHorarioPrevisto: string | null;
 }
 
 /**
  * US #16 — posição ao vivo dos ônibus de uma linha, do feed de GPS do
  * SEMOB (a mesma fonte do app oficial DF no Ponto).
+ * US #19 — quando `coordenadasUsuario` é informado, cada veículo vem
+ * com `etaMinutos` calculado até essa posição.
  *
  * Lista vazia é situação normal: significa que nenhum veículo dessa
- * linha está reportando posição agora (Cenário 3 da US). Falha de rede
- * também devolve lista vazia — o trajeto continua no mapa, só sem os
- * ônibus; não faz sentido derrubar a tela por causa disso.
+ * linha está reportando posição agora (Cenário 3 da US #16). Falha de
+ * rede também devolve lista vazia — o trajeto continua no mapa, só sem
+ * os ônibus; não faz sentido derrubar a tela por causa disso.
  */
 export async function buscarPosicoesDaLinha(
-  numero: string
-): Promise<VeiculoAoVivo[]> {
+  numero: string,
+  coordenadasUsuario?: { lat: number; lng: number } | null
+): Promise<PosicoesDaLinha> {
+  const vazio: PosicoesDaLinha = { veiculos: [], proximoHorarioPrevisto: null };
   try {
+    const params = coordenadasUsuario
+      ? `?lat=${coordenadasUsuario.lat}&lng=${coordenadasUsuario.lng}`
+      : "";
     const response = await fetch(
-      `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes`,
+      `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes${params}`,
       { credentials: "include", cache: "no-store" }
     );
-    if (!response.ok) return [];
+    if (!response.ok) return vazio;
 
     const data = await response.json();
-    return (data.veiculos ?? []).map(
+    const veiculos: VeiculoAoVivo[] = (data.veiculos ?? []).map(
       (v: {
         prefixo: string;
         lat: number;
@@ -599,6 +618,7 @@ export async function buscarPosicoesDaLinha(
         direcao: number | null;
         atualizado_em: string;
         operadora: string;
+        eta_minutos: number | null;
       }) => ({
         linha: data.numero ?? numero,
         prefixo: v.prefixo,
@@ -609,9 +629,15 @@ export async function buscarPosicoesDaLinha(
         direcao: v.direcao ?? null,
         atualizadoEm: v.atualizado_em,
         operadora: v.operadora,
+        etaMinutos: v.eta_minutos ?? null,
       })
     );
+
+    return {
+      veiculos,
+      proximoHorarioPrevisto: data.proximo_horario_previsto ?? null,
+    };
   } catch {
-    return [];
+    return vazio;
   }
 }

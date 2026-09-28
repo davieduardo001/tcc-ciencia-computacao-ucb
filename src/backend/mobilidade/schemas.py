@@ -84,6 +84,10 @@ class PosicaoVeiculoResponse(BaseModel):
     direcao: float | None = None
     atualizado_em: str
     operadora: str
+    # US #19 — só calculado quando o cliente informa lat/lng (posição do
+    # usuário). `None` quando não informado, ou quando o veículo está
+    # parado/sem velocidade (Cenário 5: pílula sem tempo).
+    eta_minutos: float | None = None
 
 
 class PosicoesLinhaResponse(BaseModel):
@@ -96,3 +100,7 @@ class PosicoesLinhaResponse(BaseModel):
 
     numero: str
     veiculos: list[PosicaoVeiculoResponse]
+    # US #19, Cenário 3 — só preenchido quando `veiculos` está vazio e o
+    # cliente informou lat/lng: próximo horário da tabela teórica, já
+    # que sem GPS não há distância/velocidade pra estimar nada.
+    proximo_horario_previsto: str | None = None

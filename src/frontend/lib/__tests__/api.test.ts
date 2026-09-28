@@ -299,12 +299,15 @@ describe("api.ts — posição ao vivo (US #16)", () => {
             velocidade: 8.06,
             atualizado_em: "2026-09-13T22:13:40",
             operadora: "VIAÇÃO PIRACICABANA - BACIA 01",
+            eta_minutos: null,
           },
         ],
       }),
     }) as jest.Mock;
 
-    const veiculos = await buscarPosicoesDaLinha("0.620");
+    const { veiculos, proximoHorarioPrevisto } = await buscarPosicoesDaLinha(
+      "0.620"
+    );
 
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toMatch(/\/api\/mobilidade\/linhas\/0\.620\/posicoes$/);
@@ -313,6 +316,60 @@ describe("api.ts — posição ao vivo (US #16)", () => {
     expect(veiculos[0].prefixo).toBe("122190");
     expect(veiculos[0].atualizadoEm).toBe("2026-09-13T22:13:40");
     expect(veiculos[0].velocidade).toBe(8.06);
+    expect(veiculos[0].etaMinutos).toBeNull();
+    expect(proximoHorarioPrevisto).toBeNull();
+  });
+
+  it("US #19 — informa lat/lng do usuário e devolve eta_minutos por veículo", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        numero: "0.620",
+        veiculos: [
+          {
+            prefixo: "122190",
+            lat: -15.60806,
+            lng: -47.69308,
+            sentido: "VOLTA",
+            velocidade: 8.06,
+            atualizado_em: "2026-09-13T22:13:40",
+            operadora: "VIAÇÃO PIRACICABANA - BACIA 01",
+            eta_minutos: 4.2,
+          },
+        ],
+      }),
+    }) as jest.Mock;
+
+    const { veiculos } = await buscarPosicoesDaLinha("0.620", {
+      lat: -15.6,
+      lng: -47.69,
+    });
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain("lat=-15.6");
+    expect(url).toContain("lng=-47.69");
+    expect(veiculos[0].etaMinutos).toBe(4.2);
+  });
+
+  it("US #19, Cenário 3 — sem veículo, devolve o próximo horário previsto", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        numero: "0.110",
+        veiculos: [],
+        proximo_horario_previsto: "06:20",
+      }),
+    }) as jest.Mock;
+
+    const resultado = await buscarPosicoesDaLinha("0.110", {
+      lat: -15.8,
+      lng: -48.05,
+    });
+
+    expect(resultado.veiculos).toEqual([]);
+    expect(resultado.proximoHorarioPrevisto).toBe("06:20");
   });
 
   it("lista vazia é normal — nenhum ônibus em operação (Cenário 3)", async () => {
@@ -322,13 +379,19 @@ describe("api.ts — posição ao vivo (US #16)", () => {
       json: async () => ({ numero: "0.110", veiculos: [] }),
     }) as jest.Mock;
 
-    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual([]);
+    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual({
+      veiculos: [],
+      proximoHorarioPrevisto: null,
+    });
   });
 
-  it("falha de rede não derruba a tela — devolve []", async () => {
+  it("falha de rede não derruba a tela — devolve lista vazia", async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
 
-    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual([]);
+    await expect(buscarPosicoesDaLinha("0.110")).resolves.toEqual({
+      veiculos: [],
+      proximoHorarioPrevisto: null,
+    });
   });
 });
 
