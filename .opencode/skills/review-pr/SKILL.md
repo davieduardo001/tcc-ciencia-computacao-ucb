@@ -52,6 +52,11 @@ Comentar na issue da US:
 - [ ] Testes passam localmente
 - [ ] Cobertura mínima atendida (1 teste por serviço/componente)
 
+### DoD (Definition of Done)
+
+- [ ] Critérios de aceite (BDD) da US estão de fato satisfeitos pelo código, não só "parece que sim"
+- [ ] Se aprovado, quem desenvolveu sabe que precisa comentar DoD-Sprint/DoD-Release na issue depois do merge (`AGENT.md`, seção "Critérios DOD")
+
 ### Segurança
 
 - [ ] Não há senhas ou chaves expostas

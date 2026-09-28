@@ -100,9 +100,22 @@ describe("Cadastro", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("exibe link para a página de login", () => {
+  it("exibe a aba que leva para a página de login", () => {
     render(<Cadastro />);
-    const link = screen.getByRole("link", { name: "Realizar login" });
+    const link = screen.getByRole("link", { name: "Entrar" });
     expect(link).toHaveAttribute("href", "/login");
+  });
+
+  it("mede a força da senha conforme os critérios atendidos", () => {
+    render(<Cadastro />);
+    const senha = screen.getByLabelText("Senha");
+
+    expect(screen.getByText("Digite uma senha")).toBeInTheDocument();
+
+    fireEvent.change(senha, { target: { value: "abcdefgh" } });
+    expect(screen.getByText("Fraca")).toBeInTheDocument();
+
+    fireEvent.change(senha, { target: { value: "Abcdefg1!" } });
+    expect(screen.getByText("Forte")).toBeInTheDocument();
   });
 });

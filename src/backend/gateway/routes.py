@@ -89,6 +89,56 @@ async def registrar(request: Request):
     )
 
 
+@router.post("/auth/login/google")
+async def login_google(request: Request):
+    """Login via Google: proxy + setar cookies httpOnly."""
+    response = await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/login/google",
+        request,
+    )
+
+    if response.status_code == 200:
+        data = json.loads(response.body)
+        set_auth_cookies(
+            response,
+            data.get("access_token", ""),
+            data.get("refresh_token", ""),
+        )
+
+    return response
+
+
+@router.post("/auth/link-google/confirmar")
+async def confirmar_link_google(request: Request):
+    """Confirmação de vínculo de conta local com Google: proxy + setar cookies httpOnly."""
+    response = await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/link-google/confirmar",
+        request,
+    )
+
+    if response.status_code == 200:
+        data = json.loads(response.body)
+        set_auth_cookies(
+            response,
+            data.get("access_token", ""),
+            data.get("refresh_token", ""),
+        )
+
+    return response
+
+
+@router.get("/auth/me")
+async def me(request: Request):
+    """Dados do usuário autenticado: proxy simples (sem cookies pra setar)."""
+    return await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/me",
+        request,
+    )
+
+
 @router.post("/auth/refresh")
 async def refresh(request: Request):
     """Refresh token: proxy + atualizar cookies."""

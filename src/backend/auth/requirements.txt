@@ -1,10 +1,13 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
-sqlalchemy>=2.0
-psycopg[binary]>=3.1
+# Ver mobilidade/requirements.txt: sem teto, SQLAlchemy 2.1 tenta
+# importar o driver psycopg (v3), que não está instalado aqui.
+sqlalchemy>=2.0,<2.1
+psycopg2-binary>=2.9
 pydantic>=2.0
 email-validator>=2.0
 pydantic-settings>=2.0
 python-jose[cryptography]>=3.3
 bcrypt>=4.0
 python-multipart>=0.0.9
+httpx>=0.27

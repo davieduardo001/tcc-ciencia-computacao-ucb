@@ -13,8 +13,8 @@ from models.base import Base
 # Importar todos os models para autogenerate
 from gateway.models import TestLog
 from auth.models import TestUser, Usuario, Sessao, TokenResetSenha
-from mobilidade.models import TestLinha, LinhaAcompanhada, AlertaAtraso
-from colaboracao.models import TestReporte
+from mobilidade.models import TestLinha, Linha, Rota, RotaCelula, LinhaAcompanhada, AlertaAtraso
+from colaboracao.models import TestReporte, PreferenciaNotificacao
 
 config = context.config
 

@@ -76,9 +76,13 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - Gateway seta cookies httpOnly (access + refresh) — proteção contra XSS
 - Gateway roteia requests para serviços backend via proxy
 - Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
-- Leaflet + OSM evita custos de mapa em apresentações
-- Fly.io para deploy simples via Docker
-- Neon free tier suficiente para escala do TCC
+- Cookies com `SameSite=None` + `Secure`: frontend (Vercel) e Gateway (Fly) são cross-site
+- Leaflet com base CARTO Voyager, recuando pro tile padrão do OSM sem a chave
+- Fly.io com **4 apps independentes** (gateway, auth, mobilidade, colaboracao)
+- Neon free tier suficiente para escala do TCC — **sem PostGIS**: geometria em colunas JSON
+- SEMOB copiado pro banco por ingestão em lote (GitHub Action mensal); posição lida ao vivo, nunca persistida
+- Integrações externas atrás de `typing.Protocol` (provider mock + real)
+- Registro completo das decisões da sprint: `docs/documento_arquitetura.md`, seção 10
 
 **Endpoints do Gateway:**
 
@@ -127,6 +131,9 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 | **Conventional Commits** | `feat:`, `fix:`, `docs:`, `test:`, etc. |
 | **Sem Co-Authored-By** | Commits são apenas do desenvolvedor |
 | **1 US por pessoa** | Cada membro pega 1 US por sprint |
+| **Aprovação = botão Approve** | Comentário no PR não conta — só review formal via "Review changes" |
+
+Regras de como agentes de IA devem operar nesse workflow (bypass, verificação, autoria): `docs/boas-praticas-ia.md`.
 
 ### Critérios DOR (Definitivamente Pronto para Desenvolvimento)
 
@@ -135,6 +142,21 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - [ ] Estimativa de complexidade
 - [ ] Dependências mapeadas
 - [ ] Diagrama de sequência disponível
+
+### Critérios DOD (Definition of Done) — obrigatório, 2 níveis
+
+Uma US **não fecha** sem passar pelos dois níveis. Promoção pra `main` pode acontecer em lote (várias USs de uma vez), então o nível de sprint é o que garante que a US está genuinamente terminada antes do release.
+
+**DoD-Sprint** (conta como feita na sprint):
+- [ ] PR mergeado em `homolog` (aprovação formal + CI verde)
+- [ ] Critérios de aceite (cenários BDD) validados em homolog
+- [ ] Comentário na issue com o resultado
+
+**DoD-Release** (conta como entregue de verdade):
+- [ ] PR homolog → main aprovado e mergeado
+- [ ] Validado em produção (endpoint/tela real, não suposição)
+- [ ] Issue fechada
+- [ ] Documentação atualizada, se a US alterou algo documentado (arquitetura, setup, etc.)
 
 ### Agentes e Skills (opencode)
 

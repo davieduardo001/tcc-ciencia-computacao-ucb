@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
+import LayoutAuth from "../LayoutAuth";
+import CampoTexto from "../CampoTexto";
+import CampoSenha from "../CampoSenha";
 import { registrarUsuario, RegistroError } from "@/lib/api";
 
 const SENHA_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -75,78 +77,79 @@ export default function Cadastro() {
   }
 
   return (
-    <div className="container">
-      <header>
-        <h1>Criar conta</h1>
-        <p className="subtitle">Movecity — Mobilidade Urbana Colaborativa</p>
-      </header>
+    <LayoutAuth ativa="cadastro" titulo={"Sua conta,\nem 1 minuto."}>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <CampoTexto
+          id="nome"
+          label="Nome"
+          placeholder="Nome completo"
+          icone="pessoa"
+          value={nome}
+          onChange={setNome}
+          erro={erros.nome}
+          autoComplete="name"
+        />
 
-      <main>
-        <form className="form-cadastro" onSubmit={handleSubmit} noValidate>
-          <div className="campo">
-            <label htmlFor="nome">Nome</label>
+        <CampoTexto
+          id="email"
+          label="E-mail"
+          icone="email"
+          tipo="email"
+          value={email}
+          onChange={setEmail}
+          erro={erros.email}
+          autoComplete="email"
+        />
+
+        <CampoSenha
+          id="senha"
+          label="Senha"
+          placeholder="Criar senha"
+          value={senha}
+          onChange={setSenha}
+          erro={erros.senha}
+          autoComplete="new-password"
+          medidorForca
+        />
+
+        <div className="campo-bloco">
+          <label className="caixa-marcavel cartao-termos" htmlFor="termos">
             <input
-              id="nome"
-              type="text"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
+              id="termos"
+              type="checkbox"
+              checked={termosAceitos}
+              onChange={(e) => setTermosAceitos(e.target.checked)}
             />
-            {erros.nome && <span className="erro-campo">{erros.nome}</span>}
-          </div>
+            <span className="caixa-marca grande" aria-hidden="true">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.4"
+              >
+                <path d="M5 13l4.5 4.5L19 7" />
+              </svg>
+            </span>
+            Aceito os termos de uso
+          </label>
+          {erros.termos && <span className="erro-campo">{erros.termos}</span>}
+        </div>
 
-          <div className="campo">
-            <label htmlFor="email">E-mail</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {erros.email && <span className="erro-campo">{erros.email}</span>}
-          </div>
+        {erros.geral && <p className="status-error">{erros.geral}</p>}
+        {mensagemSucesso && (
+          <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
+        )}
 
-          <div className="campo">
-            <label htmlFor="senha">Senha</label>
-            <input
-              id="senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
-            {erros.senha && <span className="erro-campo">{erros.senha}</span>}
-          </div>
-
-          <div className="campo campo-checkbox">
-            <label htmlFor="termos">
-              <input
-                id="termos"
-                type="checkbox"
-                checked={termosAceitos}
-                onChange={(e) => setTermosAceitos(e.target.checked)}
-              />
-              Aceito os termos de uso
-            </label>
-            {erros.termos && <span className="erro-campo">{erros.termos}</span>}
-          </div>
-
-          {erros.geral && <p className="status-error">{erros.geral}</p>}
-          {mensagemSucesso && (
-            <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
-          )}
-
-          <button type="submit" disabled={enviando}>
-            {enviando ? "Cadastrando..." : "Cadastrar"}
-          </button>
-
-          <p className="link-alternativo">
-            Já possui conta? <Link href="/login">Realizar login</Link>
-          </p>
-        </form>
-      </main>
-
-      <footer>
-        <p>Movecity — TCC Grupo Segurança UCB</p>
-      </footer>
-    </div>
+        <button
+          type="submit"
+          className="botao-primario acento"
+          disabled={enviando}
+        >
+          {enviando ? "Cadastrando..." : "Cadastrar"}
+        </button>
+      </form>
+    </LayoutAuth>
   );
 }

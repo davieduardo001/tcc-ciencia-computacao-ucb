@@ -130,9 +130,12 @@ def test_login_google_account_linking_necessario():
             assert data["access_token"] == ""
             assert data["refresh_token"] == ""
             assert usuario.account_linking_pending == 1
-            assert usuario.google_id == "google-user-789"
-            assert usuario.provider == "google.com"
-            assert usuario.avatar_url == "https://example.com/avatar.png"
+            # google_id/provider/avatar_url só devem ser gravados na
+            # confirmação (/link-google/confirmar), não nessa primeira
+            # chamada — o vínculo ainda não foi confirmado pelo usuário.
+            assert usuario.google_id is None
+            assert usuario.provider == "local"
+            assert usuario.avatar_url is None
         finally:
             app.dependency_overrides.pop(get_db_ref, None)
 

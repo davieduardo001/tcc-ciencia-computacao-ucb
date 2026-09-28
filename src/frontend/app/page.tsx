@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { fetchAllServicesStatus, ServiceStatus } from "@/lib/api";
 
 export default function Home() {
@@ -26,8 +27,25 @@ export default function Home() {
   return (
     <div className="container">
       <header>
+        <div className="marca">
+          <span className="marca-simbolo">
+            <Image
+              src="/movecity-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              priority
+            />
+          </span>
+          <span className="marca-texto">
+            <strong>MoveCity</strong>
+            <small>Mobilidade DF</small>
+          </span>
+        </div>
         <h1>Movecity</h1>
-        <p className="subtitle">Mobilidade Urbana Colaborativa</p>
+        <p className="subtitle">
+          Mobilidade urbana colaborativa no Distrito Federal.
+        </p>
       </header>
 
       <main>

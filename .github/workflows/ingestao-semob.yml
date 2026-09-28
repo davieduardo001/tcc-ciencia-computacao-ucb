@@ -1,0 +1,62 @@
+name: Ingestão de linhas do SEMOB
+
+# Popula a tabela `linha` com as 923 linhas reais do DF a partir dos
+# dados públicos do SEMOB (dados.semob.df.gov.br).
+#
+# Roda aqui, e não no deploy, porque baixa ~37 MB e leva uns minutos —
+# não faz sentido repetir isso a cada deploy. Dado de linha é estático:
+# rodar de vez em quando (ou quando o SEMOB mudar algo) basta.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Todo dia 1º às 4h UTC (1h de Brasília).
+    - cron: "0 4 1 * *"
+
+jobs:
+  ingerir:
+    name: Baixar do SEMOB e popular a tabela linha
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          cd src/backend
+          pip install -r requirements.txt
+
+      - name: Rodar migrations (garante que a tabela existe)
+        run: |
+          cd src/backend
+          alembic upgrade head
+
+      - name: Ingerir linhas do SEMOB
+        run: |
+          cd src/backend
+          python -m mobilidade.ingestao_semob
+
+      - name: Conferir o resultado
+        run: |
+          cd src/backend
+          python - <<'PY'
+          from mobilidade.models.linha import Linha
+          from shared.database import SessionLocal
+
+          db = SessionLocal()
+          total = db.query(Linha).count()
+          com_parada = sum(1 for l in db.query(Linha).all() if l.paradas)
+          print(f"linhas na tabela: {total}")
+          print(f"linhas com ao menos uma parada: {com_parada}")
+          assert total > 500, f"esperava centenas de linhas, vieram {total}"
+          db.close()
+          PY
