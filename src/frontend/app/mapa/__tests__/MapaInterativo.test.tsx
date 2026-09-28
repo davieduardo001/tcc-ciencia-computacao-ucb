@@ -7,8 +7,18 @@ import { buscarPosicoesDaLinha } from "@/lib/api";
 // 20s. Só `buscarPosicoesDaLinha` precisa de dublê — o resto do módulo
 // que ele importa são tipos, apagados na compilação.
 jest.mock("@/lib/api", () => ({
-  buscarPosicoesDaLinha: jest.fn().mockResolvedValue([]),
+  buscarPosicoesDaLinha: jest
+    .fn()
+    .mockResolvedValue({ veiculos: [], proximoHorarioPrevisto: null }),
 }));
+
+/** US #19: embrulha uma lista de veículos no formato que a API devolve. */
+function resultadoPosicoes(
+  veiculos: VeiculoAoVivo[],
+  proximoHorarioPrevisto: string | null = null
+) {
+  return { veiculos, proximoHorarioPrevisto };
+}
 
 const buscarPosicoesMock = buscarPosicoesDaLinha as jest.Mock;
 
@@ -395,6 +405,7 @@ const VEICULO: VeiculoAoVivo = {
   velocidade: 41,
   atualizadoEm: "2026-09-13T22:13:22",
   operadora: "VIAÇÃO PIRACICABANA - BACIA 01",
+  etaMinutos: null,
 };
 
 describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
@@ -402,7 +413,7 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
     mockGeolocation({
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
-    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+    buscarPosicoesMock.mockReset().mockResolvedValue(resultadoPosicoes([]));
   });
 
   afterEach(() => {
@@ -410,21 +421,23 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
   });
 
   it("cenário 1: desenha um marcador por ônibus em operação", async () => {
-    buscarPosicoesMock.mockResolvedValue([
-      VEICULO,
-      { ...VEICULO, prefixo: "446149", lat: -15.81 },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        VEICULO,
+        { ...VEICULO, prefixo: "446149", lat: -15.81 },
+      ])
+    );
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
     await waitFor(() => {
       expect(screen.getAllByTestId("marcador-mapa-icone-onibus")).toHaveLength(2);
     });
-    expect(buscarPosicoesMock).toHaveBeenCalledWith(LINHA_TESTE.numero);
+    expect(buscarPosicoesMock).toHaveBeenCalledWith(LINHA_TESTE.numero, null);
   });
 
   it("issue #132: o marcador é uma pílula com o número da linha", async () => {
-    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([VEICULO]));
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -437,22 +450,36 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
   });
 
   it("issue #132: sem tempo estimado, a pílula não mostra separador nem minutos", async () => {
-    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([VEICULO]));
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
     const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
     const html = marcador.getAttribute("data-html") ?? "";
 
-    // O ETA é a US #19 e ainda não existe no contrato. Enquanto não vier,
-    // a pílula não pode inventar um tempo aproximado.
+    // Sem localização do usuário (geolocalização não resolvida no
+    // beforeEach), o backend não calcula eta_minutos — a pílula não
+    // pode inventar um tempo aproximado.
     expect(html).not.toContain("·");
     expect(html).not.toContain("min<");
   });
 
+  it("cenário 4, US #19: com etaMinutos, a pílula mostra o tempo estimado", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, etaMinutos: 4 }])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    const html = marcador.getAttribute("data-html") ?? "";
+
+    expect(html).toContain(">0.110 · 4 min<");
+  });
+
   it("cenário 2: atualiza sozinho, sem recarregar a página", async () => {
     jest.useFakeTimers();
-    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([VEICULO]));
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -471,7 +498,7 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
   });
 
   it("cenário 3: avisa quando nenhum ônibus está em operação", async () => {
-    buscarPosicoesMock.mockResolvedValue([]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([]));
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -483,9 +510,28 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
     expect(screen.queryByTestId("marcador-mapa-icone-onibus")).not.toBeInTheDocument();
   });
 
+  it("cenário 3, US #19: com localização do usuário, mostra o horário previsto", async () => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn((sucesso) =>
+        sucesso({
+          coords: { latitude: -15.83, longitude: -48.04 },
+        } as GeolocationPosition)
+      ) as unknown as Geolocation["getCurrentPosition"],
+    });
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([], "06:20"));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Próximo horário previsto: 06:20/)
+      ).toBeInTheDocument();
+    });
+  });
+
   it("para de consultar ao fechar a linha, sem vazar o intervalo", async () => {
     jest.useFakeTimers();
-    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([VEICULO]));
 
     const { rerender, unmount } = render(<MapaInterativo linha={LINHA_TESTE} />);
     await act(async () => {});
@@ -518,7 +564,7 @@ describe("MapaInterativo — rastreio das linhas do itinerário (US #16 + #20)",
     mockGeolocation({
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
-    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+    buscarPosicoesMock.mockReset().mockResolvedValue(resultadoPosicoes([]));
   });
 
   afterEach(() => {
@@ -529,21 +575,25 @@ describe("MapaInterativo — rastreio das linhas do itinerário (US #16 + #20)",
     // Sem isso, quem planejava "Taguatinga → UCB" via a linha no
     // resultado e não tinha como ver onde o ônibus estava — precisava
     // buscar a linha pelo número numa segunda busca.
-    buscarPosicoesMock.mockResolvedValue([]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([]));
 
     render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
 
     await waitFor(() => {
       expect(buscarPosicoesMock).toHaveBeenCalledTimes(2);
     });
-    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.186");
-    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.110");
+    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.186", null);
+    expect(buscarPosicoesMock).toHaveBeenCalledWith("0.110", null);
   });
 
   it("desenha os ônibus das duas pernas no mapa", async () => {
     buscarPosicoesMock
-      .mockResolvedValueOnce([{ ...VEICULO, linha: "0.186", prefixo: "A1" }])
-      .mockResolvedValueOnce([{ ...VEICULO, linha: "0.110", prefixo: "B1" }]);
+      .mockResolvedValueOnce(
+        resultadoPosicoes([{ ...VEICULO, linha: "0.186", prefixo: "A1" }])
+      )
+      .mockResolvedValueOnce(
+        resultadoPosicoes([{ ...VEICULO, linha: "0.110", prefixo: "B1" }])
+      );
 
     render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} />);
 
@@ -554,9 +604,9 @@ describe("MapaInterativo — rastreio das linhas do itinerário (US #16 + #20)",
 
   it("repassa os ônibus rastreados para quem desenha o painel", async () => {
     const onVeiculos = jest.fn();
-    buscarPosicoesMock.mockResolvedValue([
-      { ...VEICULO, linha: "0.186", prefixo: "A1" },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, linha: "0.186", prefixo: "A1" }])
+    );
 
     render(
       <MapaInterativo viagem={VIAGEM_COM_BALDEACAO} onVeiculos={onVeiculos} />
@@ -636,15 +686,15 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
     mockGeolocation({
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
-    buscarPosicoesMock.mockReset().mockResolvedValue([]);
+    buscarPosicoesMock.mockReset().mockResolvedValue(resultadoPosicoes([]));
   });
 
   it("aponta a seta na direção que o ônibus está indo", async () => {
     // O feed traz `direcao` em graus e a gente ignorava. Sem ela o
     // ônibus é um ponto sem orientação no mapa.
-    buscarPosicoesMock.mockResolvedValue([
-      { ...VEICULO, velocidade: 41, direcao: 218.72 },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, velocidade: 41, direcao: 218.72 }])
+    );
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -657,9 +707,9 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
   it("ônibus parado não ganha seta nem pulso", async () => {
     // Apontar rumo em quem está a 0 km/h mostraria a direção da última
     // vez que andou — informação errada apresentada como atual.
-    buscarPosicoesMock.mockResolvedValue([
-      { ...VEICULO, velocidade: 0, direcao: 218.72 },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, velocidade: 0, direcao: 218.72 }])
+    );
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -670,9 +720,9 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
   });
 
   it("velocidade abaixo do limiar conta como parado", async () => {
-    buscarPosicoesMock.mockResolvedValue([
-      { ...VEICULO, velocidade: 1.2, direcao: 90 },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, velocidade: 1.2, direcao: 90 }])
+    );
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -688,9 +738,11 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
     // então a mesma posição às vezes aparece duas vezes. Sem essa linha
     // o usuário lê isso como "o mapa travou".
     const haQuarentaSegundos = new Date(Date.now() - 40_000).toISOString();
-    buscarPosicoesMock.mockResolvedValue([
-      { ...VEICULO, velocidade: 30, atualizadoEm: haQuarentaSegundos },
-    ]);
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, velocidade: 30, atualizadoEm: haQuarentaSegundos },
+      ])
+    );
 
     render(<MapaInterativo linha={LINHA_TESTE} />);
 
@@ -700,7 +752,7 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
   });
 
   it("desliga a transição durante o zoom, pra frota não sair escorregando", async () => {
-    buscarPosicoesMock.mockResolvedValue([VEICULO]);
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([VEICULO]));
     const { container } = render(<MapaInterativo linha={LINHA_TESTE} />);
 
     const canvas = container.querySelector(".mapa-canvas") as HTMLElement;
