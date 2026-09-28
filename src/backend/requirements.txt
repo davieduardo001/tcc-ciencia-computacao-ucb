@@ -4,7 +4,7 @@ uvicorn[standard]>=0.30.0
 # importar o driver psycopg (v3), que não está instalado aqui.
 sqlalchemy>=2.0,<2.1
 alembic>=1.13
-psycopg[binary]>=3.1
+psycopg2-binary>=2.9
 pydantic>=2.0
 email-validator>=2.0
 pydantic-settings>=2.0
