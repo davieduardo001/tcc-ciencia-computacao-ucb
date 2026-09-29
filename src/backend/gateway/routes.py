@@ -89,6 +89,27 @@ async def registrar(request: Request):
     )
 
 
+@router.post("/auth/esqueci-senha")
+async def esqueci_senha(request: Request):
+    """Solicitação de recuperação de senha: proxy para Auth Service."""
+    return await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/esqueci-senha",
+        request,
+    )
+
+
+@router.post("/auth/redefinir-senha")
+async def redefinir_senha(request: Request):
+    """Redefinição de senha: proxy para Auth Service."""
+    return await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/redefinir-senha",
+        request,
+    )
+
+
+
 @router.post("/auth/login/google")
 async def login_google(request: Request):
     """Login via Google: proxy + setar cookies httpOnly."""

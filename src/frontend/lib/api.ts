@@ -75,6 +75,71 @@ export async function registrarUsuario(
   return response.json();
 }
 
+
+export interface RecuperacaoSenhaResponse {
+  mensagem: string;
+}
+
+export class RecuperacaoSenhaError extends Error {}
+
+export async function solicitarResetSenha(
+  email: string
+): Promise<RecuperacaoSenhaResponse> {
+  const response = await fetch(`${API_URL}/api/auth/esqueci-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 429) {
+    throw new RecuperacaoSenhaError(
+      "Muitas solicitações. Tente novamente mais tarde."
+    );
+  }
+
+  if (!response.ok) {
+    throw new RecuperacaoSenhaError(
+      data.detail || "Não foi possível solicitar a recuperação de senha."
+    );
+  }
+
+  return data;
+}
+
+
+export interface RedefinirSenhaPayload {
+  token: string;
+  novaSenha: string;
+  confirmacaoSenha: string;
+}
+
+export async function redefinirSenha(
+  dados: RedefinirSenhaPayload
+): Promise<RecuperacaoSenhaResponse> {
+  const response = await fetch(`${API_URL}/api/auth/redefinir-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: dados.token,
+      nova_senha: dados.novaSenha,
+      confirmacao_senha: dados.confirmacaoSenha,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new RecuperacaoSenhaError(
+      data.detail || "Não foi possível redefinir a senha."
+    );
+  }
+
+  return data;
+}
+
+
 export interface LoginPayload {
   email: string;
   senha: string;

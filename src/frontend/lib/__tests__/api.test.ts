@@ -9,13 +9,13 @@ import {
   CalcularRotaError,
   nomearLugar,
   buscarPosicoesDaLinha,
+  solicitarResetSenha,
+  redefinirSenha,
 } from "../api";
 
 /**
  * Regressão: o front-end já bateu em /auth/registro e /auth/login
- * (sem o prefixo /api, e "registro" em vez de "registrar") — paths
- * que não existem no Gateway (só /api/auth/registrar e /api/auth/login
- * são roteados/públicos). Isso travava CORS + 401 em produção.
+ * (sem o prefixo /api, e "registro" em vez de "registrar") — paths do Gateway
  */
 describe("api.ts — paths do Gateway", () => {
   beforeEach(() => {
@@ -120,7 +120,11 @@ describe("api.ts — sugerirLinhas (autocomplete, US #17)", () => {
       ok: true,
       status: 200,
       json: async () => [
-        { numero: "0.108", nome: "0.108 — Ceilândia / Plano Piloto", sentido: "Ceilândia → Plano Piloto" },
+        {
+          numero: "0.108",
+          nome: "0.108 — Ceilândia / Plano Piloto",
+          sentido: "Ceilândia → Plano Piloto",
+        },
       ],
     }) as jest.Mock;
 
@@ -388,5 +392,94 @@ describe("api.ts — posição ao vivo (US #16)", () => {
       veiculos: [],
       proximoHorarioPrevisto: null,
     });
+  });
+});
+
+describe("api.ts — recuperação de senha (US #133)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("solicitarResetSenha chama /api/auth/esqueci-senha", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        mensagem:
+          "Se o e-mail estiver cadastrado, voce recebera um link de redefinicao.",
+      }),
+    }) as jest.Mock;
+
+    const resultado = await solicitarResetSenha("teste@example.com");
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+
+    expect(url).toMatch(/\/api\/auth\/esqueci-senha$/);
+    expect(options.method).toBe("POST");
+    expect(options.headers["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(options.body)).toEqual({
+      email: "teste@example.com",
+    });
+    expect(resultado.mensagem).toContain("Se o e-mail estiver cadastrado");
+  });
+
+  it("solicitarResetSenha mostra mensagem amigável quando recebe 429", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        detail: "Muitas solicitações.",
+      }),
+    }) as jest.Mock;
+
+    await expect(
+      solicitarResetSenha("teste@example.com")
+    ).rejects.toThrow("Muitas solicitações. Tente novamente mais tarde.");
+  });
+
+  it("redefinirSenha chama /api/auth/redefinir-senha com os dados corretos", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        mensagem: "Senha redefinida com sucesso.",
+      }),
+    }) as jest.Mock;
+
+    const resultado = await redefinirSenha({
+      token: "token-de-teste",
+      novaSenha: "NovaSenha123!",
+      confirmacaoSenha: "NovaSenha123!",
+    });
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+
+    expect(url).toMatch(/\/api\/auth\/redefinir-senha$/);
+    expect(options.method).toBe("POST");
+    expect(options.headers["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(options.body)).toEqual({
+      token: "token-de-teste",
+      nova_senha: "NovaSenha123!",
+      confirmacao_senha: "NovaSenha123!",
+    });
+    expect(resultado.mensagem).toBe("Senha redefinida com sucesso.");
+  });
+
+  it("redefinirSenha transforma erro do backend em RecuperacaoSenhaError", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        detail: "Este link nao e mais valido ou expirou.",
+      }),
+    }) as jest.Mock;
+
+    await expect(
+      redefinirSenha({
+        token: "token-invalido",
+        novaSenha: "NovaSenha123!",
+        confirmacaoSenha: "NovaSenha123!",
+      })
+    ).rejects.toThrow("Este link nao e mais valido ou expirou.");
   });
 });

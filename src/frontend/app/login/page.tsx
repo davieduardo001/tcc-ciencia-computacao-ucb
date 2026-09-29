@@ -2,10 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import LayoutAuth from "../LayoutAuth";
 import CampoTexto from "../CampoTexto";
 import CampoSenha from "../CampoSenha";
-import AvisoEmBreve from "../AvisoEmBreve";
 import {
   loginUsuario,
   LoginError,
@@ -40,7 +40,6 @@ export default function Login() {
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [enviandoGoogle, setEnviandoGoogle] = useState(false);
   const [lembrar, setLembrar] = useState(true);
-  const [avisoRecuperacao, setAvisoRecuperacao] = useState(false);
   const [vinculoPendente, setVinculoPendente] =
     useState<VinculoPendente | null>(null);
 
@@ -185,13 +184,9 @@ export default function Login() {
             Lembrar de mim
           </label>
 
-          <button
-            type="button"
-            className="auth-link-discreto"
-            onClick={() => setAvisoRecuperacao(true)}
-          >
+          <Link href="/recuperar-senha" className="auth-link-discreto">
             Esqueci a senha
-          </button>
+          </Link>
         </div>
 
         {erros.geral && <p className="status-error">{erros.geral}</p>}
@@ -215,14 +210,6 @@ export default function Login() {
         </button>
       </form>
 
-      <AvisoEmBreve
-        aberto={avisoRecuperacao}
-        onFechar={() => setAvisoRecuperacao(false)}
-        titulo="Recuperação de senha"
-      >
-        Essa parte ainda está sendo construída. Em breve você vai poder
-        redefinir sua senha por aqui.
-      </AvisoEmBreve>
 
       {vinculoPendente ? (
         <div className="vinculo-confirmacao">

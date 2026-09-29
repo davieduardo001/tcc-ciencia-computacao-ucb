@@ -22,6 +22,8 @@ class AutenticacaoMiddleware(BaseHTTPMiddleware):
         "/api/auth/login/google",
         "/api/auth/link-google/confirmar",
         "/api/auth/registrar",
+        "/api/auth/esqueci-senha",
+        "/api/auth/redefinir-senha",
         "/api/auth/refresh",
         "/api/auth/logout",
         "/docs",
