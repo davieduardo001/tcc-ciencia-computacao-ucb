@@ -107,23 +107,13 @@ describe("Login", () => {
     expect(link).toHaveAttribute("href", "/cadastro");
   });
 
-  it("avisa que a recuperação de senha ainda não está disponível", async () => {
-    render(<Login />);
+it("leva para a página de recuperação de senha", () => {
+  render(<Login />);
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const link = screen.getByRole("link", { name: "Esqueci a senha" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Esqueci a senha" }));
-
-    const dialogo = screen.getByRole("dialog");
-    expect(dialogo).toBeInTheDocument();
-    expect(screen.getByText("Recuperação de senha")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-  });
+  expect(link).toHaveAttribute("href", "/recuperar-senha");
+});
 
   it("alterna a visibilidade da senha", () => {
     render(<Login />);
