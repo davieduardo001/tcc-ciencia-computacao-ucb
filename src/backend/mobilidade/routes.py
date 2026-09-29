@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-
+import uuid
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from mobilidade.eta_service import calcular_eta_minutos, proximo_horario_previsto
 from mobilidade.geocode_service import GeocodeService
 from mobilidade.linha_service import LinhaService
 from mobilidade.models.linha import Linha
+from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
 from mobilidade.posicao_service import FUSO_SEMOB, PosicaoService
 from mobilidade.rota_service import RotaService
+from mobilidade.services.servico_notificacoes import NotificadorNulo
+from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.schemas import (
     LinhaResponse,
     LinhaResumoResponse,
@@ -44,6 +48,10 @@ _geocode_service = GeocodeService()
 # US #16 — uma instância só por processo: o cache do feed de GPS é
 # compartilhado entre todos os usuários (ver posicao_service.py).
 _posicao_service = PosicaoService()
+
+
+def get_servico() -> ServicoRastreamento:
+    return ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
 
 
 @router.get("/hello")
@@ -249,3 +257,44 @@ async def posicoes_da_linha(
         veiculos=resposta_veiculos,
         proximo_horario_previsto=horario_previsto,
     )
+
+
+@router.get("/alertas")
+def listar_alertas(
+    servico: ServicoRastreamento = Depends(get_servico),
+    usuario_id: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    uid = uuid.UUID(usuario_id)
+    alertas = servico.listar_alertas(uid, db)
+    return [
+        {
+            "id": str(a.id),
+            "linha_id": a.linha_id,
+            "status": a.status,
+            "atraso_inicio_minutos": a.atraso_inicio_minutos,
+            "ultimo_atraso_notificado": a.ultimo_atraso_notificado,
+            "ultimo_alerta_enviado_em": a.ultimo_alerta_enviado_em,
+            "criado_em": a.criado_em,
+            "cancelado_em": a.cancelado_em,
+        }
+        for a in alertas
+    ]
+
+
+@router.get("/linhas-acompanhadas")
+def listar_linhas_acompanhadas(
+    servico: ServicoRastreamento = Depends(get_servico),
+    usuario_id: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    uid = uuid.UUID(usuario_id)
+    linhas = servico.listar_linhas_acompanhadas(uid, db)
+    return [
+        {
+            "linha_id": l.linha_id,
+            "criado_em": l.criado_em,
+            "ativo": l.ativo,
+        }
+        for l in linhas
+    ]
