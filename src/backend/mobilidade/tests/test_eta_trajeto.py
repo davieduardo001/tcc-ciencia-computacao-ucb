@@ -117,6 +117,29 @@ def test_eta_por_trajeto_circular_da_a_volta_para_quem_ja_passou():
     assert eta is not None and eta > 0
 
 
+def test_eta_por_trajeto_circular_aceita_veiculo_reportando_ida_ou_volta():
+    """
+    Regressão: conferido contra o feed real do SEMOB — veículo de linha
+    circular nunca reporta "CIRCULAR" como o próprio sentido (vem
+    "IDA", "VOLTA" ou None). Exigir igualdade rejeitaria toda linha
+    circular, mesmo rodando (foi o que aconteceu na prática: 3 ônibus
+    ativos na linha e nenhum ETA calculado).
+    """
+    lat_alvo, lng_alvo = TRAJETO[INDICE_EMBARQUE]
+
+    for sentido_reportado in ("IDA", "VOLTA", None):
+        veiculo = _veiculo(indice_trajeto=10, sentido=sentido_reportado)
+        eta = eta_minutos_veiculo(
+            veiculo,
+            lat_alvo=lat_alvo,
+            lng_alvo=lng_alvo,
+            agora=AGORA,
+            trajeto=TRAJETO_MEDIDO,
+            sentido_alvo="CIRCULAR",
+        )
+        assert eta is not None and eta > 0, f"sentido reportado {sentido_reportado!r} deveria contar"
+
+
 def test_eta_por_trajeto_posicao_velha_fica_sem_eta():
     veiculo = _veiculo(indice_trajeto=10, idade_min=10.0)  # > IDADE_MAXIMA_ETA_MIN
     lat_alvo, lng_alvo = TRAJETO[INDICE_EMBARQUE]
@@ -203,6 +226,15 @@ def test_intervalo_medio_ignora_comboio():
 def test_intervalo_medio_ignora_veiculo_de_sentido_diferente():
     veiculos = [_veiculo(10, sentido="IDA"), _veiculo(20, sentido="VOLTA")]
     assert intervalo_medio_min(veiculos, TRAJETO_MEDIDO, "IDA", AGORA) is None
+
+
+def test_intervalo_medio_circular_aceita_veiculos_reportando_ida():
+    # Mesma regressão de _eta_por_trajeto: linha circular, veículo
+    # reportando "IDA" (nunca "CIRCULAR") — confirmado no feed real.
+    veiculos = [_veiculo(i, sentido="IDA", prefixo=f"44002{n}") for n, i in enumerate((0, 14, 28))]
+    intervalo = intervalo_medio_min(veiculos, TRAJETO_MEDIDO, "CIRCULAR", AGORA)
+
+    assert intervalo is not None
 
 
 # --------------------------------------------------------------------------

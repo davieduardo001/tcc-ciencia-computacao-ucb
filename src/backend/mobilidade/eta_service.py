@@ -192,7 +192,14 @@ def _eta_por_trajeto(
     if veiculo.velocidade is None or veiculo.velocidade < VELOCIDADE_MINIMA_KMH:
         return None
 
-    if sentido_alvo is not None:
+    # Confirmado contra o feed real do SEMOB: veículo de linha circular
+    # nunca reporta sentido "CIRCULAR" (vem "IDA", "VOLTA" ou None,
+    # conforme o operador) — só a rota tem esse rótulo, o veículo não.
+    # Exigir igualdade aqui rejeitaria 100% dos ônibus de toda linha
+    # circular, mesmo rodando. Sem sentidos distintos para uma linha
+    # circular (só existe uma geometria), não há "sentido errado" a
+    # descartar mesmo.
+    if sentido_alvo is not None and sentido_alvo.strip().upper() != "CIRCULAR":
         sentido_veiculo = (veiculo.sentido or "").strip().upper()
         if sentido_veiculo != sentido_alvo.strip().upper():
             return None
@@ -253,7 +260,9 @@ def intervalo_medio_min(
     posicoes_m: list[float] = []
 
     for v in veiculos:
-        if (v.sentido or "").strip().upper() != sentido_alvo:
+        # Mesma ressalva de `_eta_por_trajeto`: veículo de linha
+        # circular não reporta "CIRCULAR" como o próprio sentido.
+        if sentido_alvo != "CIRCULAR" and (v.sentido or "").strip().upper() != sentido_alvo:
             continue
         idade_min = (agora - v.atualizado_em).total_seconds() / 60
         if idade_min > IDADE_MAXIMA_ETA_MIN:
