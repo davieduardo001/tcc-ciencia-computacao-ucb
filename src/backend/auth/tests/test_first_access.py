@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+import uuid
 
 from fastapi.testclient import TestClient
 
@@ -25,7 +26,7 @@ def _criar_usuario_mock(first_access: bool = True) -> Usuario:
         status="ativo",
         first_access=first_access,
     )
-    usuario.id = "550e8400-e29b-41d4-a716-446655440000"
+    usuario.id = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
     return usuario
 
 
@@ -41,16 +42,15 @@ def test_me_retorna_first_access_true_por_padrao():
     token = criar_access_token({"sub": str(usuario.id)})
 
     app.dependency_overrides[get_db] = lambda: mock_db
+    client.cookies.set("access_token", token)
     try:
-        response = client.get(
-            "/auth/me",
-            cookies={"access_token": token},
-        )
+        response = client.get("/auth/me")
         assert response.status_code == 200
         data = response.json()
         assert data["first_access"] is True
     finally:
         app.dependency_overrides.clear()
+        client.cookies.clear()
 
 
 def test_me_retorna_first_access_false():
@@ -61,16 +61,15 @@ def test_me_retorna_first_access_false():
     token = criar_access_token({"sub": str(usuario.id)})
 
     app.dependency_overrides[get_db] = lambda: mock_db
+    client.cookies.set("access_token", token)
     try:
-        response = client.get(
-            "/auth/me",
-            cookies={"access_token": token},
-        )
+        response = client.get("/auth/me")
         assert response.status_code == 200
         data = response.json()
         assert data["first_access"] is False
     finally:
         app.dependency_overrides.clear()
+        client.cookies.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -85,11 +84,11 @@ def test_atualizar_first_access_para_false():
     token = criar_access_token({"sub": str(usuario.id)})
 
     app.dependency_overrides[get_db] = lambda: mock_db
+    client.cookies.set("access_token", token)
     try:
         response = client.put(
             "/auth/me/first-access",
             json={"first_access": False},
-            cookies={"access_token": token},
         )
         assert response.status_code == 200
         data = response.json()
@@ -97,6 +96,7 @@ def test_atualizar_first_access_para_false():
         mock_db.commit.assert_called()
     finally:
         app.dependency_overrides.clear()
+        client.cookies.clear()
 
 
 def test_atualizar_first_access_para_true():
@@ -107,17 +107,18 @@ def test_atualizar_first_access_para_true():
     token = criar_access_token({"sub": str(usuario.id)})
 
     app.dependency_overrides[get_db] = lambda: mock_db
+    client.cookies.set("access_token", token)
     try:
         response = client.put(
             "/auth/me/first-access",
             json={"first_access": True},
-            cookies={"access_token": token},
         )
         assert response.status_code == 200
         data = response.json()
         assert data["first_access"] is True
     finally:
         app.dependency_overrides.clear()
+        client.cookies.clear()
 
 
 def test_atualizar_first_access_sem_token():
@@ -129,9 +130,12 @@ def test_atualizar_first_access_sem_token():
 
 
 def test_atualizar_first_access_token_invalido():
-    response = client.put(
-        "/auth/me/first-access",
-        json={"first_access": False},
-        cookies={"access_token": "token-invalido"},
-    )
-    assert response.status_code == 401
+    client.cookies.set("access_token", "token-invalido")
+    try:
+        response = client.put(
+            "/auth/me/first-access",
+            json={"first_access": False},
+        )
+        assert response.status_code == 401
+    finally:
+        client.cookies.clear()
