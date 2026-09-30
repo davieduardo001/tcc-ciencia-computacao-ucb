@@ -1,11 +1,13 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from mobilidade.eta_service import calcular_eta_minutos, proximo_horario_previsto
+from mobilidade.eta_service import eta_minutos_veiculo, estimar_viagem, proximo_horario_previsto
 from mobilidade.geocode_service import GeocodeService
+from mobilidade.geometria import TrajetoMedido
 from mobilidade.linha_service import LinhaService
 from mobilidade.models.linha import Linha
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
@@ -117,15 +119,18 @@ async def lugar_reverso(lat: float, lng: float):
 
 
 @router.get("/rotas", response_model=list[OpcaoViagemResponse])
-def calcular_rotas(
-    origem_lat: float = Query(...),
-    origem_lng: float = Query(...),
-    destino_lat: float = Query(...),
-    destino_lng: float = Query(...),
+async def calcular_rotas(
+    origem_lat: float = Query(..., ge=-90, le=90),
+    origem_lng: float = Query(..., ge=-180, le=180),
+    destino_lat: float = Query(..., ge=-90, le=90),
+    destino_lng: float = Query(..., ge=-180, le=180),
     db: Session = Depends(get_db),
 ):
     """
     US #20 — Calcular Rota de Origem até Destino por Ônibus.
+    US #159 — ETA real de cada opção, a partir da posição ao vivo dos
+              ônibus (embarque) e do intervalo médio entre veículos
+              (baldeação) — ver `eta_service.estimar_viagem`.
 
     Cenário 1: rota simples → opções com uma perna (uma linha só).
     Cenário 2: rota com baldeação → quando não há linha direta, opções
@@ -134,35 +139,62 @@ def calcular_rotas(
     Cenário 5: destino por endereço/referência → resolvido antes, em
                GET /mobilidade/lugares.
 
-    A duração é estimada por velocidade média, não por horário de
-    tabela: planejamento por horário é a US #115.
+    `duracao_estimada_min` (velocidade média) nunca some: é o que o
+    front mostra quando não há ETA real (`tipo_estimativa == "teorica"`).
+    Planejamento por horário de tabela é a US #115, fora de escopo.
     """
-    opcoes = _rota_service.calcular(
-        db, (origem_lat, origem_lng), (destino_lat, destino_lng)
+    opcoes = await run_in_threadpool(
+        _rota_service.calcular, db, (origem_lat, origem_lng), (destino_lat, destino_lng)
     )
+    if not opcoes:
+        return []
 
-    return [
-        OpcaoViagemResponse(
-            pernas=[
-                {
-                    "numero": perna.numero,
-                    "sentido": perna.sentido,
-                    "nome": perna.nome,
-                    "embarque": perna.embarque.__dict__,
-                    "desembarque": perna.desembarque.__dict__,
-                    "distancia_km": perna.distancia_km,
-                    "paradas_no_trecho": perna.paradas_no_trecho,
-                    "trajeto": perna.trajeto,
-                }
-                for perna in opcao.pernas
-            ],
-            baldeacoes=opcao.baldeacoes,
-            distancia_km=opcao.distancia_km,
-            caminhada_metros=opcao.caminhada_metros,
-            duracao_estimada_min=opcao.duracao_estimada_min,
+    agora = datetime.now(timezone.utc)
+    numeros_linha = {perna.numero for opcao in opcoes for perna in opcao.pernas}
+    posicoes_por_linha = await _posicao_service.posicoes_das_linhas(numeros_linha)
+
+    trajetos_por_perna: dict[tuple[str, str], TrajetoMedido] = {}
+    for opcao in opcoes:
+        for perna in opcao.pernas:
+            chave = (perna.numero, perna.sentido)
+            if chave in trajetos_por_perna:
+                continue
+            resolvido = _rota_service.trajeto_medido(db, perna.numero, perna.sentido)
+            if resolvido is not None:
+                trajetos_por_perna[chave] = resolvido[0]
+
+    respostas = []
+    for opcao in opcoes:
+        estimativa = estimar_viagem(opcao, posicoes_por_linha, trajetos_por_perna, agora)
+        respostas.append(
+            OpcaoViagemResponse(
+                pernas=[
+                    {
+                        "numero": perna.numero,
+                        "sentido": perna.sentido,
+                        "nome": perna.nome,
+                        "embarque": perna.embarque.__dict__,
+                        "desembarque": perna.desembarque.__dict__,
+                        "distancia_km": perna.distancia_km,
+                        "paradas_no_trecho": perna.paradas_no_trecho,
+                        "trajeto": perna.trajeto,
+                        "espera_min": est_perna.espera_min,
+                        "fonte_espera": est_perna.fonte,
+                        "prefixo_veiculo": est_perna.prefixo_veiculo,
+                        "intervalo_medio_min": est_perna.intervalo_medio_min,
+                    }
+                    for perna, est_perna in zip(opcao.pernas, estimativa.pernas)
+                ],
+                baldeacoes=opcao.baldeacoes,
+                distancia_km=opcao.distancia_km,
+                caminhada_metros=opcao.caminhada_metros,
+                duracao_estimada_min=opcao.duracao_estimada_min,
+                duracao_real_min=estimativa.duracao_real_min,
+                tipo_estimativa=estimativa.tipo,
+                calculado_em=agora.isoformat(),
+            )
         )
-        for opcao in opcoes
-    ]
+    return respostas
 
 
 @router.get("/linhas/{numero_linha}", response_model=LinhaResponse)
@@ -217,6 +249,18 @@ async def posicoes_da_linha(
     veiculos = await _posicao_service.posicoes_da_linha(numero_linha)
     tem_localizacao_usuario = lat is not None and lng is not None
 
+    # US #19 — quando dá para resolver a geometria da linha, o ETA é
+    # medido ao longo do trajeto real (e descarta veículo de sentido
+    # errado ou que já passou), não em linha reta. Sem rota ingerida
+    # para esta linha, `eta_minutos_veiculo` cai sozinho para a
+    # estimativa em linha reta original.
+    trajeto_sentido = (
+        _rota_service.trajeto_medido(db, numero_linha) if tem_localizacao_usuario else None
+    )
+    trajeto = trajeto_sentido[0] if trajeto_sentido else None
+    sentido_resolvido = trajeto_sentido[1] if trajeto_sentido else None
+    agora = datetime.now(timezone.utc)
+
     resposta_veiculos = [
         PosicaoVeiculoResponse(
             prefixo=v.prefixo,
@@ -228,12 +272,13 @@ async def posicoes_da_linha(
             atualizado_em=v.atualizado_em.isoformat(),
             operadora=v.operadora,
             eta_minutos=(
-                calcular_eta_minutos(
-                    lat_veiculo=v.lat,
-                    lng_veiculo=v.lng,
-                    velocidade_kmh=v.velocidade,
-                    lat_usuario=lat,
-                    lng_usuario=lng,
+                eta_minutos_veiculo(
+                    v,
+                    lat_alvo=lat,
+                    lng_alvo=lng,
+                    agora=agora,
+                    trajeto=trajeto,
+                    sentido_alvo=sentido_resolvido,
                 )
                 if tem_localizacao_usuario
                 else None
