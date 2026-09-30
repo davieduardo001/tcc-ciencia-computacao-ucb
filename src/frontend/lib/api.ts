@@ -307,6 +307,7 @@ export interface UsuarioAtual {
   nome: string;
   email: string;
   avatarUrl: string | null;
+  firstAccess: boolean;
 }
 
 /**
@@ -332,6 +333,7 @@ export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
       nome: data.nome,
       email: data.email,
       avatarUrl: data.avatar_url ?? null,
+      firstAccess: data.first_access ?? true,
     };
   } catch {
     return null;
@@ -353,6 +355,24 @@ export async function logoutUsuario(): Promise<void> {
     });
   } finally {
     clearTokens();
+  }
+}
+
+/**
+ * Atualiza a flag first_access do usuário logado.
+ * Usado para pular ou rever o tutorial de onboarding.
+ */
+export async function atualizarFirstAccess(firstAccess: boolean): Promise<void> {
+  const response = await fetch(`${API_URL}/api/auth/me/first-access`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ first_access: firstAccess }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Não foi possível atualizar preferência do tutorial.");
   }
 }
 

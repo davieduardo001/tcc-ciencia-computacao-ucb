@@ -68,8 +68,13 @@ class RespostaGenerica(BaseModel):
     mensagem: str
 
 
+class FirstAccessInput(BaseModel):
+    first_access: bool
+
+
 class MeResponse(BaseModel):
     id: str
     nome: str
     email: str
     avatar_url: Optional[str] = None
+    first_access: bool = True
