@@ -13,6 +13,7 @@ from auth.schemas import (
     LoginInput, LoginResponse, RegistrarInput, RegistrarResponse,
     GoogleLoginInput, GoogleLoginResponse, GoogleConfirmLinkInput,
     SolicitacaoResetSenha, RedefinirSenha, RespostaGenerica, MeResponse,
+    FirstAccessInput,
 )
 from auth.security import (
     hash_senha, verificar_senha, criar_access_token, criar_refresh_token,
@@ -124,6 +125,43 @@ def me(request: Request, db: Session = Depends(get_db)):
         nome=usuario.nome,
         email=usuario.email,
         avatar_url=usuario.avatar_url,
+        first_access=usuario.first_access,
+    )
+
+
+@router.put("/me/first-access", response_model=MeResponse)
+def atualizar_first_access(
+    dados: FirstAccessInput,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Não autenticado.")
+
+    payload = decodificar_access_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    try:
+        usuario_id = uuid.UUID(payload["sub"])
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+
+    usuario.first_access = dados.first_access
+    db.commit()
+    db.refresh(usuario)
+
+    return MeResponse(
+        id=str(usuario.id),
+        nome=usuario.nome,
+        email=usuario.email,
+        avatar_url=usuario.avatar_url,
+        first_access=usuario.first_access,
     )
 
 

@@ -73,3 +73,8 @@ class MeResponse(BaseModel):
     nome: str
     email: str
     avatar_url: Optional[str] = None
+    first_access: bool = True
+
+
+class FirstAccessInput(BaseModel):
+    first_access: bool

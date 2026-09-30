@@ -345,9 +345,9 @@ export default function AppShell({
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
           </button>
-          <button type="button" className="ms-icon-btn" title="Preferências">
+          <Link href="/configuracoes" className="ms-icon-btn" title="Configurações">
             <Settings size={17} />
-          </button>
+          </Link>
           <button type="button" className="ms-icon-btn" title="Perfil">
             <User size={17} />
           </button>
