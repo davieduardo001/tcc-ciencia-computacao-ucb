@@ -13,6 +13,7 @@ import {
   confirmarVinculoGoogle,
   decodificarIdTokenGoogle,
   GoogleLoginError,
+  buscarUsuarioAtual,
 } from "@/lib/api";
 import GoogleLoginButton from "./GoogleLoginButton";
 
@@ -73,8 +74,13 @@ export default function Login() {
 
     try {
       await loginUsuario({ email, senha });
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Login realizado com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof LoginError) {
         setErros({ geral: err.message });
@@ -104,8 +110,13 @@ export default function Login() {
         return;
       }
 
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Login realizado com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof GoogleLoginError) {
         setErros({ geral: err.message });
@@ -126,8 +137,13 @@ export default function Login() {
     try {
       await confirmarVinculoGoogle(vinculoPendente);
       setVinculoPendente(null);
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Conta vinculada ao Google com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof GoogleLoginError) {
         setErros({ geral: err.message });
