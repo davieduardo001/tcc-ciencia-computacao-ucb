@@ -301,3 +301,48 @@ def test_data_do_semob_e_interpretada_como_horario_de_brasilia():
     assert convertida is not None
     assert convertida.tzinfo is not None, "sem fuso, a comparação depende da máquina"
     assert convertida.utcoffset() == timedelta(hours=-3)
+
+
+# --------------------------------------------------------------------------
+# posicoes_das_linhas — US #159: várias linhas, um download só.
+# --------------------------------------------------------------------------
+
+
+def test_posicoes_das_linhas_separa_por_numero():
+    payload = _feed(_veiculo("0.110", prefixo="446149"), _veiculo("0.108", prefixo="449342"))
+
+    with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=_resposta(payload))):
+        resultado = asyncio.run(PosicaoService().posicoes_das_linhas(["0.110", "0.108", "9.999"]))
+
+    assert [v.prefixo for v in resultado["0.110"]] == ["446149"]
+    assert [v.prefixo for v in resultado["0.108"]] == ["449342"]
+    assert resultado["9.999"] == []  # linha sem veículo: presente, vazia
+
+
+def test_posicoes_das_linhas_baixa_o_feed_uma_unica_vez():
+    payload = _feed(_veiculo("0.110"), _veiculo("0.108"))
+
+    with patch(
+        "httpx.AsyncClient.get", new=AsyncMock(return_value=_resposta(payload))
+    ) as get_mock:
+        asyncio.run(PosicaoService().posicoes_das_linhas(["0.110", "0.108"]))
+
+    assert get_mock.await_count == 1
+
+
+def test_posicoes_das_linhas_com_conjunto_vazio_nao_chama_o_semob():
+    with patch("httpx.AsyncClient.get", new=AsyncMock()) as get_mock:
+        resultado = asyncio.run(PosicaoService().posicoes_das_linhas([]))
+
+    assert resultado == {}
+    get_mock.assert_not_called()
+
+
+def test_posicoes_da_linha_continua_igual_usando_posicoes_das_linhas():
+    # posicoes_da_linha agora delega para posicoes_das_linhas por dentro
+    # — esta é a garantia de que o comportamento por linha não mudou.
+    payload = _feed(_veiculo("0.110", prefixo="446149"), _veiculo("0.108"))
+
+    posicoes = _rodar(PosicaoService(), "0.110", payload)
+
+    assert [p.prefixo for p in posicoes] == ["446149"]

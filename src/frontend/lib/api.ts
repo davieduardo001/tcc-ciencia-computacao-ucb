@@ -449,6 +449,15 @@ export interface PernaViagem {
   distancia_km: number;
   paradas_no_trecho: number;
   trajeto: [number, number][];
+  /** US #159 — minutos estimados até embarcar nesta perna. `undefined`
+   * num backend antigo (o campo é novo e opcional); `null` quando o
+   * backend não conseguiu estimar. */
+  espera_min?: number | null;
+  fonte_espera?: "tempo_real" | "intervalo_medio" | "teorica";
+  /** Só vem preenchido quando `fonte_espera === "tempo_real"`. */
+  prefixo_veiculo?: string | null;
+  /** Só vem preenchido quando `fonte_espera === "intervalo_medio"`. */
+  intervalo_medio_min?: number | null;
 }
 
 export interface OpcaoViagem {
@@ -457,6 +466,12 @@ export interface OpcaoViagem {
   distancia_km: number;
   caminhada_metros: number;
   duracao_estimada_min: number;
+  /** US #159 — ETA real da viagem inteira, calculado a partir da
+   * posição ao vivo dos ônibus. `null`/ausente quando não há ônibus
+   * identificável — nesse caso use `duracao_estimada_min`. */
+  duracao_real_min?: number | null;
+  tipo_estimativa?: "tempo_real" | "parcial" | "teorica";
+  calculado_em?: string | null;
 }
 
 /**

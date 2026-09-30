@@ -208,6 +208,13 @@ function rotuloDoPonto(nome: string, lat: number, lng: number): string {
 }
 
 function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
+  // US #159 — "tempo_real"/"parcial" têm ao menos a 1ª perna medida a
+  // partir de um ônibus real; "teorica" (ou backend antigo, sem o
+  // campo) continua mostrando a duração por velocidade média de sempre.
+  const temEtaReal =
+    opcao.tipo_estimativa && opcao.tipo_estimativa !== "teorica" && opcao.duracao_real_min != null;
+  const minutos = temEtaReal ? opcao.duracao_real_min! : opcao.duracao_estimada_min;
+
   return (
     <div className="plan-opcao-resumo">
       <div className="plan-opcao-linhas">
@@ -219,7 +226,18 @@ function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
         ))}
       </div>
       <div className="plan-opcao-metricas">
-        <strong>~{opcao.duracao_estimada_min} min</strong>
+        <strong>~{minutos} min</strong>
+        <span
+          className={temEtaReal ? "plan-opcao-selo-ao-vivo" : "plan-opcao-selo-estimado"}
+          title={
+            temEtaReal
+              ? "Calculado a partir da posição ao vivo dos ônibus"
+              : "Sem ônibus rastreado se aproximando; estimativa por velocidade média"
+          }
+        >
+          {temEtaReal && <span className="mapa-pulso" />}
+          {temEtaReal ? "ao vivo" : "estimado"}
+        </span>
         <span>
           <Footprints size={12} /> {opcao.caminhada_metros} m
         </span>
@@ -485,9 +503,42 @@ export default function PlanejadorViagem({
 
                           {/* US #16 no contexto da US #20: quem planeja a
                               viagem quer saber onde está o ônibus que vai
-                              pegar, sem ter que buscar a linha de novo. */}
+                              pegar, sem ter que buscar a linha de novo.
+                              US #159 — quando a rota já trouxe uma espera
+                              calculada para esta perna, ela é mais
+                              específica que a contagem de US #16 (fala do
+                              ônibus que serve *esta* viagem, não de todos
+                              os que rodam a linha agora) e aparece antes. */}
                           <div className="plan-passo-aovivo">
                             {(() => {
+                              if (perna.fonte_espera === "tempo_real" && perna.espera_min != null) {
+                                return (
+                                  <>
+                                    <span className="mapa-pulso" />
+                                    <Bus size={12} />
+                                    <span>
+                                      Chega em <strong>{perna.espera_min} min</strong>
+                                      {perna.prefixo_veiculo
+                                        ? ` (carro ${perna.prefixo_veiculo})`
+                                        : ""}
+                                    </span>
+                                  </>
+                                );
+                              }
+                              if (
+                                perna.fonte_espera === "intervalo_medio" &&
+                                perna.intervalo_medio_min != null
+                              ) {
+                                return (
+                                  <span>
+                                    Passa a cada ~<strong>{perna.intervalo_medio_min} min</strong>
+                                    {perna.espera_min != null
+                                      ? ` (espera estimada ~${perna.espera_min} min)`
+                                      : ""}
+                                  </span>
+                                );
+                              }
+
                               const rodando = veiculosPorLinha[perna.numero] ?? 0;
                               if (rodando > 0) {
                                 return (

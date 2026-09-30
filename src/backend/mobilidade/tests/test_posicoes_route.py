@@ -13,7 +13,9 @@ from fastapi.testclient import TestClient
 
 from mobilidade.main import app
 from mobilidade.models.linha import Linha
+from mobilidade.models.rota import Rota, RotaCelula
 from mobilidade.posicao_service import PosicaoVeiculo
+from mobilidade.tests.test_rota_service import PREFIXO, _semear, _trajeto
 from shared.database import SessionLocal
 
 client = TestClient(app)
@@ -124,3 +126,84 @@ def test_sem_veiculo_e_sem_lat_lng_nao_busca_horario_previsto(linha_com_horario_
 
     assert response.status_code == 200
     assert response.json()["proximo_horario_previsto"] is None
+
+
+# --------------------------------------------------------------------------
+# US #159 — quando a linha tem rota ingerida, o ETA passa a ser medido
+# ao longo do trajeto real, não em linha reta. Usa o mesmo trajeto
+# sintético de test_rota_service.py para poder colocar o veículo "antes"
+# e "depois" do ponto informado.
+# --------------------------------------------------------------------------
+
+NUMERO_COM_ROTA = f"{PREFIXO}200"
+
+
+@pytest.fixture
+def rota_ingerida():
+    db = SessionLocal()
+    db.query(RotaCelula).filter(RotaCelula.numero == NUMERO_COM_ROTA).delete()
+    db.query(Rota).filter(Rota.numero == NUMERO_COM_ROTA).delete()
+    _semear(db, NUMERO_COM_ROTA, "IDA", _trajeto())
+    db.commit()
+    yield
+    db.query(RotaCelula).filter(RotaCelula.numero == NUMERO_COM_ROTA).delete()
+    db.query(Rota).filter(Rota.numero == NUMERO_COM_ROTA).delete()
+    db.commit()
+    db.close()
+
+
+def _veiculo_no_indice(indice, sentido="IDA"):
+    lat, lng = _trajeto()[indice]
+    return PosicaoVeiculo(
+        prefixo="440001",
+        lat=lat,
+        lng=lng,
+        sentido=sentido,
+        velocidade=30.0,
+        direcao=0.0,
+        atualizado_em=datetime.now(timezone.utc),
+        operadora="VIAÇÃO TESTE",
+    )
+
+
+def test_com_rota_ingerida_eta_e_medido_ao_longo_do_trajeto(rota_ingerida):
+    alvo_lat, alvo_lng = _trajeto()[20]
+    # Veículo antes do alvo (índice 5): está chegando.
+    with _mockar_posicoes([_veiculo_no_indice(5)]):
+        response = client.get(
+            f"/mobilidade/linhas/{NUMERO_COM_ROTA}/posicoes",
+            params={"lat": alvo_lat, "lng": alvo_lng},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["veiculos"][0]["eta_minutos"] is not None
+
+
+def test_com_rota_ingerida_veiculo_que_ja_passou_fica_sem_eta(rota_ingerida):
+    """
+    A diferença central desta melhoria: em linha reta, um ônibus logo
+    depois do alvo mede "perto" do mesmo jeito que um que está
+    chegando. Com o trajeto conhecido, dá para saber que ele já passou.
+    """
+    alvo_lat, alvo_lng = _trajeto()[20]
+    # Veículo depois do alvo (índice 25): já passou, mesmo sentido.
+    with _mockar_posicoes([_veiculo_no_indice(25)]):
+        response = client.get(
+            f"/mobilidade/linhas/{NUMERO_COM_ROTA}/posicoes",
+            params={"lat": alvo_lat, "lng": alvo_lng},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["veiculos"][0]["eta_minutos"] is None
+
+
+def test_com_rota_ingerida_sentido_errado_fica_sem_eta(rota_ingerida):
+    alvo_lat, alvo_lng = _trajeto()[20]
+    with _mockar_posicoes([_veiculo_no_indice(5, sentido="VOLTA")]):
+        response = client.get(
+            f"/mobilidade/linhas/{NUMERO_COM_ROTA}/posicoes",
+            params={"lat": alvo_lat, "lng": alvo_lng},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["veiculos"][0]["eta_minutos"] is None
