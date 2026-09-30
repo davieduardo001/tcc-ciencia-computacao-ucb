@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
+from shared.logs import instalar_redator_de_acesso
 from mobilidade.routes import router as mobilidade_router
 from mobilidade.workers.monitoramento import criar_worker
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 
+instalar_redator_de_acesso()
 settings = get_settings()
 
 app = FastAPI(

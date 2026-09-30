@@ -174,8 +174,11 @@ class GeocodeService:
                     )
                     resposta.raise_for_status()
                     return resposta.json()
-        except Exception:
-            logger.warning("Geocodificação indisponível (%s)", url, exc_info=True)
+        except Exception as exc:
+            # Sem exc_info: a exceção do httpx carrega a URL completa da
+            # chamada, com a coordenada/termo de busca do usuário — não
+            # pode ir para o log (LGPD).
+            logger.warning("Geocodificação indisponível (%s): %s", url, type(exc).__name__)
             return None
 
     @staticmethod
