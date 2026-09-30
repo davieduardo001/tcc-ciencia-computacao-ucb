@@ -1064,6 +1064,27 @@
   gap: 3px;
 }
 
+/* US #159 — selo que diferencia ETA real (medido a partir de um ônibus
+   ao vivo) da duração estimada por velocidade média de sempre. */
+.plan-opcao-selo-ao-vivo,
+.plan-opcao-selo-estimado {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.plan-opcao-selo-ao-vivo {
+  background: rgba(26, 160, 90, 0.12);
+  color: #1aa05a;
+}
+
+.plan-opcao-selo-estimado {
+  background: var(--surface-muted, rgba(0, 0, 0, 0.06));
+  color: var(--muted);
+}
+
 .plan-passos {
   list-style: none;
   margin: 12px 0 0;
