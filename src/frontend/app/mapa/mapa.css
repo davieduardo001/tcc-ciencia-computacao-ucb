@@ -1423,11 +1423,14 @@
   }
 
   .ms-fab {
+    /* Protótipo v3: o botão central é um quadrado arredondado (24px num
+       frame de 66px), não um círculo — e o fundo é um degradê, não a cor
+       sólida var(--mc-teal). */
     width: 62px;
     height: 62px;
-    border-radius: 50%;
+    border-radius: 22px;
     border: 5px solid var(--mc-petroleo);
-    background: var(--mc-teal);
+    background: linear-gradient(150deg, #5fe3d3, var(--mc-teal));
     color: #fff;
     display: grid;
     place-items: center;
