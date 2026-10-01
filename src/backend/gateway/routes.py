@@ -233,9 +233,20 @@ async def mobilidade_proxy(path: str, request: Request):
     methods=["GET", "POST", "PUT", "DELETE"],
 )
 async def colaboracao_proxy(path: str, request: Request):
-    """Proxy para Colaboracao Service."""
+    """Proxy para Colaboracao Service.
+
+    Encaminha X-User-Id baseado na identidade autenticada pelo gateway
+    middleware (request.state.usuario_id), mesmo padrão do proxy de
+    Mobilidade. Faltava aqui — rotas de colaboracao (ex.: US #23)
+    recebiam a request sem nenhuma identidade confiável anexada.
+    """
+    usuario_id = getattr(request.state, "usuario_id", None)
+    extra = {}
+    if usuario_id:
+        extra["X-User-Id"] = str(usuario_id)
     return await proxy_request(
         settings.COLABORACAO_SERVICE_URL,
         f"/colaboracao/{path}",
         request,
+        extra_headers=extra,
     )
