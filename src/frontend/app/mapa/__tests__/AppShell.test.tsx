@@ -137,11 +137,39 @@ describe("AppShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ações rápidas" }));
 
     const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
-    fireEvent.click(within(inferior).getByText("Ocorrências"));
+    fireEvent.click(within(inferior).getByText("Alertas"));
 
     const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByText("Ocorrências")).toBeInTheDocument();
+    expect(within(dialogo).getByText("Alertas")).toBeInTheDocument();
     expect(within(dialogo).getByText("Em breve")).toBeInTheDocument();
+  });
+
+  it("sidebar de desktop também linka para Ocorrências — único acesso em telas >920px (US #23)", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    const link = within(sidebar).getByRole("link", { name: "Ocorrências" });
+    expect(link).toHaveAttribute("href", "/ocorrencias");
+  });
+
+  it("ação 'Ocorrências' do arco já navega para a tela real (US #23)", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ações rápidas" }));
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    fireEvent.click(within(inferior).getByText("Ocorrências"));
+
+    expect(pushMock).toHaveBeenCalledWith("/ocorrencias");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("mostra o selo 'Em breve' na sidebar para itens indisponíveis", () => {

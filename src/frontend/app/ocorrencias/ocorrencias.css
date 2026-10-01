@@ -1,0 +1,226 @@
+/* ===== US #23 — Reportar Ocorrência ===== */
+
+.ocor-page {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 24px 22px 48px;
+}
+
+.ocor-page h1 {
+  font-family: var(--mc-fonte-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mc-petroleo);
+  margin: 0 0 6px;
+}
+
+.ocor-sub {
+  font-size: 13.5px;
+  color: var(--mc-texto-2, #57686f);
+  max-width: 560px;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.ocor-form {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ocor-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.ocor-campo > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mc-petroleo);
+}
+
+.ocor-campo input,
+.ocor-campo textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--mc-petroleo);
+  background: #fff;
+  border: 1.5px solid rgba(14, 42, 63, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.ocor-campo textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.ocor-campo input:focus,
+.ocor-campo textarea:focus {
+  outline: none;
+  border-color: var(--mc-teal);
+}
+
+.ocor-sugestoes {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin-top: 4px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 42, 63, 0.08);
+  box-shadow: 0 16px 30px -16px rgba(14, 42, 63, 0.4);
+  list-style: none;
+  padding: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ocor-sugestoes button {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--mc-petroleo);
+}
+
+.ocor-sugestoes button:hover {
+  background: var(--mc-areia-clara, #f4f1eb);
+}
+
+.ocor-sugestoes button span {
+  color: rgba(14, 42, 63, 0.55);
+  font-size: 12.5px;
+}
+
+.ocor-label-tipo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mc-petroleo);
+}
+
+.ocor-grid-tipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-top: -8px;
+}
+
+.ocor-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: #f8f6f1;
+  border: 1.5px solid rgba(14, 42, 63, 0.06);
+  border-radius: 18px;
+  padding: 14px 8px;
+  cursor: pointer;
+  min-height: 44px;
+  color: var(--mc-petroleo);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+
+.ocor-chip:hover {
+  border-color: var(--mc-teal);
+  transform: translateY(-2px);
+}
+
+.ocor-chip.on {
+  background: var(--mc-petroleo);
+  border-color: var(--mc-petroleo);
+  color: #fff;
+}
+
+.ocor-chip span {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.ocor-local-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ocor-local-linha input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.ocor-btn-localizar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--mc-teal);
+  background: rgba(43, 166, 155, 0.1);
+  border: none;
+  border-radius: 12px;
+  padding: 0 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ocor-btn-localizar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ocor-mensagem {
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0;
+}
+
+.ocor-mensagem.sucesso {
+  background: rgba(43, 166, 155, 0.12);
+  color: var(--mc-teal-escuro, #137f77);
+}
+
+.ocor-mensagem.erro {
+  background: rgba(216, 68, 42, 0.1);
+  color: #d8442a;
+}
+
+.ocor-btn-enviar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--mc-teal);
+  border: none;
+  border-radius: 999px;
+  padding: 14px;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.ocor-btn-enviar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

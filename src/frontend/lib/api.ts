@@ -676,3 +676,87 @@ export async function buscarPosicoesDaLinha(
     return vazio;
   }
 }
+
+// ---------------------------------------------------------------------------
+// US #23 — Reportar Ocorrência em uma Linha
+// ---------------------------------------------------------------------------
+
+export type TipoOcorrencia =
+  | "atraso"
+  | "nao_passou"
+  | "lotacao"
+  | "obra_via"
+  | "onibus_quebrou"
+  | "acidente"
+  | "seguranca";
+
+export interface OcorrenciaPayload {
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  descricao?: string;
+  local?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface OcorrenciaRegistrada {
+  id: string;
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  status: string;
+  contadorConfirmacoes: number;
+  criadoEm: string;
+  expiraEm: string;
+}
+
+export class ReportarOcorrenciaError extends Error {
+  resetEm?: string;
+
+  constructor(message: string, resetEm?: string) {
+    super(message);
+    this.resetEm = resetEm;
+  }
+}
+
+export async function reportarOcorrencia(
+  dados: OcorrenciaPayload
+): Promise<OcorrenciaRegistrada> {
+  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      linha_numero: dados.linhaNumero,
+      tipo: dados.tipo,
+      descricao: dados.descricao,
+      local: dados.local,
+      lat: dados.lat,
+      lng: dados.lng,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw new ReportarOcorrenciaError("Faça login para reportar uma ocorrência.");
+  }
+  if (response.status === 429) {
+    const data = await response.json();
+    throw new ReportarOcorrenciaError(
+      "Você atingiu o limite de reportes. Tente novamente mais tarde.",
+      data.detail?.reset_em
+    );
+  }
+  if (!response.ok) {
+    throw new ReportarOcorrenciaError("Não foi possível registrar o reporte.");
+  }
+
+  const data = await response.json();
+  return {
+    id: data.id,
+    linhaNumero: data.linha_numero,
+    tipo: data.tipo,
+    status: data.status,
+    contadorConfirmacoes: data.contador_confirmacoes,
+    criadoEm: data.criado_em,
+    expiraEm: data.expira_em,
+  };
+}
