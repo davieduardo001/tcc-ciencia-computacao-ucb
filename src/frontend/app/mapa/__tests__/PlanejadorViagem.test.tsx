@@ -102,3 +102,56 @@ describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
     expect(painel).not.toHaveClass("recolhida");
   });
 });
+
+function pernaMock(numero: string) {
+  return {
+    numero,
+    sentido: "Sentido Teste",
+    nome: "Linha Teste",
+    embarque: { lat: 0, lng: 0, parada_nome: "Parada A", caminhada_metros: 50 },
+    desembarque: { lat: 0, lng: 0, parada_nome: "Parada B", caminhada_metros: 50 },
+    distancia_km: 5,
+    paradas_no_trecho: 3,
+    trajeto: [] as [number, number][],
+  };
+}
+
+describe("PlanejadorViagem — resumo da opção de rota", () => {
+  it("pluraliza 'baldeações' quando há mais de uma troca de linha", () => {
+    render(
+      <PlanejadorViagem
+        {...props}
+        opcoes={[
+          {
+            pernas: [pernaMock("0.110"), pernaMock("0.120"), pernaMock("0.130")],
+            baldeacoes: 2,
+            distancia_km: 10,
+            caminhada_metros: 300,
+            duracao_estimada_min: 40,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("2 baldeações")).toBeInTheDocument();
+  });
+
+  it("mantém 'baldeação' no singular quando há só uma troca", () => {
+    render(
+      <PlanejadorViagem
+        {...props}
+        opcoes={[
+          {
+            pernas: [pernaMock("0.110"), pernaMock("0.120")],
+            baldeacoes: 1,
+            distancia_km: 8,
+            caminhada_metros: 200,
+            duracao_estimada_min: 30,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("1 baldeação")).toBeInTheDocument();
+  });
+});

@@ -218,8 +218,9 @@
 .ms-ajuda-btn,
 .ms-sair-btn {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+  /* Era 30x30 — abaixo do alvo de toque mínimo (44px). */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border-2);
   background: #fff;
@@ -385,8 +386,9 @@
 }
 
 .ms-icon-btn {
-  width: 42px;
-  height: 42px;
+  /* Era 42x42 — abaixo do alvo de toque mínimo (44px). */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border-2);
   background: #fff;
@@ -465,8 +467,9 @@
 }
 
 .mapa-botao-icone {
-  width: 42px;
-  height: 42px;
+  /* Era 42x42 — abaixo do alvo de toque mínimo (44px). */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border-2);
   background: #fff;
@@ -582,12 +585,20 @@
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
   overflow: auto;
-  z-index: 1000;
+  /* Era 1000 fixo, igual a .mapa-controles (também 1000) — ordem de
+     empilhamento caía pra ordem do DOM, podendo esconder os botões
+     flutuantes de localização/camadas atrás deste painel. O painel
+     irmão (.plan-painel) já usa este token (1001) por este motivo. */
+  z-index: var(--z-folha);
 }
 
 .mapa-painel-cabecalho {
   display: flex;
   align-items: center;
+  /* Faltava — sem isso o botão de fechar ficava colado à esquerda, antes
+     do título, enquanto o painel irmão (.plan-cabecalho) tem o mesmo
+     botão à direita via este mesmo space-between. */
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--border-2);
@@ -807,6 +818,9 @@
 .plan-input:focus {
   outline: none;
   border-color: var(--primary);
+  /* Só a cor da borda era um indicador de foco fraco pra quem navega
+     por teclado — reforça com o mesmo anel usado nos campos de auth. */
+  box-shadow: var(--mc-foco);
 }
 
 .plan-campo.escolhendo .plan-input {
@@ -819,7 +833,10 @@
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  padding: 4px;
+  /* Era só padding:4px em cima de um ícone de 14px (~22px de área
+     clicável) — abaixo do alvo de toque mínimo (44px). */
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
 }
@@ -873,8 +890,9 @@
 
 .plan-inverter {
   align-self: flex-end;
-  width: 32px;
-  height: 32px;
+  /* Era 32x32 — abaixo do alvo de toque mínimo (44px). */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border-2);
   background: #fff;
@@ -882,7 +900,7 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  margin: -4px 0;
+  margin: -8px 0;
 }
 
 .plan-inverter:hover:not(:disabled) {
@@ -1035,6 +1053,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Itinerário com várias pernas (muitos badges + ícone de troca entre
+     eles) podia ultrapassar a largura do painel sem ter pra onde
+     quebrar. */
+  flex-wrap: wrap;
 }
 
 .plan-opcao-linhas > span {
@@ -1064,6 +1086,12 @@
   gap: 10px;
   font-size: 12px;
   color: var(--muted);
+  /* .plan-opcao-resumo distribui os dois grupos com space-between, mas
+     quando .plan-opcao-linhas é longo o bastante pra empurrar este grupo
+     pra uma segunda linha, ele fica sozinho nela — e space-between, com
+     um item só por linha, alinha à esquerda, não à direita. margin-left
+     auto garante a direita nos dois casos (quebrando ou não). */
+  margin-left: auto;
 }
 
 .plan-opcao-metricas strong {
@@ -1275,7 +1303,10 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 26px;
+    /* Era 26px — abaixo do alvo de toque mínimo (44px); só o tracinho
+       visual (.plan-alca-traco) continua fino, a área de arrastar que
+       cresce. */
+    height: 44px;
     flex: none;
     border: none;
     background: none;

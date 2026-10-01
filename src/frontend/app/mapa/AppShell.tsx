@@ -103,7 +103,13 @@ const ACOES_RAPIDAS = [
 ] as const;
 
 interface AppShellProps {
-  active: (typeof NAV_ITEMS)[number]["id"];
+  /** Normalmente um id de NAV_ITEMS (destaca o item correspondente na
+   * sidebar/bottomnav). Telas alcançadas por outro caminho — hoje só
+   * /configuracoes, via o ícone de engrenagem na topbar — passam um id
+   * que não está em NAV_ITEMS de propósito: nenhum item fica marcado
+   * como ativo, o que é o comportamento certo pra uma tela que não é
+   * nenhuma das seções principais. */
+  active: (typeof NAV_ITEMS)[number]["id"] | (string & {});
   children: React.ReactNode;
   /** US #17 — busca de linha pelo topbar. Sem essas props, a busca fica
    * só visual (páginas que ainda não a implementam). */
