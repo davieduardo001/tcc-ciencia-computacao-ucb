@@ -30,7 +30,11 @@
   /* --- Texto ------------------------------------------------------------ */
   --mc-texto: #0e2a3f;
   --mc-texto-2: #57686f;
-  --mc-texto-3: #8a99a0;
+  /* Era #8a99a0 (~2.9:1 sobre branco) — usado como texto real em dezenas
+     de lugares (subtítulos, métricas, "Em breve"), não só decoração.
+     Falhava o mínimo de WCAG AA pra texto normal (4.5:1). #6b7280
+     mantém a ideia de "mais apagado que --mc-texto-2", só que a ~4.6:1. */
+  --mc-texto-3: #6b7280;
   --mc-placeholder: #a6b3b8;
   --mc-texto-invertido: #ffffff;
 
@@ -516,7 +520,9 @@ footer {
   margin-top: 18px;
   text-align: center;
   font-size: 11.5px;
-  color: var(--mc-placeholder);
+  /* Texto real (assinatura do rodapé), não place holder de campo — usar
+     --mc-placeholder aqui falhava contraste AA. */
+  color: var(--mc-texto-3);
 }
 
 /* --- Alternador Entrar / Criar conta -------------------------------------- */
@@ -538,7 +544,9 @@ footer {
   justify-content: center;
   font-size: 13.5px;
   font-weight: 700;
-  color: #7d8c93;
+  /* Era #7d8c93 solto (~3:1 sobre o fundo da aba) — abaixo do mínimo AA.
+     Usa o token de texto apagado, já corrigido pra ~4.6:1. */
+  color: var(--mc-texto-3);
   cursor: pointer;
   transition:
     background 0.3s ease,
@@ -837,7 +845,9 @@ footer {
   font-weight: 800;
   min-width: 92px;
   text-align: right;
-  color: var(--mc-placeholder);
+  /* Rótulo real ("Fraca/Razoável/Boa/Forte"), não placeholder — mesma
+     correção de contraste de .auth-assinatura. */
+  color: var(--mc-texto-3);
   transition: color 0.3s ease;
 }
 
@@ -880,7 +890,8 @@ footer {
   gap: 9px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #96a2a8;
+  /* Era #96a2a8 solto (~2.9:1) — mesma correção de contraste do resto. */
+  color: var(--mc-texto-3);
   transition: color 0.25s ease;
 }
 
@@ -964,7 +975,8 @@ footer {
   align-items: center;
   gap: 12px;
   margin: 14px 0;
-  color: var(--mc-placeholder);
+  /* Texto real ("ou"), não placeholder. */
+  color: var(--mc-texto-3);
   font-size: 12px;
   font-weight: 700;
 }
