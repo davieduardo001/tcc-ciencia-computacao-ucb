@@ -573,12 +573,20 @@
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
   overflow: auto;
-  z-index: 1000;
+  /* Era 1000 fixo, igual a .mapa-controles (também 1000) — ordem de
+     empilhamento caía pra ordem do DOM, podendo esconder os botões
+     flutuantes de localização/camadas atrás deste painel. O painel
+     irmão (.plan-painel) já usa este token (1001) por este motivo. */
+  z-index: var(--z-folha);
 }
 
 .mapa-painel-cabecalho {
   display: flex;
   align-items: center;
+  /* Faltava — sem isso o botão de fechar ficava colado à esquerda, antes
+     do título, enquanto o painel irmão (.plan-cabecalho) tem o mesmo
+     botão à direita via este mesmo space-between. */
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--border-2);

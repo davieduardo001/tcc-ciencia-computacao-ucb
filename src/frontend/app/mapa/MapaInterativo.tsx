@@ -695,6 +695,10 @@ export default function MapaInterativo({
       {linha && (
         <aside className="mapa-painel-linha">
           <div className="mapa-painel-cabecalho">
+            <div>
+              <strong>{linha.nome}</strong>
+              <span className="mapa-painel-sentido">{linha.sentido}</span>
+            </div>
             <button
               type="button"
               className="mapa-botao-icone"
@@ -703,10 +707,6 @@ export default function MapaInterativo({
             >
               <X size={16} />
             </button>
-            <div>
-              <strong>{linha.nome}</strong>
-              <span className="mapa-painel-sentido">{linha.sentido}</span>
-            </div>
           </div>
 
           <div className="mapa-painel-corpo">
