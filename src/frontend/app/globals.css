@@ -516,6 +516,18 @@ footer {
   flex-direction: column;
 }
 
+/* Usada em recuperar-senha/redefinir-senha como texto de abertura antes
+   dos campos (ou único conteúdo nos estados de sucesso/link inválido) —
+   nunca tinha sido definida; sem ela, o reset global zera a margem e o
+   texto fica sem tamanho/line-height do design system, colado no campo
+   ou botão seguinte. */
+.auth-texto-intro {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--mc-texto-2);
+  margin-bottom: 20px;
+}
+
 .auth-assinatura {
   margin-top: 18px;
   text-align: center;
@@ -537,7 +549,8 @@ footer {
 
 .aba {
   flex: 1;
-  height: 42px;
+  /* Era 42px — abaixo do alvo de toque mínimo (44px). */
+  height: 44px;
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -642,8 +655,10 @@ footer {
 }
 
 .botao-olho {
-  width: 34px;
-  height: 34px;
+  /* Era 34x34 — abaixo do alvo de toque minimo recomendado (44px). O
+     campo (.campo-v3) tem 56px de altura, cabe folgado. */
+  width: 44px;
+  height: 44px;
   flex: none;
   border: none;
   border-radius: var(--mc-r-sm);
