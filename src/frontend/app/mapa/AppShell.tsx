@@ -59,7 +59,11 @@ const NAV_ITEMS = [
     href: "/ocorrencias",
     label: "Ocorrências",
     Icone: TriangleAlert,
-    disponivel: false,
+    // US #23 — único jeito de chegar aqui em telas >920px: o arco do
+    // botão central (ACOES_RAPIDAS) só existe na navegação inferior
+    // mobile (mapa.css). Sem isso, a tela não tinha nenhuma entrada no
+    // desktop/web.
+    disponivel: true,
   },
   { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: false },
 ] as const;
@@ -89,12 +93,12 @@ const NAV_INFERIOR = [
 ] as const;
 
 // O arco que abre no botão central. São as três seções que o protótipo
-// tira da barra para caberem os quatro destinos principais. Nenhuma tem
-// tela ainda — todas abrem o aviso de "em breve".
+// tira da barra para caberem os quatro destinos principais. "Ocorrências"
+// (US #23) já tem tela — as outras duas ainda abrem o aviso de "em breve".
 const ACOES_RAPIDAS = [
-  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54 },
-  { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84 },
-  { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54 },
+  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: undefined },
+  { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84, href: "/ocorrencias" },
+  { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54, href: undefined },
 ] as const;
 
 interface AppShellProps {
@@ -164,6 +168,11 @@ export default function AppShell({
   function avisar(label: string) {
     setFabAberto(false);
     setEmBreve(label);
+  }
+
+  function irParaAcaoRapida(href: string) {
+    setFabAberto(false);
+    router.push(href);
   }
 
   // Escape fecha o arco: o fundo que o fecha por clique é decorativo, e
@@ -345,9 +354,9 @@ export default function AppShell({
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
           </button>
-          <button type="button" className="ms-icon-btn" title="Preferências">
+          <Link href="/configuracoes" className="ms-icon-btn" title="Configurações">
             <Settings size={17} />
-          </button>
+          </Link>
           <button type="button" className="ms-icon-btn" title="Perfil">
             <User size={17} />
           </button>
@@ -384,7 +393,7 @@ export default function AppShell({
         ))}
 
         <div className={`ms-fab-area${fabAberto ? " aberto" : ""}`}>
-          {ACOES_RAPIDAS.map(({ id, label, Icone, dx, dy }, indice) => (
+          {ACOES_RAPIDAS.map(({ id, label, Icone, dx, dy, href }, indice) => (
             <button
               key={id}
               type="button"
@@ -398,7 +407,7 @@ export default function AppShell({
               }
               tabIndex={fabAberto ? 0 : -1}
               aria-hidden={!fabAberto}
-              onClick={() => avisar(label)}
+              onClick={() => (href ? irParaAcaoRapida(href) : avisar(label))}
             >
               <span className="ms-fab-acao-icone">
                 <Icone size={17} />

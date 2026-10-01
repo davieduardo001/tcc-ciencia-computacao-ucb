@@ -2,9 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
+from shared.logs import instalar_redator_de_acesso
 from gateway.routes import router as gateway_router
 from gateway.middleware import AutenticacaoMiddleware
 
+instalar_redator_de_acesso()
 settings = get_settings()
 
 app = FastAPI(

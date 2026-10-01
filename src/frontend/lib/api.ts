@@ -75,6 +75,71 @@ export async function registrarUsuario(
   return response.json();
 }
 
+
+export interface RecuperacaoSenhaResponse {
+  mensagem: string;
+}
+
+export class RecuperacaoSenhaError extends Error {}
+
+export async function solicitarResetSenha(
+  email: string
+): Promise<RecuperacaoSenhaResponse> {
+  const response = await fetch(`${API_URL}/api/auth/esqueci-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 429) {
+    throw new RecuperacaoSenhaError(
+      "Muitas solicitações. Tente novamente mais tarde."
+    );
+  }
+
+  if (!response.ok) {
+    throw new RecuperacaoSenhaError(
+      data.detail || "Não foi possível solicitar a recuperação de senha."
+    );
+  }
+
+  return data;
+}
+
+
+export interface RedefinirSenhaPayload {
+  token: string;
+  novaSenha: string;
+  confirmacaoSenha: string;
+}
+
+export async function redefinirSenha(
+  dados: RedefinirSenhaPayload
+): Promise<RecuperacaoSenhaResponse> {
+  const response = await fetch(`${API_URL}/api/auth/redefinir-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: dados.token,
+      nova_senha: dados.novaSenha,
+      confirmacao_senha: dados.confirmacaoSenha,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new RecuperacaoSenhaError(
+      data.detail || "Não foi possível redefinir a senha."
+    );
+  }
+
+  return data;
+}
+
+
 export interface LoginPayload {
   email: string;
   senha: string;
@@ -242,6 +307,7 @@ export interface UsuarioAtual {
   nome: string;
   email: string;
   avatarUrl: string | null;
+  firstAccess: boolean;
 }
 
 /**
@@ -267,6 +333,7 @@ export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
       nome: data.nome,
       email: data.email,
       avatarUrl: data.avatar_url ?? null,
+      firstAccess: data.first_access ?? true,
     };
   } catch {
     return null;
@@ -288,6 +355,24 @@ export async function logoutUsuario(): Promise<void> {
     });
   } finally {
     clearTokens();
+  }
+}
+
+/**
+ * Atualiza a flag first_access do usuário logado.
+ * Usado para pular ou rever o tutorial de onboarding.
+ */
+export async function atualizarFirstAccess(firstAccess: boolean): Promise<void> {
+  const response = await fetch(`${API_URL}/api/auth/me/first-access`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ first_access: firstAccess }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Não foi possível atualizar preferência do tutorial.");
   }
 }
 
@@ -364,6 +449,15 @@ export interface PernaViagem {
   distancia_km: number;
   paradas_no_trecho: number;
   trajeto: [number, number][];
+  /** US #159 — minutos estimados até embarcar nesta perna. `undefined`
+   * num backend antigo (o campo é novo e opcional); `null` quando o
+   * backend não conseguiu estimar. */
+  espera_min?: number | null;
+  fonte_espera?: "tempo_real" | "intervalo_medio" | "teorica";
+  /** Só vem preenchido quando `fonte_espera === "tempo_real"`. */
+  prefixo_veiculo?: string | null;
+  /** Só vem preenchido quando `fonte_espera === "intervalo_medio"`. */
+  intervalo_medio_min?: number | null;
 }
 
 export interface OpcaoViagem {
@@ -372,6 +466,12 @@ export interface OpcaoViagem {
   distancia_km: number;
   caminhada_metros: number;
   duracao_estimada_min: number;
+  /** US #159 — ETA real da viagem inteira, calculado a partir da
+   * posição ao vivo dos ônibus. `null`/ausente quando não há ônibus
+   * identificável — nesse caso use `duracao_estimada_min`. */
+  duracao_real_min?: number | null;
+  tipo_estimativa?: "tempo_real" | "parcial" | "teorica";
+  calculado_em?: string | null;
 }
 
 /**
@@ -502,29 +602,48 @@ export interface VeiculoAoVivo {
   direcao: number | null;
   atualizadoEm: string;
   operadora: string;
+  /** US #19 — minutos até chegar na posição do usuário. `null` quando não
+   * informamos localização, ou quando o veículo está parado/sem
+   * velocidade confiável (Cenário 5: pílula sem tempo). */
+  etaMinutos: number | null;
+}
+
+/** US #19 — resultado de uma busca de posições, com o fallback do Cenário 3. */
+export interface PosicoesDaLinha {
+  veiculos: VeiculoAoVivo[];
+  /** Só preenchido quando `veiculos` está vazio e a localização do
+   * usuário foi informada: próximo horário previsto da tabela teórica. */
+  proximoHorarioPrevisto: string | null;
 }
 
 /**
  * US #16 — posição ao vivo dos ônibus de uma linha, do feed de GPS do
  * SEMOB (a mesma fonte do app oficial DF no Ponto).
+ * US #19 — quando `coordenadasUsuario` é informado, cada veículo vem
+ * com `etaMinutos` calculado até essa posição.
  *
  * Lista vazia é situação normal: significa que nenhum veículo dessa
- * linha está reportando posição agora (Cenário 3 da US). Falha de rede
- * também devolve lista vazia — o trajeto continua no mapa, só sem os
- * ônibus; não faz sentido derrubar a tela por causa disso.
+ * linha está reportando posição agora (Cenário 3 da US #16). Falha de
+ * rede também devolve lista vazia — o trajeto continua no mapa, só sem
+ * os ônibus; não faz sentido derrubar a tela por causa disso.
  */
 export async function buscarPosicoesDaLinha(
-  numero: string
-): Promise<VeiculoAoVivo[]> {
+  numero: string,
+  coordenadasUsuario?: { lat: number; lng: number } | null
+): Promise<PosicoesDaLinha> {
+  const vazio: PosicoesDaLinha = { veiculos: [], proximoHorarioPrevisto: null };
   try {
+    const params = coordenadasUsuario
+      ? `?lat=${coordenadasUsuario.lat}&lng=${coordenadasUsuario.lng}`
+      : "";
     const response = await fetch(
-      `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes`,
+      `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes${params}`,
       { credentials: "include", cache: "no-store" }
     );
-    if (!response.ok) return [];
+    if (!response.ok) return vazio;
 
     const data = await response.json();
-    return (data.veiculos ?? []).map(
+    const veiculos: VeiculoAoVivo[] = (data.veiculos ?? []).map(
       (v: {
         prefixo: string;
         lat: number;
@@ -534,6 +653,7 @@ export async function buscarPosicoesDaLinha(
         direcao: number | null;
         atualizado_em: string;
         operadora: string;
+        eta_minutos: number | null;
       }) => ({
         linha: data.numero ?? numero,
         prefixo: v.prefixo,
@@ -544,9 +664,99 @@ export async function buscarPosicoesDaLinha(
         direcao: v.direcao ?? null,
         atualizadoEm: v.atualizado_em,
         operadora: v.operadora,
+        etaMinutos: v.eta_minutos ?? null,
       })
     );
+
+    return {
+      veiculos,
+      proximoHorarioPrevisto: data.proximo_horario_previsto ?? null,
+    };
   } catch {
-    return [];
+    return vazio;
   }
+}
+
+// ---------------------------------------------------------------------------
+// US #23 — Reportar Ocorrência em uma Linha
+// ---------------------------------------------------------------------------
+
+export type TipoOcorrencia =
+  | "atraso"
+  | "nao_passou"
+  | "lotacao"
+  | "obra_via"
+  | "onibus_quebrou"
+  | "acidente"
+  | "seguranca";
+
+export interface OcorrenciaPayload {
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  descricao?: string;
+  local?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface OcorrenciaRegistrada {
+  id: string;
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  status: string;
+  contadorConfirmacoes: number;
+  criadoEm: string;
+  expiraEm: string;
+}
+
+export class ReportarOcorrenciaError extends Error {
+  resetEm?: string;
+
+  constructor(message: string, resetEm?: string) {
+    super(message);
+    this.resetEm = resetEm;
+  }
+}
+
+export async function reportarOcorrencia(
+  dados: OcorrenciaPayload
+): Promise<OcorrenciaRegistrada> {
+  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      linha_numero: dados.linhaNumero,
+      tipo: dados.tipo,
+      descricao: dados.descricao,
+      local: dados.local,
+      lat: dados.lat,
+      lng: dados.lng,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw new ReportarOcorrenciaError("Faça login para reportar uma ocorrência.");
+  }
+  if (response.status === 429) {
+    const data = await response.json();
+    throw new ReportarOcorrenciaError(
+      "Você atingiu o limite de reportes. Tente novamente mais tarde.",
+      data.detail?.reset_em
+    );
+  }
+  if (!response.ok) {
+    throw new ReportarOcorrenciaError("Não foi possível registrar o reporte.");
+  }
+
+  const data = await response.json();
+  return {
+    id: data.id,
+    linhaNumero: data.linha_numero,
+    tipo: data.tipo,
+    status: data.status,
+    contadorConfirmacoes: data.contador_confirmacoes,
+    criadoEm: data.criado_em,
+    expiraEm: data.expira_em,
+  };
 }

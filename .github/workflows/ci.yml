@@ -48,17 +48,6 @@ jobs:
           cd src/backend
           pip install -r requirements.txt
 
-      - name: Verificar dependências
-        run: |
-          cd src/backend
-          pip install -r gateway/requirements.txt --dry-run
-
-      - name: Verificar imports
-        run: |
-          cd src/backend
-          python -c "from gateway.main import app; print('Gateway imports OK')"
-          python -c "from auth.main import app; print('Auth imports OK')"
-
       - name: Health check
         run: |
           cd src/backend
@@ -76,6 +65,57 @@ jobs:
         run: |
           cd src/backend
           pytest -v --tb=short
+
+  verificar-servicos:
+    # Reproduz o que o contêiner de cada serviço faz no boot.
+    #
+    # O job de testes instala o requirements COMBINADO da raiz, que tem
+    # tudo. O Dockerfile de cada serviço instala só o requirements dele.
+    # Por isso dependência faltando no arquivo de um serviço passava verde
+    # aqui e derrubava o contêiner em produção — aconteceu no PR #102
+    # (mobilidade) e no #127/#128 (colaboracao).
+    #
+    # A verificação anterior (`pip install -r ... --dry-run`) não pegava
+    # isso: o dry-run confere se os pacotes LISTADOS no arquivo resolvem,
+    # e não tem como saber de um pacote que o código importa e que está
+    # ausente da lista. Era justamente esse o defeito das duas quedas.
+    #
+    # Aqui cada serviço ganha um venv limpo com só o próprio requirements,
+    # e a aplicação é importada. Falta de dependência quebra o import, que
+    # é exatamente o que acontece no boot do contêiner.
+    name: Contêiner do serviço (${{ matrix.servico }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Sem fail-fast: se dois serviços estiverem quebrados, queremos ver
+      # os dois, não só o primeiro.
+      fail-fast: false
+      matrix:
+        servico: [gateway, auth, mobilidade, colaboracao]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/backend/${{ matrix.servico }}/requirements.txt
+
+      - name: Instalar SÓ o requirements deste serviço
+        run: |
+          python -m venv /tmp/venv-${{ matrix.servico }}
+          /tmp/venv-${{ matrix.servico }}/bin/pip install --quiet --upgrade pip
+          /tmp/venv-${{ matrix.servico }}/bin/pip install --quiet \
+            -r src/backend/${{ matrix.servico }}/requirements.txt
+
+      - name: Importar a aplicação, como o contêiner faz no boot
+        run: |
+          cd src/backend
+          /tmp/venv-${{ matrix.servico }}/bin/python -c \
+            "from ${{ matrix.servico }}.main import app; print('${{ matrix.servico }}: import OK')"
 
   test-frontend:
     name: Testes Frontend (Jest)

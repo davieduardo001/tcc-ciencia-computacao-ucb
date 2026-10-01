@@ -11,16 +11,24 @@
 from __future__ import annotations
 
 import logging
-from collections import Counter
+import time
+from collections import Counter, OrderedDict
 from dataclasses import dataclass
 
 from sqlalchemy import tuple_ as sql_tuple
 from sqlalchemy.orm import Session
 
+from mobilidade.geometria import TrajetoMedido
 from mobilidade.models.rota import Rota, RotaCelula
-from mobilidade.semob_source import _distancia_metros
+from mobilidade.semob_source import _distancia_metros, escolher_sentido_principal
 
 logger = logging.getLogger(__name__)
+
+# Quanto tempo um trajeto resolvido fica em cache (US #19/#159): a
+# ingestão do SEMOB é em lote, então a geometria de uma rota não muda
+# durante o dia — não há por que reconsultar o banco a cada request.
+CACHE_TRAJETO_VALIDADE_S = 6 * 3600
+CACHE_TRAJETO_MAXIMO = 64
 
 # Lado da célula do índice espacial, em graus (~275 m). A busca olha as
 # 3x3 células ao redor do ponto, então o alcance efetivo a pé fica entre
@@ -141,6 +149,57 @@ class RotaService:
     destino, e **nessa ordem** — a comparação de índices ao longo do
     traçado é o que faz IDA e VOLTA se separarem sozinhas.
     """
+
+    def __init__(self) -> None:
+        # (numero, sentido) -> (quando entrou no cache, trajeto medido).
+        self._cache_trajetos: OrderedDict[tuple[str, str], tuple[float, TrajetoMedido]] = (
+            OrderedDict()
+        )
+
+    def trajeto_medido(
+        self, db: Session, numero: str, sentido: str | None = None
+    ) -> tuple[TrajetoMedido, str] | None:
+        """
+        Geometria completa de uma linha (US #19/#159): usada para medir
+        distância real ao longo do traçado, não em linha reta.
+
+        Quando `sentido` não é informado (linha buscada avulsa, fora de
+        uma rota já calculada), infere o sentido principal do jeito que
+        a ingestão já faz — `Linha.sentido` é só um rótulo legível, não
+        serve para casar com o sentido do feed de posição.
+        """
+        sentido_alvo = sentido or self._sentido_principal(db, numero)
+        if sentido_alvo is None:
+            return None
+
+        chave = (numero, sentido_alvo)
+        agora = time.monotonic()
+        cache = self._cache_trajetos.get(chave)
+        if cache is not None and agora - cache[0] < CACHE_TRAJETO_VALIDADE_S:
+            self._cache_trajetos.move_to_end(chave)
+            return cache[1], sentido_alvo
+
+        rota = (
+            db.query(Rota)
+            .filter(Rota.numero == numero, Rota.sentido == sentido_alvo)
+            .one_or_none()
+        )
+        if rota is None or not rota.trajeto or len(rota.trajeto) < 2:
+            return None
+
+        medido = TrajetoMedido([(float(lat), float(lng)) for lat, lng in rota.trajeto])
+        self._cache_trajetos[chave] = (agora, medido)
+        if len(self._cache_trajetos) > CACHE_TRAJETO_MAXIMO:
+            self._cache_trajetos.popitem(last=False)
+        return medido, sentido_alvo
+
+    def _sentido_principal(self, db: Session, numero: str) -> str | None:
+        sentidos = [
+            s for (s,) in db.query(Rota.sentido).filter(Rota.numero == numero).distinct().all()
+        ]
+        if not sentidos:
+            return None
+        return escolher_sentido_principal(sentidos)
 
     def calcular(
         self,

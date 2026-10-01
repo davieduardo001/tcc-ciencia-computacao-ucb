@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Uuid, Integer, func
+from sqlalchemy import Column, String, DateTime, Uuid, Integer, Boolean, func
 from models.base import Base
 import uuid
 
@@ -18,5 +18,6 @@ class Usuario(Base):
     tentativas_falhas = Column(Integer, default=0)
     bloqueado_ate = Column(DateTime, nullable=True)
     account_linking_pending = Column(Integer, default=0)
+    first_access = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=func.now())
     atualizado_em = Column(DateTime, default=func.now(), onupdate=func.now())

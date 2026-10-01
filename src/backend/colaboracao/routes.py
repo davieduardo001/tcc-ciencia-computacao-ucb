@@ -1,24 +1,27 @@
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
+from colaboracao.dependencies import get_usuario_atual_id
 from colaboracao.deduplicador import Deduplicador
 from colaboracao.eta_service import ETAService
 from colaboracao.monitoring_worker import MonitoramentoWorker
 from colaboracao.providers.eta_mock import ETAMockProvider
 from colaboracao.providers.favoritos_mock import FavoritosMockProvider
 from colaboracao.push_service import PushService
-from colaboracao.models import PreferenciaNotificacao
+from colaboracao.models import PreferenciaNotificacao, Ocorrencia
 from colaboracao.schemas import (
     PreferenciaNotificacaoResponse,
     AntecedenciaInput,
     TipoNotificacaoInput,
     ToggleNotificacoesInput,
     RespostaGenerica,
+    OcorrenciaInput,
+    OcorrenciaResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -207,4 +210,73 @@ def desativar_todas_notificacoes(usuario_id: str, dados: ToggleNotificacoesInput
         notificacoes_ativas=preferencia.notificacoes_ativas,
         alerta_chegada=preferencia.alerta_chegada,
         alerta_cancelamento=preferencia.alerta_cancelamento,
+    )
+
+
+# ---------------------------------------------------------------------------
+# US #23 — Reportar Ocorrência em uma Linha
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ocorrencias", response_model=OcorrenciaResponse, status_code=201)
+def reportar_ocorrencia(
+    dados: OcorrenciaInput,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    if dados.tipo not in Ocorrencia.TIPOS_VALIDOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo inválido. Valores permitidos: {Ocorrencia.TIPOS_VALIDOS}",
+        )
+
+    uma_hora_atras = datetime.utcnow() - timedelta(hours=1)
+    reportes_na_janela = (
+        db.query(Ocorrencia)
+        .filter(
+            Ocorrencia.usuario_id == usuario_id,
+            Ocorrencia.criado_em >= uma_hora_atras,
+        )
+        .order_by(Ocorrencia.criado_em.asc())
+        .all()
+    )
+
+    if len(reportes_na_janela) >= Ocorrencia.LIMITE_REPORTES_POR_HORA:
+        reset_em = reportes_na_janela[0].criado_em + timedelta(hours=1)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "detail": "limite_reportes_excedido",
+                "reset_em": reset_em.isoformat(),
+            },
+        )
+
+    criado_em = datetime.utcnow()
+    ocorrencia = Ocorrencia(
+        id=uuid.uuid4(),
+        usuario_id=usuario_id,
+        linha_numero=dados.linha_numero,
+        tipo=dados.tipo,
+        descricao=dados.descricao,
+        local=dados.local,
+        lat=dados.lat,
+        lng=dados.lng,
+        contador_confirmacoes=0,
+        criado_em=criado_em,
+        expira_em=Ocorrencia.calcular_expiracao(dados.tipo, criado_em),
+    )
+    ocorrencia.status = ocorrencia.status_inicial
+
+    db.add(ocorrencia)
+    db.commit()
+    db.refresh(ocorrencia)
+
+    return OcorrenciaResponse(
+        id=str(ocorrencia.id),
+        linha_numero=ocorrencia.linha_numero,
+        tipo=ocorrencia.tipo,
+        status=ocorrencia.status,
+        contador_confirmacoes=ocorrencia.contador_confirmacoes,
+        criado_em=ocorrencia.criado_em,
+        expira_em=ocorrencia.expira_em,
     )

@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -122,11 +123,28 @@ class PosicaoService:
         if not numero_alvo:
             return []
 
+        resultado = await self.posicoes_das_linhas([numero_alvo])
+        return resultado.get(numero_alvo, [])
+
+    async def posicoes_das_linhas(
+        self, numeros_linha: Iterable[str]
+    ) -> dict[str, list[PosicaoVeiculo]]:
+        """
+        Igual a `posicoes_da_linha`, para várias linhas de uma vez —
+        usada pela rota planejada (US #159), que precisa das posições de
+        todas as linhas envolvidas na viagem. Percorre o feed cacheado
+        **uma única vez**, não uma vez por linha: o custo é o mesmo de
+        uma chamada só, e não gera nenhuma requisição extra ao SEMOB.
+        """
+        alvos = {n.strip() for n in numeros_linha if n and n.strip()}
+        posicoes: dict[str, list[PosicaoVeiculo]] = {n: [] for n in alvos}
+        if not alvos:
+            return posicoes
+
         feed = await self._obter_feed()
         # Em UTC, não no relógio local do processo: o container não sabe
         # em que fuso está e não deve precisar saber.
         agora = datetime.now(timezone.utc)
-        posicoes: list[PosicaoVeiculo] = []
 
         for operadora in feed:
             nome_operadora = operadora.get("NomeOperadora", "")
@@ -135,7 +153,8 @@ class PosicaoService:
                 propriedades = feature.get("properties", {})
                 veiculo = propriedades.get("veiculo") or {}
 
-                if (veiculo.get("numero") or "").strip() != numero_alvo:
+                numero = (veiculo.get("numero") or "").strip()
+                if numero not in alvos:
                     continue
 
                 coordenadas = (feature.get("geometry") or {}).get("coordinates")
@@ -149,7 +168,7 @@ class PosicaoService:
                     continue
 
                 lng, lat = coordenadas[0], coordenadas[1]
-                posicoes.append(
+                posicoes[numero].append(
                     PosicaoVeiculo(
                         prefixo=(veiculo.get("prefixo") or "").strip(),
                         lat=lat,
