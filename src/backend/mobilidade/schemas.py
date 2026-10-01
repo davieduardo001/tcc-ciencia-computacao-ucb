@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -58,6 +60,14 @@ class PernaResponse(BaseModel):
     distancia_km: float
     paradas_no_trecho: int
     trajeto: list[tuple[float, float]]
+    # US #159 — espera estimada até embarcar nesta perna. `None` quando
+    # não há dado suficiente (o front usa a duração teórica nesse caso).
+    espera_min: float | None = None
+    fonte_espera: Literal["tempo_real", "intervalo_medio", "teorica"] = "teorica"
+    # Só preenchido quando `fonte_espera == "tempo_real"`.
+    prefixo_veiculo: str | None = None
+    # Só preenchido quando `fonte_espera == "intervalo_medio"`.
+    intervalo_medio_min: float | None = None
 
 
 class OpcaoViagemResponse(BaseModel):
@@ -66,6 +76,14 @@ class OpcaoViagemResponse(BaseModel):
     distancia_km: float
     caminhada_metros: int
     duracao_estimada_min: int
+    # US #159 — ETA real da viagem inteira, calculado a partir da
+    # posição ao vivo dos ônibus. `None` quando não há ônibus
+    # identificável se aproximando da parada de embarque — nesse caso
+    # `duracao_estimada_min` (velocidade média) continua sendo a
+    # referência, e `tipo_estimativa` fica "teorica".
+    duracao_real_min: int | None = None
+    tipo_estimativa: Literal["tempo_real", "parcial", "teorica"] = "teorica"
+    calculado_em: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +102,10 @@ class PosicaoVeiculoResponse(BaseModel):
     direcao: float | None = None
     atualizado_em: str
     operadora: str
+    # US #19 — só calculado quando o cliente informa lat/lng (posição do
+    # usuário). `None` quando não informado, ou quando o veículo está
+    # parado/sem velocidade (Cenário 5: pílula sem tempo).
+    eta_minutos: float | None = None
 
 
 class PosicoesLinhaResponse(BaseModel):
@@ -96,3 +118,7 @@ class PosicoesLinhaResponse(BaseModel):
 
     numero: str
     veiculos: list[PosicaoVeiculoResponse]
+    # US #19, Cenário 3 — só preenchido quando `veiculos` está vazio e o
+    # cliente informou lat/lng: próximo horário da tabela teórica, já
+    # que sem GPS não há distância/velocidade pra estimar nada.
+    proximo_horario_previsto: str | None = None

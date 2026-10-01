@@ -1,6 +1,13 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
-sqlalchemy>=2.0
+# SQLAlchemy 2.1 passou a resolver "postgresql://" pro driver psycopg
+# (v3) por padrão, em vez de psycopg2 — que é o único instalado aqui.
+# Sem o teto, o import quebra no boot com "No module named 'psycopg'"
+# (derrubou o CI de qualquer PR aberto em 28/set/2026: containers de
+# auth/colaboracao/mobilidade e as migrations do pytest, todos com o
+# mesmo erro). Fixa em 2.0.x até decidirmos migrar pro driver psycopg
+# de propósito, com o pacote certo instalado.
+sqlalchemy>=2.0,<2.1
 psycopg2-binary>=2.9
 pydantic>=2.0
 pydantic-settings>=2.0
@@ -10,3 +17,4 @@ httpx>=0.27.0
 # SEMOB (ver posicao_service.FUSO_SEMOB). Sem isso o ZoneInfo levanta
 # ZoneInfoNotFoundError e o código cai no deslocamento fixo.
 tzdata>=2024.1
+apscheduler>=3.10.0

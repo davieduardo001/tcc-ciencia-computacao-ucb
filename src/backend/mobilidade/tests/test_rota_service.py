@@ -134,6 +134,55 @@ def test_sentido_volta_atende_o_caminho_inverso(db, servico):
     assert [p.sentido for o in volta for p in o.pernas] == ["VOLTA"]
 
 
+# --------------------------------------------------------------------------
+# trajeto_medido — US #19/#159: geometria completa de uma linha, para o
+# motor de ETA medir distância real ao longo do traçado.
+# --------------------------------------------------------------------------
+
+
+def test_trajeto_medido_com_sentido_explicito(db, servico):
+    _semear(db, f"{PREFIXO}004", "IDA", _trajeto())
+    db.commit()
+
+    resultado = servico.trajeto_medido(db, f"{PREFIXO}004", "IDA")
+
+    assert resultado is not None
+    medido, sentido = resultado
+    assert sentido == "IDA"
+    assert medido.comprimento_m > 0
+
+
+def test_trajeto_medido_infere_sentido_principal_quando_nao_informado(db, servico):
+    _semear(db, f"{PREFIXO}005", "VOLTA", _trajeto(inverso=True))
+    _semear(db, f"{PREFIXO}005", "CIRCULAR", _trajeto())
+    db.commit()
+
+    # CIRCULAR tem prioridade sobre VOLTA (mesma regra da ingestão).
+    resultado = servico.trajeto_medido(db, f"{PREFIXO}005")
+
+    assert resultado is not None
+    _, sentido = resultado
+    assert sentido == "CIRCULAR"
+
+
+def test_trajeto_medido_devolve_none_para_linha_nao_ingerida(db, servico):
+    assert servico.trajeto_medido(db, f"{PREFIXO}999") is None
+
+
+def test_trajeto_medido_usa_cache_sem_reconsultar_o_banco(db, servico):
+    _semear(db, f"{PREFIXO}006", "IDA", _trajeto())
+    db.commit()
+
+    primeiro = servico.trajeto_medido(db, f"{PREFIXO}006", "IDA")
+    # Apaga a rota do banco: se a segunda chamada fosse ao banco, viria None.
+    _limpar(db)
+
+    segundo = servico.trajeto_medido(db, f"{PREFIXO}006", "IDA")
+
+    assert primeiro is not None and segundo is not None
+    assert primeiro[0] is segundo[0]  # mesmo objeto, veio do cache
+
+
 def test_origem_longe_do_trajeto_nao_devolve_nada(db, servico):
     _semear(db, f"{PREFIXO}004", "IDA", _trajeto())
     db.commit()

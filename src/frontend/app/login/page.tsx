@@ -2,10 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import LayoutAuth from "../LayoutAuth";
 import CampoTexto from "../CampoTexto";
 import CampoSenha from "../CampoSenha";
-import AvisoEmBreve from "../AvisoEmBreve";
 import {
   loginUsuario,
   LoginError,
@@ -13,6 +13,7 @@ import {
   confirmarVinculoGoogle,
   decodificarIdTokenGoogle,
   GoogleLoginError,
+  buscarUsuarioAtual,
 } from "@/lib/api";
 import GoogleLoginButton from "./GoogleLoginButton";
 
@@ -40,7 +41,6 @@ export default function Login() {
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [enviandoGoogle, setEnviandoGoogle] = useState(false);
   const [lembrar, setLembrar] = useState(true);
-  const [avisoRecuperacao, setAvisoRecuperacao] = useState(false);
   const [vinculoPendente, setVinculoPendente] =
     useState<VinculoPendente | null>(null);
 
@@ -74,8 +74,13 @@ export default function Login() {
 
     try {
       await loginUsuario({ email, senha });
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Login realizado com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof LoginError) {
         setErros({ geral: err.message });
@@ -105,8 +110,13 @@ export default function Login() {
         return;
       }
 
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Login realizado com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof GoogleLoginError) {
         setErros({ geral: err.message });
@@ -127,8 +137,13 @@ export default function Login() {
     try {
       await confirmarVinculoGoogle(vinculoPendente);
       setVinculoPendente(null);
+      const usuario = await buscarUsuarioAtual();
       setMensagemSucesso("Conta vinculada ao Google com sucesso!");
-      router.push("/mapa");
+      if (usuario?.firstAccess) {
+        router.push("/tutorial");
+      } else {
+        router.push("/mapa");
+      }
     } catch (err) {
       if (err instanceof GoogleLoginError) {
         setErros({ geral: err.message });
@@ -185,13 +200,9 @@ export default function Login() {
             Lembrar de mim
           </label>
 
-          <button
-            type="button"
-            className="auth-link-discreto"
-            onClick={() => setAvisoRecuperacao(true)}
-          >
+          <Link href="/recuperar-senha" className="auth-link-discreto">
             Esqueci a senha
-          </button>
+          </Link>
         </div>
 
         {erros.geral && <p className="status-error">{erros.geral}</p>}
@@ -215,14 +226,6 @@ export default function Login() {
         </button>
       </form>
 
-      <AvisoEmBreve
-        aberto={avisoRecuperacao}
-        onFechar={() => setAvisoRecuperacao(false)}
-        titulo="Recuperação de senha"
-      >
-        Essa parte ainda está sendo construída. Em breve você vai poder
-        redefinir sua senha por aqui.
-      </AvisoEmBreve>
 
       {vinculoPendente ? (
         <div className="vinculo-confirmacao">
