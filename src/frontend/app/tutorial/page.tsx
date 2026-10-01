@@ -2,28 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Map, Search, Star, TriangleAlert } from "lucide-react";
 import { atualizarFirstAccess, buscarUsuarioAtual } from "@/lib/api";
 
+// Ícones em lucide-react, não emoji — mesmo sistema usado no resto do
+// app (AppShell, mapa, /ocorrencias). Mapa/Ocorrências/Rotas salvas
+// usam exatamente os mesmos ícones de app/mapa/AppShell.tsx, de
+// propósito: é o mesmo conceito, deveria parecer a mesma coisa.
 const ETAPAS = [
   {
     titulo: "Buscar Linhas",
     descricao: "Digite o número, nome ou destino da linha para ver trajetos, paradas e horários.",
-    icone: "🔍",
+    Icone: Search,
   },
   {
     titulo: "Visualizar no Mapa",
     descricao: "Veja o trajeto da linha, posições dos ônibus em tempo real e pontos de embarque mais próximos.",
-    icone: "🗺️",
+    Icone: Map,
   },
   {
     titulo: "Reportar Ocorrência",
     descricao: "Ajude a comunidade reportando ônibus fantasma, atrasos, lotação ou problemas de segurança.",
-    icone: "📍",
+    Icone: TriangleAlert,
   },
   {
     titulo: "Salvar Rota Favorita",
     descricao: "Marque suas linhas e rotas preferidas para receber alertas personalizados de chegada e atraso.",
-    icone: "⭐",
+    Icone: Star,
   },
 ];
 
@@ -106,7 +111,9 @@ export default function Tutorial() {
         </div>
 
         <div className="tutorial-content">
-          <div className="tutorial-icone">{etapa.icone}</div>
+          <div className="tutorial-icone">
+            <etapa.Icone size={40} strokeWidth={1.8} />
+          </div>
           <h2>{etapa.titulo}</h2>
           <p>{etapa.descricao}</p>
         </div>
@@ -195,7 +202,9 @@ export default function Tutorial() {
           box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
         }
         .tutorial-icone {
-          font-size: 3.5rem;
+          display: flex;
+          justify-content: center;
+          color: #2563eb;
           margin-bottom: 1rem;
         }
         .tutorial-content h2 {
