@@ -68,6 +68,24 @@ git push -u origin docs/nome-da-atualizacao
 # → abrir Pull Request: docs/nome-da-atualizacao → main
 ```
 
+### Promoção para produção (`homolog` → `main`)
+
+A PR que promove `homolog` para `main` **é mergeada com "Create a merge commit"**, nunca com squash.
+
+O motivo é prático. `homolog` é uma branch de vida longa: ela não morre depois do merge, continua recebendo trabalho. Quando a promoção entra como squash, a `main` fica com o conteúdo, mas os commits originais do `homolog` **não ficam alcançáveis por ela**. O resultado é que o Git passa a dizer "homolog está N commits à frente da main" mesmo quando o conteúdo é byte a byte idêntico — e na release seguinte esse N volta a contar os mesmos commits, mais os novos.
+
+Na prática, perde-se o sinal mais útil do processo: a resposta à pergunta *"o que ainda falta promover?"*.
+
+Para as demais PRs — `feat/`, `fix/`, `docs/`, `chore/` — squash continua sendo a escolha certa: são branches de vida curta, que morrem no merge, e o squash mantém o histórico da `homolog` legível, com um commit por entrega.
+
+| Tipo de PR | Como mergear | Por quê |
+|---|---|---|
+| `feat/`, `fix/` → `homolog` | Squash | Branch de vida curta; um commit por entrega |
+| `docs/`, `chore/` → `main` | Squash | Mesma razão |
+| **`homolog` → `main`** | **Merge commit** | Branch de vida longa; squash quebra a contagem do que falta promover |
+
+> **Se acontecer de entrar como squash**, o conserto é mergear a `main` de volta no `homolog`. Isso não altera nenhuma linha — o diff já é vazio — e devolve à `main` o status de ancestral, evitando que a próxima PR de release nasça desatualizada. A contagem "N commits à frente", porém, só se normaliza na release seguinte, quando um merge commit tornar aqueles commits alcançáveis pela `main`. Foi o que aconteceu na PR #142.
+
 ---
 
 ## Nomeclatura de Branches
