@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Ban,
   Clock,
@@ -37,10 +37,27 @@ const TIPOS: { id: TipoOcorrencia; label: string; Icone: LucideIcon }[] = [
   { id: "seguranca", label: "Segurança", Icone: ShieldAlert },
 ];
 
+/**
+ * `useSearchParams` exige renderização no cliente — sem o Suspense o
+ * `next build` falha na geração estática (mesmo padrão de app/mapa/page.tsx).
+ */
 export default function OcorrenciasPage() {
-  const router = useRouter();
+  return (
+    <Suspense fallback={null}>
+      <OcorrenciasConteudo />
+    </Suspense>
+  );
+}
 
-  const [linhaNumero, setLinhaNumero] = useState("");
+function OcorrenciasConteudo() {
+  const router = useRouter();
+  // US #23 — vindo do atalho "Reportar ocorrência nesta linha" (detalhe
+  // da linha no mapa), a linha já chega preenchida; quem abre a tela
+  // direto (pelo "+" ou pela sidebar) continua digitando do zero.
+  const searchParams = useSearchParams();
+  const linhaDaUrl = searchParams.get("linha") ?? "";
+
+  const [linhaNumero, setLinhaNumero] = useState(linhaDaUrl);
   const [sugestoes, setSugestoes] = useState<LinhaResumo[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

@@ -10,7 +10,8 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
-import { Bus, Crosshair, Layers, X } from "lucide-react";
+import Link from "next/link";
+import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
 import {
   buscarPosicoesDaLinha,
   LinhaDetalhada,
@@ -117,6 +118,28 @@ function descreverIdade(atualizadoEm: string): string {
 
   const minutos = Math.round(segundos / 60);
   return `Posição de ${minutos} min atrás`;
+}
+
+// US #16 — "pra onde o ônibus tá indo". O popup só mostrava o sentido
+// quando a API devolvia o texto (`veiculo.sentido`), que o feed da SEMOB
+// nem sempre preenche — nesses casos o popup caía num genérico "Em
+// operação", sem dizer nada sobre direção. `direcao` (graus) quase
+// sempre vem, porque é o mesmo campo que já orienta a seta do ícone — dá
+// pra traduzir em texto como reforço, não como substituto do sentido.
+const PONTOS_CARDEAIS = [
+  "norte",
+  "nordeste",
+  "leste",
+  "sudeste",
+  "sul",
+  "sudoeste",
+  "oeste",
+  "noroeste",
+] as const;
+
+function direcaoCardinal(graus: number): string {
+  const indice = Math.round(((graus % 360) + 360) % 360 / 45) % 8;
+  return PONTOS_CARDEAIS[indice];
 }
 
 /** O número da linha vem da API e entra em innerHTML — escapa. */
@@ -662,7 +685,9 @@ export default function MapaInterativo({
                 <br />
                 {veiculo.sentido
                   ? `Sentido ${veiculo.sentido.toLowerCase()}`
-                  : "Em operação"}
+                  : !parado && veiculo.direcao !== null
+                    ? `Indo pra ${direcaoCardinal(veiculo.direcao)}`
+                    : "Em operação"}
                 {veiculo.velocidade !== null && (
                   <>
                     {" · "}
@@ -734,6 +759,19 @@ export default function MapaInterativo({
                 </span>
               )}
             </div>
+
+            {/* US #23 — achado de uso real: o link de "Ocorrências" só
+                existe na sidebar, longe de onde a pessoa está olhando (o
+                detalhe desta linha). Um atalho contextual aqui, já com a
+                linha preenchida, é o caminho óbvio pra quem quer reportar
+                um problema enquanto olha pra ela. */}
+            <Link
+              href={`/ocorrencias?linha=${encodeURIComponent(linha.numero)}`}
+              className="mapa-painel-reportar"
+            >
+              <TriangleAlert size={15} />
+              Reportar ocorrência nesta linha
+            </Link>
 
             <div className="mapa-painel-titulo">Trajeto e paradas</div>
             <div className="mapa-timeline">

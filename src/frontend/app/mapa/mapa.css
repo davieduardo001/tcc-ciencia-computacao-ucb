@@ -594,7 +594,12 @@
 
 .mapa-painel-cabecalho {
   display: flex;
-  align-items: center;
+  /* Nome de linha longo quebra em várias linhas (ex: linhas circulares,
+     com vários pontos turísticos no nome) — com align-items:center o
+     botão de fechar flutuava no meio do bloco de texto em vez de ficar
+     ancorado no canto. flex-start deixa o X sempre no topo, não importa
+     quantas linhas o título ocupe. */
+  align-items: flex-start;
   /* Faltava — sem isso o botão de fechar ficava colado à esquerda, antes
      do título, enquanto o painel irmão (.plan-cabecalho) tem o mesmo
      botão à direita via este mesmo space-between. */
@@ -618,6 +623,32 @@
 
 .mapa-painel-corpo {
   padding: 16px 18px 20px;
+}
+
+/* US #23 — atalho contextual pra reportar ocorrência nesta linha,
+   direto de onde a pessoa já está olhando. */
+.mapa-painel-reportar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--mc-alerta, #c77f1e);
+  border-radius: 999px;
+  background: var(--mc-alerta-fundo, #f3e6c6);
+  color: var(--mc-alerta, #c77f1e);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: 0.14s;
+}
+
+.mapa-painel-reportar:hover {
+  background: var(--mc-alerta, #c77f1e);
+  color: #fff;
 }
 
 .mapa-painel-titulo {
@@ -1024,7 +1055,10 @@
 .plan-opcao {
   width: 100%;
   text-align: left;
-  padding: 12px 14px;
+  /* Era 12px 14px — card ficava com pouco respiro, texto parecia mais
+     espremido do que já é (achado de uso real: "letras muito pequenas,
+     nada bem distribuído"). */
+  padding: 14px 16px;
   border: 1px solid var(--border-2);
   border-radius: var(--radius-sm, 10px);
   background: #fff;
@@ -1071,11 +1105,13 @@
 
 .plan-badge-linha {
   display: inline-block;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 6px;
   background: var(--accent, #1aa0ad);
   color: #fff;
-  font-size: 12px;
+  /* Era 12px — pequeno demais pro número da linha, a informação mais
+     importante do card. */
+  font-size: 13px;
   font-weight: 700;
   font-style: normal;
 }
@@ -1084,7 +1120,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  /* Era 12px. */
+  font-size: 13px;
   color: var(--muted);
   /* .plan-opcao-resumo distribui os dois grupos com space-between, mas
      quando .plan-opcao-linhas é longo o bastante pra empurrar este grupo
@@ -1096,7 +1133,9 @@
 
 .plan-opcao-metricas strong {
   color: var(--text);
-  font-size: 13.5px;
+  /* Era 13.5px — a duração é o dado que mais importa pra escolher entre
+     as opções, merece ser o maior texto do card. */
+  font-size: 15px;
 }
 
 .plan-opcao-metricas span {
@@ -1109,9 +1148,10 @@
    ao vivo) da duração estimada por velocidade média de sempre. */
 .plan-opcao-selo-ao-vivo,
 .plan-opcao-selo-estimado {
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 10.5px;
+  /* Era 10.5px. */
+  font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -1144,7 +1184,10 @@
 }
 
 .plan-passo-nome {
-  font-size: 12.5px;
+  /* Eram 11.5-12.5px em toda esta seção — pequeno demais pro detalhe de
+     embarque/desembarque, que é o texto que a pessoa precisa ler com
+     mais atenção (onde entrar e onde sair do ônibus). */
+  font-size: 13.5px;
   color: var(--text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1154,8 +1197,8 @@
 .plan-passo-detalhe {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 12.5px;
+  gap: 4px;
+  font-size: 13.5px;
   color: var(--text-2);
   padding-left: 4px;
 }
@@ -1168,7 +1211,7 @@
 .plan-passo-detalhe em {
   font-style: normal;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .plan-passo-meio {
@@ -1176,7 +1219,7 @@
   align-items: center;
   gap: 5px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 2px 0;
 }
 
@@ -1186,7 +1229,7 @@
   align-items: center;
   gap: 6px;
   margin: 0 0 6px 4px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-2);
 }
 

@@ -226,6 +226,16 @@ describe("MapaInterativo", () => {
     expect(rotulos.length).toBeGreaterThanOrEqual(LINHA_TESTE.paradas.length);
   });
 
+  it("tem um atalho pra reportar ocorrência já com a linha preenchida", () => {
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const atalho = screen.getByText("Reportar ocorrência nesta linha");
+    expect(atalho.closest("a")).toHaveAttribute(
+      "href",
+      "/ocorrencias?linha=0.110"
+    );
+  });
+
   it("chama onFecharLinha ao clicar em fechar o painel", () => {
     const onFecharLinha = jest.fn();
     render(<MapaInterativo linha={LINHA_TESTE} onFecharLinha={onFecharLinha} />);
@@ -702,6 +712,34 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
       const marcador = screen.getByTestId("marcador-mapa-icone-onibus");
       expect(marcador.getAttribute("data-html")).toContain("rotate(218.72deg)");
     });
+  });
+
+  it("sem 'sentido' da API, popup mostra a direção cardeal calculada do rumo", async () => {
+    // Achado de uso real: o feed da SEMOB nem sempre preenche `sentido`,
+    // e o popup caía num "Em operação" genérico, sem dizer pra onde o
+    // ônibus ia — mesmo a seta do ícone já sabendo a direção (`direcao`).
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, sentido: null, velocidade: 41, direcao: 218.72 }])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Indo pra sudoeste/)).toBeInTheDocument();
+    });
+  });
+
+  it("ônibus parado sem 'sentido' não inventa direção (não está mais indo a lugar nenhum)", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([{ ...VEICULO, sentido: null, velocidade: 0, direcao: 218.72 }])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Em operação/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Indo pra/)).not.toBeInTheDocument();
   });
 
   it("ônibus parado não ganha seta nem pulso", async () => {

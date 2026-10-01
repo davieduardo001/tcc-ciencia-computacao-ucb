@@ -15,8 +15,12 @@ jest.mock("@/lib/api", () => {
 });
 
 const pushMock = jest.fn();
+let paramsLinha = "";
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  useSearchParams: () => ({
+    get: (chave: string) => (chave === "linha" ? paramsLinha || null : null),
+  }),
 }));
 
 const reportarOcorrenciaMock = reportarOcorrencia as jest.Mock;
@@ -33,6 +37,14 @@ describe("OcorrenciasPage", () => {
   beforeEach(() => {
     pushMock.mockReset();
     reportarOcorrenciaMock.mockReset();
+    paramsLinha = "";
+  });
+
+  it("vindo do atalho 'Reportar nesta linha', já chega com a linha preenchida", () => {
+    paramsLinha = "0.312";
+    render(<OcorrenciasPage />);
+
+    expect(screen.getByPlaceholderText("Ex: 0.110")).toHaveValue("0.312");
   });
 
   it("renderiza os 7 tipos de ocorrência do protótipo v3", () => {
