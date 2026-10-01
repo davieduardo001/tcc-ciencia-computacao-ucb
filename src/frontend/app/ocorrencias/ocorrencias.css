@@ -63,6 +63,9 @@
 .ocor-campo textarea:focus {
   outline: none;
   border-color: var(--mc-teal);
+  /* Só a cor da borda era um indicador de foco fraco pra quem navega
+     por teclado — reforça com o mesmo anel usado nos campos de auth. */
+  box-shadow: var(--mc-foco);
 }
 
 .ocor-sugestoes {

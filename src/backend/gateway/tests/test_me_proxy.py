@@ -56,3 +56,49 @@ def test_me_sem_sessao_retorna_401_sem_chamar_o_proxy():
 
     assert response.status_code == 401
     proxy_mock.assert_not_called()
+
+
+def _proxy_response_first_access(valor: bool):
+    corpo = json.dumps(
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "nome": "Usuária de Teste",
+            "email": "teste@example.com",
+            "avatar_url": None,
+            "first_access": valor,
+        }
+    ).encode()
+    return Response(content=corpo, status_code=200, media_type="application/json")
+
+
+def test_first_access_proxyado_com_sessao_valida():
+    """Regressão: PUT /auth/me/first-access não tinha rota no Gateway (só
+    GET /auth/me existia) — caia em 404 antes de chegar no Auth Service,
+    e o tutorial nunca persistia ter sido concluído/pulado."""
+    with patch(
+        "gateway.routes.proxy_request",
+        AsyncMock(return_value=_proxy_response_first_access(False)),
+    ) as proxy_mock:
+        response = client.put(
+            "/api/auth/me/first-access",
+            json={"first_access": False},
+            cookies={"access_token": _token_valido()},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["first_access"] is False
+    proxy_mock.assert_called_once()
+
+
+def test_first_access_sem_sessao_retorna_401_sem_chamar_o_proxy():
+    with patch(
+        "gateway.routes.proxy_request",
+        AsyncMock(return_value=_proxy_response_first_access(False)),
+    ) as proxy_mock:
+        response = client.put(
+            "/api/auth/me/first-access",
+            json={"first_access": False},
+        )
+
+    assert response.status_code == 401
+    proxy_mock.assert_not_called()
