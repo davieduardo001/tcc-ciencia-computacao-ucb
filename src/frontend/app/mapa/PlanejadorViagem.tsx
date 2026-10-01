@@ -244,7 +244,7 @@ function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
         <span>
           {opcao.baldeacoes === 0
             ? "direto"
-            : `${opcao.baldeacoes} baldeação`}
+            : `${opcao.baldeacoes} ${opcao.baldeacoes === 1 ? "baldeação" : "baldeações"}`}
         </span>
       </div>
     </div>

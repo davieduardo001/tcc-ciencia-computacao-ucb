@@ -1040,6 +1040,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Itinerário com várias pernas (muitos badges + ícone de troca entre
+     eles) podia ultrapassar a largura do painel sem ter pra onde
+     quebrar. */
+  flex-wrap: wrap;
 }
 
 .plan-opcao-linhas > span {
@@ -1069,6 +1073,12 @@
   gap: 10px;
   font-size: 12px;
   color: var(--muted);
+  /* .plan-opcao-resumo distribui os dois grupos com space-between, mas
+     quando .plan-opcao-linhas é longo o bastante pra empurrar este grupo
+     pra uma segunda linha, ele fica sozinho nela — e space-between, com
+     um item só por linha, alinha à esquerda, não à direita. margin-left
+     auto garante a direita nos dois casos (quebrando ou não). */
+  margin-left: auto;
 }
 
 .plan-opcao-metricas strong {
