@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Sora } from "next/font/google";
 import RegistrarServiceWorker from "./RegistrarServiceWorker";
+import SplashScreen from "./SplashScreen";
 import "./globals.css";
 
 // Identidade v3: Manrope para texto corrido, Sora para títulos e números.
@@ -53,6 +54,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${manrope.variable} ${sora.variable}`}>
       <body>
+        <SplashScreen />
         {children}
         <RegistrarServiceWorker />
       </body>
