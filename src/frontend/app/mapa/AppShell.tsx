@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Bus,
+  HelpCircle,
   LogOut,
   Map as MapIcon,
   Navigation,
@@ -17,7 +18,7 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
-import { buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
+import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
 import AvisoEmBreve from "../AvisoEmBreve";
 import "./mapa.css";
 
@@ -207,6 +208,18 @@ export default function AppShell({
     }
   }
 
+  // US #30 — reabre o guia sob demanda. /tutorial redireciona de volta pro
+  // mapa se firstAccess já for false (ver tutorial/page.tsx), então
+  // precisa marcar true ANTES de navegar — mesmo padrão já usado em
+  // "Ver tutorial novamente" (configuracoes/page.tsx).
+  async function abrirGuia() {
+    try {
+      await atualizarFirstAccess(true);
+    } finally {
+      router.push("/tutorial");
+    }
+  }
+
   async function handleSair() {
     setSaindo(true);
     await logoutUsuario();
@@ -274,6 +287,17 @@ export default function AppShell({
               {carregandoUsuario ? "" : usuario?.email ?? "Não autenticado"}
             </small>
           </div>
+          {usuario && (
+            <button
+              type="button"
+              className="ms-ajuda-btn"
+              title="Rever o guia"
+              aria-label="Rever o guia"
+              onClick={abrirGuia}
+            >
+              <HelpCircle size={16} />
+            </button>
+          )}
           {usuario && (
             <button
               type="button"

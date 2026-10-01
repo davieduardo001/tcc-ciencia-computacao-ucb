@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AppShell from "../AppShell";
-import { buscarUsuarioAtual, logoutUsuario } from "@/lib/api";
+import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario } from "@/lib/api";
 
 jest.mock("@/lib/api", () => ({
   buscarUsuarioAtual: jest.fn(),
   logoutUsuario: jest.fn(),
+  atualizarFirstAccess: jest.fn(),
 }));
 
 const pushMock = jest.fn();
@@ -14,6 +15,7 @@ jest.mock("next/navigation", () => ({
 
 const buscarUsuarioAtualMock = buscarUsuarioAtual as jest.Mock;
 const logoutUsuarioMock = logoutUsuario as jest.Mock;
+const atualizarFirstAccessMock = atualizarFirstAccess as jest.Mock;
 
 describe("AppShell", () => {
   beforeEach(() => {
@@ -21,6 +23,8 @@ describe("AppShell", () => {
     buscarUsuarioAtualMock.mockResolvedValue(null);
     logoutUsuarioMock.mockReset();
     logoutUsuarioMock.mockResolvedValue(undefined);
+    atualizarFirstAccessMock.mockReset();
+    atualizarFirstAccessMock.mockResolvedValue(undefined);
     pushMock.mockReset();
   });
 
@@ -375,5 +379,43 @@ describe("AppShell", () => {
       expect(logoutUsuarioMock).toHaveBeenCalledTimes(1);
       expect(pushMock).toHaveBeenCalledWith("/login");
     });
+  });
+
+  it("botão de ajuda marca first_access=true e abre o tutorial (US #30)", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue({
+      id: "1",
+      nome: "Ana Passageira",
+      email: "ana@teste.com",
+      avatarUrl: null,
+    });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const botaoAjuda = await screen.findByTitle("Rever o guia");
+    fireEvent.click(botaoAjuda);
+
+    await waitFor(() => {
+      expect(atualizarFirstAccessMock).toHaveBeenCalledWith(true);
+      expect(pushMock).toHaveBeenCalledWith("/tutorial");
+    });
+  });
+
+  it("não mostra o botão de ajuda para visitante não autenticado", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue(null);
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Visitante")).toBeInTheDocument();
+    });
+    expect(screen.queryByTitle("Rever o guia")).not.toBeInTheDocument();
   });
 });

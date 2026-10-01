@@ -215,6 +215,7 @@
   white-space: nowrap;
 }
 
+.ms-ajuda-btn,
 .ms-sair-btn {
   flex-shrink: 0;
   width: 30px;
@@ -227,6 +228,12 @@
   place-items: center;
   cursor: pointer;
   transition: 0.14s;
+}
+
+.ms-ajuda-btn:hover {
+  background: var(--bg-soft);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .ms-sair-btn:hover:not(:disabled) {
