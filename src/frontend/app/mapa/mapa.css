@@ -805,6 +805,9 @@
 .plan-input:focus {
   outline: none;
   border-color: var(--primary);
+  /* Só a cor da borda era um indicador de foco fraco pra quem navega
+     por teclado — reforça com o mesmo anel usado nos campos de auth. */
+  box-shadow: var(--mc-foco);
 }
 
 .plan-campo.escolhendo .plan-input {
