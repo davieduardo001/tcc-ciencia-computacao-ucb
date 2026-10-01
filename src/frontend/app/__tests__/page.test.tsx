@@ -1,43 +1,43 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import Home from "../page";
+import { buscarUsuarioAtual } from "@/lib/api";
 
-describe("Home", () => {
+jest.mock("@/lib/api", () => ({
+  buscarUsuarioAtual: jest.fn(),
+}));
+
+const replaceMock = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: replaceMock }),
+}));
+
+const buscarUsuarioAtualMock = buscarUsuarioAtual as jest.Mock;
+
+describe("Home (/)", () => {
   beforeEach(() => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        service: "gateway",
-        status: "ok",
-        servicos: [
-          { service: "gateway", status: "ok" },
-          { service: "auth", status: "ok" },
-          { service: "mobilidade", status: "ok" },
-          { service: "colaboracao", status: "ok" },
-        ],
-      }),
-    }) as jest.Mock;
+    replaceMock.mockReset();
+    buscarUsuarioAtualMock.mockReset();
   });
 
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
-
-  it("deve renderizar o título Movecity", async () => {
-    render(<Home />);
-    expect(screen.getByText("Movecity")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.queryByText("Carregando...")).not.toBeInTheDocument();
+  it("redireciona pro mapa quando já existe sessão", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue({
+      id: "1",
+      nome: "Ana",
+      email: "ana@teste.com",
+      avatarUrl: null,
+      firstAccess: false,
     });
-  });
-
-  it("deve marcar serviço como Offline quando a resposta falha", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
 
     render(<Home />);
 
-    await waitFor(() => {
-      expect(screen.getAllByText("Offline").length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/mapa"));
+  });
+
+  it("redireciona pro login quando não há sessão", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue(null);
+
+    render(<Home />);
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 });

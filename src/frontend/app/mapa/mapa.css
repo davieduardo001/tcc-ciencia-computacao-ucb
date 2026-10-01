@@ -572,7 +572,9 @@
   top: 20px;
   right: 20px;
   bottom: 20px;
-  width: 360px;
+  /* Mesmo ajuste do .plan-painel: 360px apertava nome da linha + sentido
+     + timeline de paradas no desktop, onde sobra largura de tela. */
+  width: 420px;
   max-width: calc(100% - 40px);
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid var(--border-2);
@@ -709,7 +711,11 @@
   top: 20px;
   left: 20px;
   bottom: 20px;
-  width: 370px;
+  /* 370px sobrava apertado no desktop pra mostrar linha + troca + ETA +
+     duração numa opção só — texto quebrava de um jeito que parecia
+     desalinhado. Acima de 920px (.max-width recua pra caber no celular;
+     abaixo disso o media query de mobile já troca pra width:auto). */
+  width: 420px;
   max-width: calc(100% - 40px);
   display: flex;
   flex-direction: column;
@@ -1557,17 +1563,21 @@
 }
 
 .mapa-icone-onibus-seta::before {
+  /* Era 5px/8px — legível de perto, mas sumia no zoom-out padrão do
+     mapa (e em cima de área verde, a cor confundia com o próprio tile).
+     Halo mais forte + um pouco maior resolve as duas coisas sem mudar
+     a posição relativa ao marcador. */
   content: "";
   position: absolute;
-  top: -7px;
+  top: -9px;
   left: 50%;
   width: 0;
   height: 0;
-  margin-left: -5px;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 8px solid var(--primary);
-  filter: drop-shadow(0 -1px 1px rgba(255, 255, 255, 0.9));
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid var(--primary);
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff);
 }
 
 /* Parado não pulsa: o halo animado sugere movimento que não existe. */
