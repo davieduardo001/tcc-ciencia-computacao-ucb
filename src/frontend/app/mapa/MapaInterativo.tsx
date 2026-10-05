@@ -13,9 +13,13 @@ import L from "leaflet";
 import Link from "next/link";
 import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
 import {
+  buscarDetalhesParada,
   buscarPosicoesDaLinha,
+  BuscarParadaError,
+  DetalhesParada,
   LinhaDetalhada,
   OpcaoViagem,
+  ParadaLinha,
   VeiculoAoVivo,
 } from "@/lib/api";
 import type { PontoEscolhido } from "./PlanejadorViagem";
@@ -359,6 +363,14 @@ export default function MapaInterativo({
   const coordenadasRef = useRef<Coordenadas | null>(null);
   coordenadasRef.current = coordenadas;
 
+  // US #18 — detalhes da parada selecionada no mapa.
+  const [detalheParada, setDetalheParada] = useState<{
+    parada: ParadaLinha;
+    detalhes: DetalhesParada | null;
+    carregando: boolean;
+    erro: string | null;
+  } | null>(null);
+
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       setStatus("indisponivel");
@@ -433,6 +445,13 @@ export default function MapaInterativo({
     }
   }, [linha]);
 
+  // Uma nova busca de linha (ou o fechamento dela) invalida o painel de
+  // detalhes da parada que estava aberto — senão ele fica cobrindo o
+  // resultado novo, com dados de uma parada que já saiu do mapa.
+  useEffect(() => {
+    setDetalheParada(null);
+  }, [linha]);
+
   // US #16 — linhas a rastrear: a que foi buscada pelo número, ou as
   // que compõem o itinerário escolhido no planejador (US #20).
   //
@@ -493,6 +512,39 @@ export default function MapaInterativo({
     if (coordenadas && mapRef.current) {
       mapRef.current.setView([coordenadas.lat, coordenadas.lng], ZOOM_LOCALIZADO);
     }
+  }
+
+  // US #18 — Cenário 1: ao tocar numa parada, busca e exibe o painel de
+  // detalhes (linhas que passam por ela e próximos horários).
+  async function abrirDetalheParada(parada: ParadaLinha) {
+    setDetalheParada({ parada, detalhes: null, carregando: true, erro: null });
+
+    try {
+      const detalhes = await buscarDetalhesParada(parada.lat, parada.lng);
+      setDetalheParada({
+        parada,
+        detalhes,
+        carregando: false,
+        erro: detalhes
+          ? null
+          : "Não encontramos detalhes para esta parada no momento.",
+      });
+    } catch (err) {
+      setDetalheParada({
+        parada,
+        detalhes: null,
+        carregando: false,
+        erro:
+          err instanceof BuscarParadaError
+            ? err.message
+            : "Não foi possível carregar os detalhes da parada. Tente novamente.",
+      });
+    }
+  }
+
+  // US #18 — Cenário 3: fechar o painel e retornar ao mapa.
+  function fecharDetalheParada() {
+    setDetalheParada(null);
   }
 
   const corLinha = linha ? corDaLinha(linha.numero) : undefined;
@@ -645,10 +697,12 @@ export default function MapaInterativo({
                 key={`${parada.nome}-${indice}`}
                 position={[parada.lat, parada.lng]}
                 icon={iconeParada}
-              >
-                {/* Cenário 2 da US #17: nome da parada ao tocar/clicar */}
-                <Popup>{nomeDaParada(parada.nome)}</Popup>
-              </Marker>
+                eventHandlers={{
+                  // US #18, Cenário 1: tocar na parada abre o painel de
+                  // detalhes (linhas que passam por ela + próximos horários).
+                  click: () => abrirDetalheParada(parada),
+                }}
+              />
             ))}
 
 
@@ -717,7 +771,82 @@ export default function MapaInterativo({
         </button>
       </div>
 
-      {linha && (
+      {/* US #18 — painel de detalhes da parada selecionada. Tem prioridade
+          sobre o painel da linha; fechar (Cenário 3) devolve a ele. */}
+      {detalheParada && (
+        <aside className="mapa-painel-linha">
+          <div className="mapa-painel-cabecalho">
+            <div>
+              <strong>
+                {detalheParada.detalhes?.nome ??
+                  nomeDaParada(detalheParada.parada.nome)}
+              </strong>
+              {detalheParada.detalhes && (
+                <span className="mapa-painel-sentido">
+                  Parada {detalheParada.detalhes.codigo}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="mapa-botao-icone"
+              title="Fechar"
+              onClick={fecharDetalheParada}
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="mapa-painel-corpo">
+            {detalheParada.carregando && (
+              <p className="mapa-painel-sem-veiculo">
+                Carregando detalhes da parada...
+              </p>
+            )}
+
+            {detalheParada.erro && (
+              <div className="mapa-aviso" role="alert">
+                {detalheParada.erro}
+              </div>
+            )}
+
+            {detalheParada.detalhes && (
+              <>
+                <div className="mapa-painel-titulo">
+                  Linhas que passam por aqui ·{" "}
+                  {detalheParada.detalhes.linhas.length}
+                </div>
+                <div className="mapa-timeline">
+                  {detalheParada.detalhes.linhas.map((linhaNaParada) => (
+                    <div className="mapa-timeline-passo" key={linhaNaParada.numero}>
+                      <span className="mapa-timeline-no" />
+                      <span className="mapa-timeline-rotulo">
+                        <strong>{linhaNaParada.numero}</strong>{" "}
+                        {linhaNaParada.nome}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
+                  Próximos horários
+                </div>
+                {/* Cenário 2 da US #18: parada sem horário disponível */}
+                {detalheParada.detalhes.proximosHorarios.length > 0 ? (
+                  <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
+                ) : (
+                  <p className="mapa-painel-sem-veiculo">
+                    Nenhum horário previsto disponível para esta parada no
+                    momento.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </aside>
+      )}
+
+      {!detalheParada && linha && (
         <aside className="mapa-painel-linha">
           <div className="mapa-painel-cabecalho">
             <div>
