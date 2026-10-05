@@ -160,6 +160,23 @@ async def me(request: Request):
     )
 
 
+@router.put("/auth/me/first-access")
+async def atualizar_first_access(request: Request):
+    """Proxy do PUT /auth/me/first-access (US #30 — tutorial de onboarding).
+
+    Faltava esta rota: o front chamava /api/auth/me/first-access, mas o
+    Gateway não tinha proxy pra ela (só GET /auth/me), então a chamada
+    caia em 404 antes de chegar no Auth Service. O tutorial concluía ou
+    era pulado, a chamada falhava silenciosamente (catch no front) e
+    first_access nunca persistia — voltava a aparecer em todo acesso.
+    """
+    return await proxy_request(
+        settings.AUTH_SERVICE_URL,
+        "/auth/me/first-access",
+        request,
+    )
+
+
 @router.post("/auth/refresh")
 async def refresh(request: Request):
     """Refresh token: proxy + atualizar cookies."""
