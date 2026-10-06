@@ -330,12 +330,13 @@ O Movecity persiste dados estruturados no PostgreSQL. A seguir, a descrição da
 | `sessoes` | Sessões emitidas, para revogação e renovação de token | US #10, #31 |
 | `tokens_reset_senha` | Tokens de uso único para recuperação de senha | US #13 |
 | `linha` | Catálogo de linhas: número, nome, sentido, `paradas`, `trajeto` e `horarios_previstos` | US #15, #17 |
-| `rota` / `rota_celula` | Rotas calculadas e o índice de grade que acelera a busca por proximidade | US #20 |
+| `rota` / `rota_celula` | Trajeto por linha × sentido, horários por dia da semana, tempo de percurso e o índice de grade que acelera a busca por proximidade | US #20, #173 |
+| `parada` / `rota_parada` | Parada física única (código estável) e a posição dela em cada rota: ordem, índice no trajeto, distância acumulada e distância ao traçado | US #173 |
 | `preferencias_notificacao` | Antecedência do aviso e chaves de ativação por tipo de alerta | US #29 |
 
 *Tabela 4 – Tabelas persistidas*
 
-**Entidades ainda não persistidas:** `Ocorrencia`, `RotaFavorita` e `Parada` fazem parte do modelo conceitual, mas ainda não têm tabela — as USs correspondentes (#23–26) não foram implementadas, e as paradas vivem hoje como documento JSON dentro de `linha`. `PosicaoOnibus` **não será persistida por decisão de projeto**: a posição é lida ao vivo e descartada (seção 5, processo 2).
+**Entidades ainda não persistidas:** `Ocorrencia` e `RotaFavorita` fazem parte do modelo conceitual, mas ainda não têm tabela neste quadro. A `Parada` passou a ter tabela própria na US #173; `linha.paradas` segue como JSON só para a exibição da linha. `PosicaoOnibus` **não será persistida por decisão de projeto**: a posição é lida ao vivo e descartada (seção 5, processo 2).
 
 **Representação de geometria.** Trajetos e paradas são armazenados em colunas `JSON` — `list[[lat, lng]]` para o traçado e `list[{nome, lat, lng}]` para as paradas —, e não em tipos geoespaciais. O consumidor desses dados é o Leaflet no navegador, que recebe coordenadas em JSON de qualquer forma; guardá-las no formato final evita conversão a cada leitura. A única operação genuinamente espacial do sistema — associar abrigos de parada ao traçado de uma linha — ocorre uma vez por mês, na ingestão, e é resolvida em Python com índice de grade (seção 10, ADR-02).
 
@@ -393,8 +394,9 @@ Esta seção registra as decisões arquiteturais tomadas **durante a implementa�
 | **ADR-11** | A base do mapa é o **CARTO Voyager**, com recuo automático para o tile padrão do OpenStreetMap. | O tile padrão do OSM é denso e saturado, e disputa atenção com o que importa na tela. A base do CARTO tem contraste menor e deixa legíveis linha, parada e veículo. | A CARTO passou a exigir chave. A chave é gratuita (5 milhões de tiles/mês), mas virou uma variável de ambiente a mais. Sem ela, o mapa recua para o OSM e continua funcionando — nenhuma tela quebra por falta de credencial. |
 | **ADR-12** | As máquinas do Fly operam com **escala a zero** (`min_machines_running = 0`). | Mantém o custo do projeto-piloto próximo de zero. | Partida a frio na primeira requisição após ociosidade. Conflita com a meta de 3 segundos da seção 2 em um cenário real de produção; a correção é configuração, não arquitetura. |
 | **ADR-13** | O proxy do Gateway repassa a **query string** e **não repassa o `Accept-Encoding`** do cliente. | Descartar a query string quebrava toda rota com parâmetro. Repassar o `Accept-Encoding` fazia o serviço de destino devolver corpo comprimido que o proxy entregava sem descomprimir. | O proxy deixou de ser transparente por acidente e passou a ser transparente por contrato, com teste cobrindo os dois comportamentos. |
+| **ADR-14** | A **parada física tem tabela própria** (`parada`), criada por fusão de abrigos a até 10 m na ingestão, com código derivado do centróide e desempate de colisão. | O `/pontos` do SEMOB não tem identificador e repete o mesmo abrigo em registros vizinhos (~900 pares a até 15 m). O código derivado da coordenada clicada mudava conforme o registro, e o ETA não conseguia relacionar parada, veículo e sentido. | A tabela é reconstruída a cada ingestão, então o `id` muda; **quem consome deve usar o `codigo`**. O espaço de 100 mil códigos colide (113 de 4.318 paradas), por isso há sondagem determinística. Dois abrigos de lados opostos da rua (> 10 m) continuam separados. Fusão a 10 m junta sentidos exclusivos opostos em 1 caso de 307 medidos. |
 
-*Tabela 5 – Registro de decisões arquiteturais da Sprint 1*
+*Tabela 5 – Registro de decisões arquiteturais*
 
 ### 10.2 Degradação prevista por dependência externa
 
