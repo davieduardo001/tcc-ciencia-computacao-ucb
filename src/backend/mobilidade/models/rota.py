@@ -38,6 +38,17 @@ class Rota(Base):
     # list[{"nome": str, "lat": float, "lng": float}] na ordem do trajeto.
     paradas = Column(JSON, nullable=False)
 
+    # {"0": ["05:45", ...], ..., "6": [...]} — saídas do terminal por dia
+    # da semana (0 = segunda, igual a `datetime.weekday()`). O SEMOB manda
+    # o dia junto de cada horário; misturar dia útil, sábado e domingo faz
+    # o "próximo horário" mostrar uma saída que não existe hoje. Nula até
+    # a próxima ingestão popular.
+    horarios_por_dia = Column(JSON, nullable=True)
+
+    # Duração de uma viagem completa, em minutos, como informa o /horario.
+    # Com ela dá para estimar a passagem numa parada intermediária.
+    tempo_percurso_min = Column(Integer, nullable=True)
+
     atualizado_em = Column(
         DateTime(timezone=True),
         server_default=func.now(),
