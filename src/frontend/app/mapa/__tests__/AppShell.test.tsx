@@ -41,24 +41,17 @@ describe("AppShell", () => {
     links.forEach((link) => expect(link).toHaveAttribute("href", "/mapa"));
   });
 
-  it("marca itens ainda não implementados como indisponíveis, sem link de navegação", () => {
+  it("'Rotas Salvas' agora é link navegável apontando para /favoritos (US #25)", () => {
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>
       </AppShell>
     );
 
-    // "Rotas Salvas" segue não implementada (US #25).
-    expect(
-      screen.queryByRole("link", { name: "Rotas Salvas" })
-    ).not.toBeInTheDocument();
-
-    // Na barra lateral o item é inerte.
-    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
-    const item = within(sidebar)
-      .getByText("Rotas Salvas")
-      .closest(".ms-nav-item");
-    expect(item).toHaveAttribute("aria-disabled", "true");
+    // Com disponivel: true, "Rotas Salvas" deve ser um link.
+    const links = screen.getAllByRole("link", { name: "Rotas Salvas" });
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((link) => expect(link).toHaveAttribute("href", "/favoritos"));
   });
 
   it("linhas e rotas navegam para o mapa com o painel certo", () => {
@@ -131,7 +124,23 @@ describe("AppShell", () => {
     ).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("ação ainda não entregue explica que está em breve", async () => {
+  it("ação 'Rotas salvas' do arco agora navega para /favoritos (US #25)", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ações rápidas" }));
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    fireEvent.click(within(inferior).getByText("Rotas salvas"));
+
+    expect(pushMock).toHaveBeenCalledWith("/favoritos");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("ação ainda não entregue ('Alertas') explica que está em breve", async () => {
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>

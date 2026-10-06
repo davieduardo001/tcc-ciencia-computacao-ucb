@@ -483,3 +483,252 @@ describe("api.ts — recuperação de senha (US #133)", () => {
     ).rejects.toThrow("Este link nao e mais valido ou expirou.");
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// US #25 — Salvar e Visualizar Rota Favorita
+// ---------------------------------------------------------------------------
+
+import {
+  salvarFavorito,
+  listarFavoritos,
+  listarFavoritosRemoto,
+  removerFavorito,
+  SalvarFavoritoError,
+  cachearFavoritos,
+  lerFavoritosCache,
+  limparCacheFavoritos,
+} from "../api";
+
+const PAYLOAD_FAVORITO = {
+  numero_linha: "0.110",
+  nome_linha: "0.110 — Taguatinga / Rodoviária",
+  label: "Casa → Trabalho",
+  origem_lat: -15.8305,
+  origem_lng: -48.0425,
+  destino_lat: -15.7939,
+  destino_lng: -47.8828,
+};
+
+const FAVORITO_RESPONSE = {
+  id: "uuid-teste",
+  usuario_id: "uuid-usuario",
+  ...PAYLOAD_FAVORITO,
+  criado_em: "2026-10-05T14:30:00",
+};
+
+describe("api.ts — salvarFavorito (US #25)", () => {
+  afterEach(() => jest.resetAllMocks());
+
+  it("chama POST /api/colaboracao/favoritos com credentials include", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => FAVORITO_RESPONSE,
+    }) as jest.Mock;
+
+    const resultado = await salvarFavorito(PAYLOAD_FAVORITO);
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/colaboracao\/favoritos$/);
+    expect(options.method).toBe("POST");
+    expect(options.credentials).toBe("include");
+    expect(resultado.id).toBe("uuid-teste");
+    expect(resultado.label).toBe("Casa → Trabalho");
+  });
+
+  it("lança SalvarFavoritoError com status 401 quando não autenticado", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: "Não autenticado" }),
+    }) as jest.Mock;
+
+    await expect(salvarFavorito(PAYLOAD_FAVORITO)).rejects.toThrow(
+      SalvarFavoritoError
+    );
+    await expect(salvarFavorito(PAYLOAD_FAVORITO)).rejects.toMatchObject({
+      status: 401,
+    });
+  });
+
+  it("lança SalvarFavoritoError com status 409 quando rota já favoritada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ detail: "rota_ja_favoritada" }),
+    }) as jest.Mock;
+
+    await expect(salvarFavorito(PAYLOAD_FAVORITO)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("já está"),
+    });
+  });
+
+  it("lança SalvarFavoritoError com status 422 quando limite atingido", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: "limite_favoritos_atingido" }),
+    }) as jest.Mock;
+
+    await expect(salvarFavorito(PAYLOAD_FAVORITO)).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringContaining("limite"),
+    });
+  });
+});
+
+describe("api.ts — listarFavoritos (US #25)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+    limparCacheFavoritos();
+  });
+
+  it("chama GET /api/colaboracao/favoritos com credentials include", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [FAVORITO_RESPONSE],
+    }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/colaboracao\/favoritos$/);
+    expect(options.credentials).toBe("include");
+    expect(lista).toHaveLength(1);
+    expect(lista[0].id).toBe("uuid-teste");
+  });
+
+  it("retorna [] quando a lista está vazia", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toEqual([]);
+  });
+
+  it("retorna cache local quando a requisição falha (offline)", async () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toHaveLength(1);
+    expect(lista[0].id).toBe("uuid-teste");
+  });
+
+  it("retorna cache local quando o servidor responde 5xx", async () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toHaveLength(1);
+  });
+
+  it("em 401 devolve [] e apaga o cache (cache não é por usuário)", async () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toEqual([]);
+    expect(lerFavoritosCache()).toEqual([]);
+  });
+
+  it("listarFavoritosRemoto lança quando a rede falha", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+    await expect(listarFavoritosRemoto()).rejects.toThrow();
+  });
+
+  it("atualiza o cache local quando o servidor responde com sucesso", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [FAVORITO_RESPONSE],
+    }) as jest.Mock;
+
+    await listarFavoritos();
+    const cache = lerFavoritosCache();
+    expect(cache).toHaveLength(1);
+    expect(cache[0].id).toBe("uuid-teste");
+  });
+});
+
+describe("api.ts — removerFavorito (US #25)", () => {
+  afterEach(() => jest.resetAllMocks());
+
+  it("chama DELETE /api/colaboracao/favoritos/{id} com credentials include", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    }) as jest.Mock;
+
+    await removerFavorito("uuid-teste");
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/colaboracao\/favoritos\/uuid-teste$/);
+    expect(options.method).toBe("DELETE");
+    expect(options.credentials).toBe("include");
+  });
+
+  it("lança SalvarFavoritoError com status 403 para favorito alheio", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ detail: "Acesso negado" }),
+    }) as jest.Mock;
+
+    await expect(removerFavorito("uuid-alheio")).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("lança SalvarFavoritoError com status 404 para favorito inexistente", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: "Não encontrado" }),
+    }) as jest.Mock;
+
+    await expect(removerFavorito("uuid-inexistente")).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+});
+
+describe("api.ts — cache de favoritos (US #25)", () => {
+  afterEach(() => limparCacheFavoritos());
+
+  it("cachearFavoritos persiste no localStorage", () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    const raw = localStorage.getItem("movecity:favoritos");
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw!)[0].id).toBe("uuid-teste");
+  });
+
+  it("lerFavoritosCache retorna os dados salvos", () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    const cache = lerFavoritosCache();
+    expect(cache).toHaveLength(1);
+    expect(cache[0].label).toBe("Casa → Trabalho");
+  });
+
+  it("lerFavoritosCache retorna [] quando chave ausente", () => {
+    expect(lerFavoritosCache()).toEqual([]);
+  });
+
+  it("lerFavoritosCache retorna [] quando JSON corrompido, sem lançar erro", () => {
+    localStorage.setItem("movecity:favoritos", "{ json corrompido ]");
+    expect(lerFavoritosCache()).toEqual([]);
+  });
+
+  it("limparCacheFavoritos remove a chave do localStorage", () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    limparCacheFavoritos();
+    expect(localStorage.getItem("movecity:favoritos")).toBeNull();
+  });
+});

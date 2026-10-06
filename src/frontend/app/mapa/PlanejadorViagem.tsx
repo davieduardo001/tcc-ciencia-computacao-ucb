@@ -11,9 +11,10 @@ import {
   MapPin,
   Repeat,
   Search,
+  Star,
   X,
 } from "lucide-react";
-import { buscarLugares, Lugar, OpcaoViagem } from "@/lib/api";
+import { buscarLugares, Lugar, OpcaoViagem, RotaFavorita, SalvarFavoritoError, salvarFavorito } from "@/lib/api";
 
 const DEBOUNCE_MS = 350;
 const MIN_CARACTERES = 3;
@@ -50,6 +51,10 @@ interface PlanejadorViagemProps {
   /** Falso enquanto a primeira consulta de posição não voltou — evita
    * dizer "nenhum ônibus" antes de ter perguntado. */
   rastreando: boolean;
+  /** US #25 — IDs dos favoritos já salvos, para marcar a estrela. */
+  favoritosIds?: Set<string>;
+  /** US #25 — callback ao salvar favorito com sucesso. */
+  onFavoritoSalvo?: (favorito: RotaFavorita) => void;
 }
 
 function CampoLugar({
@@ -357,9 +362,60 @@ export default function PlanejadorViagem({
   onFechar,
   veiculosPorLinha,
   rastreando,
+  favoritosIds = new Set(),
+  onFavoritoSalvo,
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
   const folha = useFolhaArrastavel();
+
+  // US #25 — estado do botão de favorito por índice de opção.
+  const [salvando, setSalvando] = useState<number | null>(null);
+  const [erroFavorito, setErroFavorito] = useState<string | null>(null);
+
+  async function handleSalvarFavorito(indice: number) {
+    if (!origem || !destino || !opcoes) return;
+    const opcao = opcoes[indice];
+    const primeiraPerna = opcao.pernas[0];
+    if (!primeiraPerna) return;
+
+    setSalvando(indice);
+    setErroFavorito(null);
+
+    try {
+      const favorito = await salvarFavorito({
+        numero_linha: primeiraPerna.numero,
+        nome_linha: primeiraPerna.nome,
+        label: `${origem.nome} → ${destino.nome}`,
+        origem_lat: origem.lat,
+        origem_lng: origem.lng,
+        destino_lat: destino.lat,
+        destino_lng: destino.lng,
+      });
+      onFavoritoSalvo?.(favorito);
+    } catch (err) {
+      if (err instanceof SalvarFavoritoError) {
+        setErroFavorito(err.message);
+      } else {
+        setErroFavorito("Não foi possível salvar o favorito.");
+      }
+    } finally {
+      setSalvando(null);
+    }
+  }
+
+  // Chave de identificação de uma opção para verificar se já está salva.
+  function chaveOpcao(opcao: OpcaoViagem, orig: PontoEscolhido, dest: PontoEscolhido): string {
+    const linha = opcao.pernas[0]?.numero ?? "";
+    return `${linha}:${orig.lat.toFixed(4)},${orig.lng.toFixed(4)}:${dest.lat.toFixed(4)},${dest.lng.toFixed(4)}`;
+  }
+
+  function jaFavoritado(opcao: OpcaoViagem): boolean {
+    if (!origem || !destino) return false;
+    // Verifica pelo cache local: itera os ids conhecidos checando a chave
+    // lógica. O Set de IDs não permite verificação por conteúdo, então
+    // guardamos a chave lógica no próprio Set quando salvamos.
+    return favoritosIds.has(chaveOpcao(opcao, origem, destino));
+  }
 
   return (
     <aside
@@ -609,6 +665,54 @@ export default function PlanejadorViagem({
                     </ol>
                   )}
                 </button>
+                {/* US #25 — botão de favorito fora do <button> da opção
+                    para evitar button dentro de button (HTML inválido). */}
+                {indice === opcaoSelecionada && (
+                  <div className="plan-favorito-area">
+                    <button
+                      type="button"
+                      className={`plan-favorito-btn${jaFavoritado(opcao) ? " salvo" : ""}`}
+                      onClick={() => {
+                        if (!jaFavoritado(opcao)) handleSalvarFavorito(indice);
+                      }}
+                      disabled={salvando === indice || jaFavoritado(opcao)}
+                      aria-label={
+                        jaFavoritado(opcao)
+                          ? "Rota já salva nos favoritos"
+                          : "Salvar como favorita"
+                      }
+                      title={
+                        jaFavoritado(opcao)
+                          ? "Já está nos seus favoritos"
+                          : "Salvar rota como favorita"
+                      }
+                    >
+                      {salvando === indice ? (
+                        <LoaderCircle size={14} className="plan-girando" />
+                      ) : (
+                        <Star
+                          size={14}
+                          fill={jaFavoritado(opcao) ? "currentColor" : "none"}
+                        />
+                      )}
+                      <span>
+                        {jaFavoritado(opcao)
+                          ? "Salva nos favoritos"
+                          : salvando === indice
+                          ? "Salvando..."
+                          : "Salvar como favorita"}
+                      </span>
+                    </button>
+                    {erroFavorito && salvando === null && (
+                      <p
+                        className="plan-erro plan-favorito-erro"
+                        role="alert"
+                      >
+                        {erroFavorito}
+                      </p>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

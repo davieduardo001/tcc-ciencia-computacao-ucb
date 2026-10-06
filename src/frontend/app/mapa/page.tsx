@@ -1,20 +1,25 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Navigation } from "lucide-react";
 import AppShell from "./AppShell";
+import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import {
   buscarLinha,
   BuscarLinhaError,
   calcularRotas,
   CalcularRotaError,
+  cachearFavoritos,
+  lerFavoritosCache,
+  listarFavoritos,
   LinhaDetalhada,
   LinhaResumo,
   nomearLugar,
   OpcaoViagem,
+  RotaFavorita,
   sugerirLinhas,
   VeiculoAoVivo,
 } from "@/lib/api";
@@ -25,6 +30,18 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 });
 
 const DEBOUNCE_SUGESTOES_MS = 250;
+
+/** Converte um query param em coordenada; `null` se não for número finito. */
+function lerCoordenada(valor: string | null): number | null {
+  if (valor === null || valor.trim() === "") return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Chave lógica da rota favorita (mesma regra de duplicata do backend). */
+function chaveFavorito(f: RotaFavorita): string {
+  return `${f.numero_linha}:${f.origem_lat.toFixed(4)},${f.origem_lng.toFixed(4)}:${f.destino_lat.toFixed(4)},${f.destino_lng.toFixed(4)}`;
+}
 
 interface Coordenadas {
   lat: number;
@@ -65,10 +82,28 @@ function MapaConteudo() {
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
   const [focarBusca, setFocarBusca] = useState(0);
 
+  // US #25 — favoritas do usuário: alimentam a estrela do planejador e o
+  // bloco "Minhas rotas" da tela principal.
+  const [favoritos, setFavoritos] = useState<RotaFavorita[]>([]);
+  const favoritosChaves = useMemo(
+    () => new Set(favoritos.map(chaveFavorito)),
+    [favoritos]
+  );
+  // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
+  const [rotaPendente, setRotaPendente] = useState(false);
+
   // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
   // página, só que com o painel certo já aberto — as duas
   // funcionalidades vivem no mapa, não em páginas separadas.
-  const painel = useSearchParams().get("painel");
+  const searchParams = useSearchParams();
+  const painel = searchParams.get("painel");
+  // US #25 — query params injetados pelo clique em favorito.
+  const origemLatParam = searchParams.get("origem_lat");
+  const origemLngParam = searchParams.get("origem_lng");
+  const destinoLatParam = searchParams.get("destino_lat");
+  const destinoLngParam = searchParams.get("destino_lng");
+  const origemNomeParam = searchParams.get("origem_nome");
+  const destinoNomeParam = searchParams.get("destino_nome");
 
   useEffect(() => {
     if (painel === "rotas") {
@@ -80,6 +115,43 @@ function MapaConteudo() {
       setFocarBusca((n) => n + 1);
     }
   }, [painel]);
+
+  // US #25 — ao abrir o planejador via favorito (/favoritos → "Ir"),
+  // pré-preenche origem/destino pelos query params e pede o cálculo.
+  useEffect(() => {
+    if (painel !== "rotas") return;
+    const origemLat = lerCoordenada(origemLatParam);
+    const origemLng = lerCoordenada(origemLngParam);
+    const destinoLat = lerCoordenada(destinoLatParam);
+    const destinoLng = lerCoordenada(destinoLngParam);
+    if (
+      origemLat === null ||
+      origemLng === null ||
+      destinoLat === null ||
+      destinoLng === null
+    ) {
+      return;
+    }
+    setOrigem({
+      nome: origemNomeParam ?? `${origemLat.toFixed(4)}, ${origemLng.toFixed(4)}`,
+      lat: origemLat,
+      lng: origemLng,
+    });
+    setDestino({
+      nome: destinoNomeParam ?? `${destinoLat.toFixed(4)}, ${destinoLng.toFixed(4)}`,
+      lat: destinoLat,
+      lng: destinoLng,
+    });
+    setRotaPendente(true);
+  }, [
+    painel,
+    origemLatParam,
+    origemLngParam,
+    destinoLatParam,
+    destinoLngParam,
+    origemNomeParam,
+    destinoNomeParam,
+  ]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -244,9 +316,52 @@ function MapaConteudo() {
     }
   }, [origem, destino]);
 
+  // US #25 — calcula a rota de uma favorita assim que o estado de
+  // origem/destino reflete o pedido (query params ou bloco da tela principal).
+  useEffect(() => {
+    if (rotaPendente && origem && destino) {
+      setRotaPendente(false);
+      handleCalcularRota();
+    }
+  }, [rotaPendente, origem, destino, handleCalcularRota]);
+
   const handleFecharPlanejador = useCallback(() => {
     setPlanejadorAberto(false);
     setEscolhendoNoMapa(null);
+  }, []);
+
+  // US #25 — carrega favoritas na montagem.
+  useEffect(() => {
+    listarFavoritos().then(setFavoritos);
+  }, []);
+
+  // US #25 — ao salvar, acrescenta à lista (a estrela e o bloco se atualizam)
+  // e mantém o cache local em dia.
+  const handleFavoritoSalvo = useCallback((favorito: RotaFavorita) => {
+    setFavoritos((prev) => [favorito, ...prev]);
+    cachearFavoritos([favorito, ...lerFavoritosCache()]);
+  }, []);
+
+  // US #25 — Cenário 2: rastreamento direto da linha da favorita.
+  const handleRastrearFavorita = useCallback(
+    (numeroLinha: string) => {
+      setPlanejadorAberto(false);
+      handleBuscarLinha(numeroLinha);
+    },
+    [handleBuscarLinha]
+  );
+
+  // US #25 — reabre a rota salva já calculada.
+  const handleAbrirRotaFavorita = useCallback((favorito: RotaFavorita) => {
+    const separador = favorito.label.indexOf(" → ");
+    const nomeOrigem =
+      separador > 0 ? favorito.label.slice(0, separador).trim() : "Origem";
+    const nomeDestino =
+      separador > 0 ? favorito.label.slice(separador + 3).trim() : "Destino";
+    setOrigem({ nome: nomeOrigem, lat: favorito.origem_lat, lng: favorito.origem_lng });
+    setDestino({ nome: nomeDestino, lat: favorito.destino_lat, lng: favorito.destino_lng });
+    setPlanejadorAberto(true);
+    setRotaPendente(true);
   }, []);
 
   const viagem =
@@ -304,6 +419,8 @@ function MapaConteudo() {
           onFechar={handleFecharPlanejador}
           veiculosPorLinha={veiculosPorLinha}
           rastreando={veiculos !== null}
+          favoritosIds={favoritosChaves}
+          onFavoritoSalvo={handleFavoritoSalvo}
         />
       ) : (
         <button
@@ -314,6 +431,14 @@ function MapaConteudo() {
           <Navigation size={16} />
           Para onde você vai?
         </button>
+      )}
+
+      {!planejadorAberto && !linha && (
+        <FavoritosDestaque
+          favoritos={favoritos}
+          onRastrear={handleRastrearFavorita}
+          onAbrirRota={handleAbrirRotaFavorita}
+        />
       )}
     </AppShell>
   );

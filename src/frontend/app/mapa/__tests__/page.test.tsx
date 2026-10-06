@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaPage from "../page";
 import {
+  buscarLinha,
   buscarLugares,
   calcularRotas,
+  listarFavoritos,
   nomearLugar,
   sugerirLinhas,
 } from "@/lib/api";
@@ -48,8 +50,13 @@ jest.mock("@/lib/api", () => ({
   calcularRotas: jest.fn().mockResolvedValue([]),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
+  // US #25 — funções de favoritos usadas pelo MapaConteudo
+  listarFavoritos: jest.fn().mockResolvedValue([]),
+  cachearFavoritos: jest.fn(),
+  lerFavoritosCache: jest.fn().mockReturnValue([]),
   BuscarLinhaError: class BuscarLinhaError extends Error {},
   CalcularRotaError: class CalcularRotaError extends Error {},
+  SalvarFavoritoError: class SalvarFavoritoError extends Error {},
 }));
 
 const sugerirLinhasMock = sugerirLinhas as jest.Mock;
@@ -376,5 +383,89 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     });
 
     expect(buscarLugaresMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaPage — rotas favoritas (US #25)", () => {
+  const FAVORITA = {
+    id: "fav-1",
+    usuario_id: "user-1",
+    numero_linha: "0.382",
+    nome_linha: "0.382 — Ceilândia / Rodoviária",
+    label: "Casa → Trabalho",
+    origem_lat: -15.83,
+    origem_lng: -48.04,
+    destino_lat: -15.79,
+    destino_lng: -47.88,
+    criado_em: "2026-10-05T14:30:00",
+  };
+
+  beforeEach(() => {
+    parametrosDaUrl = "";
+    (listarFavoritos as jest.Mock).mockReset().mockResolvedValue([]);
+    (buscarLinha as jest.Mock).mockReset().mockResolvedValue(null);
+    calcularRotasMock.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    parametrosDaUrl = "";
+  });
+
+  it("não mostra o bloco quando não há favoritas", async () => {
+    render(<MapaPage />);
+    await act(async () => {});
+    expect(screen.queryByText("Minhas rotas")).not.toBeInTheDocument();
+  });
+
+  it("mostra as favoritas em destaque na tela principal", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    expect(await screen.findByText("Minhas rotas")).toBeInTheDocument();
+    expect(screen.getByText("Casa → Trabalho")).toBeInTheDocument();
+  });
+
+  it("'Rastrear' busca a linha da favorita direto", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    fireEvent.click(await screen.findByLabelText(/Rastrear linha 0\.382/));
+
+    await waitFor(() => {
+      expect(buscarLinha).toHaveBeenCalledWith("0.382");
+    });
+  });
+
+  it("'Rota' abre o planejador e calcula a rota salva", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    fireEvent.click(await screen.findByLabelText("Abrir rota Casa → Trabalho"));
+
+    await waitFor(() => {
+      expect(calcularRotasMock).toHaveBeenCalledWith(
+        { nome: "Casa", lat: -15.83, lng: -48.04 },
+        { nome: "Trabalho", lat: -15.79, lng: -47.88 }
+      );
+    });
+  });
+
+  it("calcula a rota ao chegar de /favoritos com query params válidos", async () => {
+    parametrosDaUrl =
+      "painel=rotas&origem_lat=-15.83&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88&origem_nome=Casa&destino_nome=Trabalho";
+    render(<MapaPage />);
+
+    await waitFor(() => {
+      expect(calcularRotasMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("ignora query params que não são números", async () => {
+    parametrosDaUrl =
+      "painel=rotas&origem_lat=abc&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88";
+    render(<MapaPage />);
+    await act(async () => {});
+
+    expect(calcularRotasMock).not.toHaveBeenCalled();
   });
 });
