@@ -492,6 +492,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
 import {
   salvarFavorito,
   listarFavoritos,
+  listarFavoritosRemoto,
   removerFavorito,
   SalvarFavoritoError,
   cachearFavoritos,
@@ -618,6 +619,28 @@ describe("api.ts — listarFavoritos (US #25)", () => {
     const lista = await listarFavoritos();
     expect(lista).toHaveLength(1);
     expect(lista[0].id).toBe("uuid-teste");
+  });
+
+  it("retorna cache local quando o servidor responde 5xx", async () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toHaveLength(1);
+  });
+
+  it("em 401 devolve [] e apaga o cache (cache não é por usuário)", async () => {
+    cachearFavoritos([FAVORITO_RESPONSE]);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 }) as jest.Mock;
+
+    const lista = await listarFavoritos();
+    expect(lista).toEqual([]);
+    expect(lerFavoritosCache()).toEqual([]);
+  });
+
+  it("listarFavoritosRemoto lança quando a rede falha", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+    await expect(listarFavoritosRemoto()).rejects.toThrow();
   });
 
   it("atualiza o cache local quando o servidor responde com sucesso", async () => {

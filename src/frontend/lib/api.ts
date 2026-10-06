@@ -947,27 +947,39 @@ export async function salvarFavorito(
 }
 
 /**
+ * US #25 — Busca as favoritas direto do servidor. Lança em qualquer falha
+ * (rede fora, 5xx) para o chamador saber que NÃO são dados frescos.
+ *
+ * Em 401 o cache é apagado e a lista vem vazia: a sessão acabou, e o cache
+ * não é por usuário — mostrá-lo exporia as rotas de quem usou o aparelho antes.
+ */
+export async function listarFavoritosRemoto(): Promise<RotaFavorita[]> {
+  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (response.status === 401) {
+    limparCacheFavoritos();
+    return [];
+  }
+  if (!response.ok) {
+    throw new Error(`Falha ao listar favoritos (${response.status}).`);
+  }
+  const lista: RotaFavorita[] = await response.json();
+  cachearFavoritos(lista);
+  return lista;
+}
+
+/**
  * US #25 — Lista as rotas favoritas do usuário autenticado.
  *
- * Nunca lança exceção: falha de rede retorna o cache local (acesso offline).
- * O cache é atualizado quando o servidor responde com sucesso.
+ * Nunca lança exceção: falha de rede ou do servidor retorna o cache local.
+ * Quem precisa saber se os dados são frescos usa `listarFavoritosRemoto`.
  */
 export async function listarFavoritos(): Promise<RotaFavorita[]> {
   try {
-    const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
-      credentials: "include",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      // 401 ou outra falha: retorna cache sem sobrescrever.
-      return lerFavoritosCache();
-    }
-    const lista: RotaFavorita[] = await response.json();
-    // Atualiza o cache com os dados mais recentes do servidor.
-    cachearFavoritos(lista);
-    return lista;
+    return await listarFavoritosRemoto();
   } catch {
-    // Offline ou erro de rede: usa o cache local.
     return lerFavoritosCache();
   }
 }

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Bus, MapPin, Navigation, Star, Trash2, WifiOff } from "lucide-react";
 import AppShell from "../mapa/AppShell";
 import {
+  cachearFavoritos,
   lerFavoritosCache,
-  listarFavoritos,
+  listarFavoritosRemoto,
   removerFavorito,
   RotaFavorita,
   SalvarFavoritoError,
@@ -41,13 +42,13 @@ export default function FavoritosPage() {
     }
 
     // Busca do servidor em background.
-    listarFavoritos()
+    listarFavoritosRemoto()
       .then((lista) => {
         setFavoritos(lista);
         setOffline(false);
       })
       .catch(() => {
-        // listarFavoritos nunca lança — se chegou aqui, é o cache sendo retornado.
+        // Servidor inalcançável: mantém o cache já exibido e avisa.
         setOffline(true);
       })
       .finally(() => setCarregando(false));
@@ -58,15 +59,11 @@ export default function FavoritosPage() {
     setErroRemover(null);
     try {
       await removerFavorito(id);
-      // Remove da lista local e atualiza o cache.
-      setFavoritos((prev) => {
-        const nova = prev.filter((f) => f.id !== id);
-        // Importa cachearFavoritos inline para não criar dependência circular.
-        try {
-          localStorage.setItem("movecity:favoritos", JSON.stringify(nova));
-        } catch { /* best-effort */ }
-        return nova;
-      });
+      // Remove da lista local e atualiza o cache (fora do updater: ele
+      // precisa ser puro).
+      const nova = favoritos.filter((f) => f.id !== id);
+      setFavoritos(nova);
+      cachearFavoritos(nova);
     } catch (err) {
       if (err instanceof SalvarFavoritoError) {
         setErroRemover(err.message);
@@ -90,9 +87,12 @@ export default function FavoritosPage() {
       destino_lng: String(favorito.destino_lng),
     });
     // Inclui o label como nome legível dos pontos.
-    const partes = favorito.label.split("→").map((s) => s.trim());
-    if (partes[0]) params.set("origem_nome", partes[0]);
-    if (partes[1]) params.set("destino_nome", partes[1]);
+    // O label é montado como "origem → destino" (com espaços) ao salvar.
+    const separador = favorito.label.indexOf(" → ");
+    if (separador > 0) {
+      params.set("origem_nome", favorito.label.slice(0, separador).trim());
+      params.set("destino_nome", favorito.label.slice(separador + 3).trim());
+    }
 
     router.push(`/mapa?${params.toString()}`);
   }

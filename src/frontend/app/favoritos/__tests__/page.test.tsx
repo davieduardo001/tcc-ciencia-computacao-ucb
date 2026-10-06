@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FavoritosPage from "../page";
 import {
-  listarFavoritos,
+  listarFavoritosRemoto,
   removerFavorito,
   cachearFavoritos,
   lerFavoritosCache,
@@ -18,7 +18,7 @@ jest.mock("../../mapa/AppShell", () => ({
 }));
 
 jest.mock("@/lib/api", () => ({
-  listarFavoritos: jest.fn(),
+  listarFavoritosRemoto: jest.fn(),
   removerFavorito: jest.fn(),
   cachearFavoritos: jest.fn(),
   lerFavoritosCache: jest.fn(),
@@ -37,7 +37,7 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-const listarFavoritosMock = listarFavoritos as jest.Mock;
+const listarFavoritosMock = listarFavoritosRemoto as jest.Mock;
 const removerFavoritoMock = removerFavorito as jest.Mock;
 const lerFavoritosCacheMock = lerFavoritosCache as jest.Mock;
 
@@ -201,22 +201,28 @@ describe("FavoritosPage", () => {
     );
   });
 
-  it("exibe banner offline quando listarFavoritos retorna cache por falha de rede", async () => {
+  it("exibe banner offline e mantém o cache quando o servidor não responde", async () => {
     lerFavoritosCacheMock.mockReturnValue([FAV_A]);
-    // Simula falha de rede: listarFavoritos retorna o cache (não lança)
+    listarFavoritosMock.mockRejectedValue(new Error("rede fora"));
+
+    render(<FavoritosPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Você está offline/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText("Casa → Trabalho")).toBeInTheDocument();
+  });
+
+  it("não exibe banner offline quando o servidor responde", async () => {
+    lerFavoritosCacheMock.mockReturnValue([FAV_A]);
     listarFavoritosMock.mockResolvedValue([FAV_A]);
 
     render(<FavoritosPage />);
 
-    // O banner offline só aparece se o fetch realmente falhou.
-    // Neste teste listarFavoritos retorna ok, portanto não deve aparecer.
     await waitFor(() => {
       expect(screen.getByText("Casa → Trabalho")).toBeInTheDocument();
     });
-
-    expect(
-      screen.queryByText(/Você está offline/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Você está offline/i)).not.toBeInTheDocument();
   });
 
   it("botão Ir para o mapa no estado vazio navega para /mapa?painel=rotas", async () => {

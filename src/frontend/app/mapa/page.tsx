@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Navigation } from "lucide-react";
 import AppShell from "./AppShell";
+import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import {
   buscarLinha,
@@ -29,6 +30,18 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 });
 
 const DEBOUNCE_SUGESTOES_MS = 250;
+
+/** Converte um query param em coordenada; `null` se não for número finito. */
+function lerCoordenada(valor: string | null): number | null {
+  if (valor === null || valor.trim() === "") return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Chave lógica da rota favorita (mesma regra de duplicata do backend). */
+function chaveFavorito(f: RotaFavorita): string {
+  return `${f.numero_linha}:${f.origem_lat.toFixed(4)},${f.origem_lng.toFixed(4)}:${f.destino_lat.toFixed(4)},${f.destino_lng.toFixed(4)}`;
+}
 
 interface Coordenadas {
   lat: number;
@@ -69,8 +82,15 @@ function MapaConteudo() {
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
   const [focarBusca, setFocarBusca] = useState(0);
 
-  // US #25 — chaves lógicas dos favoritos salvos (para marcar a estrela).
-  const [favoritosChaves, setFavoritosChaves] = useState<Set<string>>(new Set());
+  // US #25 — favoritas do usuário: alimentam a estrela do planejador e o
+  // bloco "Minhas rotas" da tela principal.
+  const [favoritos, setFavoritos] = useState<RotaFavorita[]>([]);
+  const favoritosChaves = useMemo(
+    () => new Set(favoritos.map(chaveFavorito)),
+    [favoritos]
+  );
+  // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
+  const [rotaPendente, setRotaPendente] = useState(false);
 
   // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
   // página, só que com o painel certo já aberto — as duas
@@ -96,36 +116,42 @@ function MapaConteudo() {
     }
   }, [painel]);
 
-  // US #25 — ao abrir o planejador via favorito, pré-preenche origem/destino
-  // a partir dos query params. O cálculo automático é disparado pelo
-  // useEffect de auto-cálculo abaixo, declarado após handleCalcularRota.
+  // US #25 — ao abrir o planejador via favorito (/favoritos → "Ir"),
+  // pré-preenche origem/destino pelos query params e pede o cálculo.
   useEffect(() => {
+    if (painel !== "rotas") return;
+    const origemLat = lerCoordenada(origemLatParam);
+    const origemLng = lerCoordenada(origemLngParam);
+    const destinoLat = lerCoordenada(destinoLatParam);
+    const destinoLng = lerCoordenada(destinoLngParam);
     if (
-      painel === "rotas" &&
-      origemLatParam &&
-      origemLngParam &&
-      destinoLatParam &&
-      destinoLngParam
+      origemLat === null ||
+      origemLng === null ||
+      destinoLat === null ||
+      destinoLng === null
     ) {
-      const orig: PontoEscolhido = {
-        nome:
-          origemNomeParam ??
-          `${parseFloat(origemLatParam).toFixed(4)}, ${parseFloat(origemLngParam).toFixed(4)}`,
-        lat: parseFloat(origemLatParam),
-        lng: parseFloat(origemLngParam),
-      };
-      const dest: PontoEscolhido = {
-        nome:
-          destinoNomeParam ??
-          `${parseFloat(destinoLatParam).toFixed(4)}, ${parseFloat(destinoLngParam).toFixed(4)}`,
-        lat: parseFloat(destinoLatParam),
-        lng: parseFloat(destinoLngParam),
-      };
-      setOrigem(orig);
-      setDestino(dest);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [painel, origemLatParam, origemLngParam, destinoLatParam, destinoLngParam]);
+    setOrigem({
+      nome: origemNomeParam ?? `${origemLat.toFixed(4)}, ${origemLng.toFixed(4)}`,
+      lat: origemLat,
+      lng: origemLng,
+    });
+    setDestino({
+      nome: destinoNomeParam ?? `${destinoLat.toFixed(4)}, ${destinoLng.toFixed(4)}`,
+      lat: destinoLat,
+      lng: destinoLng,
+    });
+    setRotaPendente(true);
+  }, [
+    painel,
+    origemLatParam,
+    origemLngParam,
+    destinoLatParam,
+    destinoLngParam,
+    origemNomeParam,
+    destinoNomeParam,
+  ]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -290,49 +316,52 @@ function MapaConteudo() {
     }
   }, [origem, destino]);
 
-  // US #25 — auto-cálculo quando origem+destino chegam via query params
-  // (clique em favorito). Declarado APÓS handleCalcularRota para poder
-  // referenciá-la. Só dispara quando os query params estão preenchidos —
-  // não interfere com o fluxo manual onde o usuário digita os campos.
+  // US #25 — calcula a rota de uma favorita assim que o estado de
+  // origem/destino reflete o pedido (query params ou bloco da tela principal).
   useEffect(() => {
-    if (
-      origem &&
-      destino &&
-      origemLatParam &&
-      destinoLatParam &&
-      !opcoes &&
-      !calculandoRota
-    ) {
+    if (rotaPendente && origem && destino) {
+      setRotaPendente(false);
       handleCalcularRota();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origem, destino]);
+  }, [rotaPendente, origem, destino, handleCalcularRota]);
 
   const handleFecharPlanejador = useCallback(() => {
     setPlanejadorAberto(false);
     setEscolhendoNoMapa(null);
   }, []);
 
-  // US #25 — carrega favoritos na montagem para marcar as estrelas.
+  // US #25 — carrega favoritas na montagem.
   useEffect(() => {
-    listarFavoritos().then((lista) => {
-      const chaves = new Set(
-        lista.map(
-          (f) =>
-            `${f.numero_linha}:${f.origem_lat.toFixed(4)},${f.origem_lng.toFixed(4)}:${f.destino_lat.toFixed(4)},${f.destino_lng.toFixed(4)}`
-        )
-      );
-      setFavoritosChaves(chaves);
-    });
+    listarFavoritos().then(setFavoritos);
   }, []);
 
-  // US #25 — ao salvar um favorito, atualiza o Set de chaves para marcar a estrela.
+  // US #25 — ao salvar, acrescenta à lista (a estrela e o bloco se atualizam)
+  // e mantém o cache local em dia.
   const handleFavoritoSalvo = useCallback((favorito: RotaFavorita) => {
-    const chave = `${favorito.numero_linha}:${favorito.origem_lat.toFixed(4)},${favorito.origem_lng.toFixed(4)}:${favorito.destino_lat.toFixed(4)},${favorito.destino_lng.toFixed(4)}`;
-    setFavoritosChaves((prev) => new Set([...prev, chave]));
-    // Atualiza o cache local adicionando o novo item.
-    const cached = lerFavoritosCache();
-    cachearFavoritos([favorito, ...cached]);
+    setFavoritos((prev) => [favorito, ...prev]);
+    cachearFavoritos([favorito, ...lerFavoritosCache()]);
+  }, []);
+
+  // US #25 — Cenário 2: rastreamento direto da linha da favorita.
+  const handleRastrearFavorita = useCallback(
+    (numeroLinha: string) => {
+      setPlanejadorAberto(false);
+      handleBuscarLinha(numeroLinha);
+    },
+    [handleBuscarLinha]
+  );
+
+  // US #25 — reabre a rota salva já calculada.
+  const handleAbrirRotaFavorita = useCallback((favorito: RotaFavorita) => {
+    const separador = favorito.label.indexOf(" → ");
+    const nomeOrigem =
+      separador > 0 ? favorito.label.slice(0, separador).trim() : "Origem";
+    const nomeDestino =
+      separador > 0 ? favorito.label.slice(separador + 3).trim() : "Destino";
+    setOrigem({ nome: nomeOrigem, lat: favorito.origem_lat, lng: favorito.origem_lng });
+    setDestino({ nome: nomeDestino, lat: favorito.destino_lat, lng: favorito.destino_lng });
+    setPlanejadorAberto(true);
+    setRotaPendente(true);
   }, []);
 
   const viagem =
@@ -402,6 +431,14 @@ function MapaConteudo() {
           <Navigation size={16} />
           Para onde você vai?
         </button>
+      )}
+
+      {!planejadorAberto && !linha && (
+        <FavoritosDestaque
+          favoritos={favoritos}
+          onRastrear={handleRastrearFavorita}
+          onAbrirRota={handleAbrirRotaFavorita}
+        />
       )}
     </AppShell>
   );
