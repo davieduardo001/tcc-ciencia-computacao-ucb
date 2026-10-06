@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, String, Uuid
+from sqlalchemy import Column, DateTime, Float, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from models.base import Base
@@ -37,10 +37,10 @@ class RotaFavorita(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
-    # FK lógica para usuarios.id. Não declaramos ForeignKey aqui para
-    # manter o mesmo padrão de Ocorrencia (que também usa UUID sem FK
-    # declarada no ORM), evitando dependência cruzada entre serviços no
-    # nível do ORM. A FK real é criada na migration.
+    # O ORM não declara ForeignKey (mesmo padrão de Ocorrencia), pra não
+    # acoplar o modelo do serviço de colaboração ao de auth. A migration, porém,
+    # cria a FK real para usuarios.id — o banco garante a integridade e o
+    # autogenerate do Alembic não deve ser usado pra "corrigir" essa diferença.
     usuario_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Número da linha (ex: "0.110") — usado para rastreamento e para o
