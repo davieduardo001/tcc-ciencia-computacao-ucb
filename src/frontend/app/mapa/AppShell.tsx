@@ -54,7 +54,7 @@ const NAV_ITEMS = [
     Icone: Navigation,
     disponivel: true,
   },
-  { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: false },
+  { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: true },
   {
     id: "ocorrencias",
     href: "/ocorrencias",
@@ -97,7 +97,7 @@ const NAV_INFERIOR = [
 // tira da barra para caberem os quatro destinos principais. "Ocorrências"
 // (US #23) já tem tela — as outras duas ainda abrem o aviso de "em breve".
 const ACOES_RAPIDAS = [
-  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: undefined },
+  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: "/favoritos" },
   { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84, href: "/ocorrencias" },
   { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54, href: undefined },
 ] as const;

@@ -355,6 +355,8 @@ export async function logoutUsuario(): Promise<void> {
     });
   } finally {
     clearTokens();
+    // US #25 — limpa o cache local de favoritos ao sair.
+    try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
   }
 }
 
@@ -821,4 +823,182 @@ export async function reportarOcorrencia(
     criadoEm: data.criado_em,
     expiraEm: data.expira_em,
   };
+}
+
+
+// ---------------------------------------------------------------------------
+// US #25 — Salvar e Visualizar Rota Favorita
+// ---------------------------------------------------------------------------
+
+export interface RotaFavorita {
+  id: string;
+  usuario_id: string;
+  numero_linha: string;
+  nome_linha: string;
+  label: string;
+  origem_lat: number;
+  origem_lng: number;
+  destino_lat: number;
+  destino_lng: number;
+  criado_em: string;
+}
+
+export interface RotaFavoritaPayload {
+  numero_linha: string;
+  nome_linha: string;
+  label: string;
+  origem_lat: number;
+  origem_lng: number;
+  destino_lat: number;
+  destino_lng: number;
+}
+
+export class SalvarFavoritoError extends Error {
+  /** HTTP status retornado pelo servidor, quando disponível. */
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Chave do localStorage — prefixo "movecity:" para evitar colisão.
+const CACHE_FAVORITOS_KEY = "movecity:favoritos";
+
+/** Persiste a lista de favoritos no localStorage para acesso offline. */
+export function cachearFavoritos(lista: RotaFavorita[]): void {
+  try {
+    localStorage.setItem(CACHE_FAVORITOS_KEY, JSON.stringify(lista));
+  } catch {
+    // localStorage pode estar indisponível (modo privado, storage cheio).
+    // Falha silenciosa — o cache é best-effort.
+  }
+}
+
+/** Lê favoritos do cache local. Retorna [] em qualquer erro de parse. */
+export function lerFavoritosCache(): RotaFavorita[] {
+  try {
+    const raw = localStorage.getItem(CACHE_FAVORITOS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as RotaFavorita[];
+  } catch {
+    return [];
+  }
+}
+
+/** Remove o cache local de favoritos (chamado no logout). */
+export function limparCacheFavoritos(): void {
+  try {
+    localStorage.removeItem(CACHE_FAVORITOS_KEY);
+  } catch {
+    // Falha silenciosa.
+  }
+}
+
+/**
+ * US #25 — Salva uma rota calculada como favorita.
+ *
+ * Lança `SalvarFavoritoError` em caso de falha — o frontend precisa saber
+ * o motivo para exibir o feedback correto (limite, duplicata, não autenticado).
+ */
+export async function salvarFavorito(
+  dados: RotaFavoritaPayload
+): Promise<RotaFavorita> {
+  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      numero_linha: dados.numero_linha,
+      nome_linha: dados.nome_linha,
+      label: dados.label,
+      origem_lat: dados.origem_lat,
+      origem_lng: dados.origem_lng,
+      destino_lat: dados.destino_lat,
+      destino_lng: dados.destino_lng,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw new SalvarFavoritoError("Faça login para salvar rotas favoritas.", 401);
+  }
+  if (response.status === 409) {
+    throw new SalvarFavoritoError("Esta rota já está nos seus favoritos.", 409);
+  }
+  if (response.status === 422) {
+    const data = await response.json().catch(() => ({}));
+    const detalhe = data.detail ?? "";
+    if (detalhe === "limite_favoritos_atingido") {
+      throw new SalvarFavoritoError(
+        "Você atingiu o limite de 20 rotas favoritas. Remova uma para salvar esta.",
+        422
+      );
+    }
+    throw new SalvarFavoritoError("Dados inválidos. Verifique os campos.", 422);
+  }
+  if (!response.ok) {
+    throw new SalvarFavoritoError(
+      "Não foi possível salvar o favorito. Tente novamente."
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * US #25 — Lista as rotas favoritas do usuário autenticado.
+ *
+ * Nunca lança exceção: falha de rede retorna o cache local (acesso offline).
+ * O cache é atualizado quando o servidor responde com sucesso.
+ */
+export async function listarFavoritos(): Promise<RotaFavorita[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      // 401 ou outra falha: retorna cache sem sobrescrever.
+      return lerFavoritosCache();
+    }
+    const lista: RotaFavorita[] = await response.json();
+    // Atualiza o cache com os dados mais recentes do servidor.
+    cachearFavoritos(lista);
+    return lista;
+  } catch {
+    // Offline ou erro de rede: usa o cache local.
+    return lerFavoritosCache();
+  }
+}
+
+/**
+ * US #25 — Remove uma rota favorita pelo ID.
+ *
+ * Lança erro em caso de falha (403, 404, rede).
+ */
+export async function removerFavorito(id: string): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/api/colaboracao/favoritos/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    }
+  );
+
+  if (response.status === 403) {
+    throw new SalvarFavoritoError(
+      "Você não tem permissão para remover este favorito.",
+      403
+    );
+  }
+  if (response.status === 404) {
+    throw new SalvarFavoritoError("Favorito não encontrado.", 404);
+  }
+  if (!response.ok) {
+    throw new SalvarFavoritoError(
+      "Não foi possível remover o favorito. Tente novamente."
+    );
+  }
+  // 204 No Content — sem corpo.
 }

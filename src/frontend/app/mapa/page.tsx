@@ -11,10 +11,14 @@ import {
   BuscarLinhaError,
   calcularRotas,
   CalcularRotaError,
+  cachearFavoritos,
+  lerFavoritosCache,
+  listarFavoritos,
   LinhaDetalhada,
   LinhaResumo,
   nomearLugar,
   OpcaoViagem,
+  RotaFavorita,
   sugerirLinhas,
   VeiculoAoVivo,
 } from "@/lib/api";
@@ -65,10 +69,21 @@ function MapaConteudo() {
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
   const [focarBusca, setFocarBusca] = useState(0);
 
+  // US #25 — chaves lógicas dos favoritos salvos (para marcar a estrela).
+  const [favoritosChaves, setFavoritosChaves] = useState<Set<string>>(new Set());
+
   // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
   // página, só que com o painel certo já aberto — as duas
   // funcionalidades vivem no mapa, não em páginas separadas.
-  const painel = useSearchParams().get("painel");
+  const searchParams = useSearchParams();
+  const painel = searchParams.get("painel");
+  // US #25 — query params injetados pelo clique em favorito.
+  const origemLatParam = searchParams.get("origem_lat");
+  const origemLngParam = searchParams.get("origem_lng");
+  const destinoLatParam = searchParams.get("destino_lat");
+  const destinoLngParam = searchParams.get("destino_lng");
+  const origemNomeParam = searchParams.get("origem_nome");
+  const destinoNomeParam = searchParams.get("destino_nome");
 
   useEffect(() => {
     if (painel === "rotas") {
@@ -80,6 +95,34 @@ function MapaConteudo() {
       setFocarBusca((n) => n + 1);
     }
   }, [painel]);
+
+  // US #25 — ao abrir o planejador via favorito, pré-preenche origem/destino
+  // a partir dos query params e calcula a rota automaticamente.
+
+  useEffect(() => {
+    if (
+      painel === "rotas" &&
+      origemLatParam &&
+      origemLngParam &&
+      destinoLatParam &&
+      destinoLngParam
+    ) {
+      const orig: PontoEscolhido = {
+        nome: origemNomeParam ?? `${parseFloat(origemLatParam).toFixed(4)}, ${parseFloat(origemLngParam).toFixed(4)}`,
+        lat: parseFloat(origemLatParam),
+        lng: parseFloat(origemLngParam),
+      };
+      const dest: PontoEscolhido = {
+        nome: destinoNomeParam ?? `${parseFloat(destinoLatParam).toFixed(4)}, ${parseFloat(destinoLngParam).toFixed(4)}`,
+        lat: parseFloat(destinoLatParam),
+        lng: parseFloat(destinoLngParam),
+      };
+      setOrigem(orig);
+      setDestino(dest);
+      // O cálculo será disparado pelo useEffect seguinte que observa origem/destino.
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [painel, origemLatParam, origemLngParam, destinoLatParam, destinoLngParam]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -249,6 +292,28 @@ function MapaConteudo() {
     setEscolhendoNoMapa(null);
   }, []);
 
+  // US #25 — carrega favoritos na montagem para marcar as estrelas.
+  useEffect(() => {
+    listarFavoritos().then((lista) => {
+      const chaves = new Set(
+        lista.map(
+          (f) =>
+            `${f.numero_linha}:${f.origem_lat.toFixed(4)},${f.origem_lng.toFixed(4)}:${f.destino_lat.toFixed(4)},${f.destino_lng.toFixed(4)}`
+        )
+      );
+      setFavoritosChaves(chaves);
+    });
+  }, []);
+
+  // US #25 — ao salvar um favorito, atualiza o Set de chaves para marcar a estrela.
+  const handleFavoritoSalvo = useCallback((favorito: RotaFavorita) => {
+    const chave = `${favorito.numero_linha}:${favorito.origem_lat.toFixed(4)},${favorito.origem_lng.toFixed(4)}:${favorito.destino_lat.toFixed(4)},${favorito.destino_lng.toFixed(4)}`;
+    setFavoritosChaves((prev) => new Set([...prev, chave]));
+    // Atualiza o cache local adicionando o novo item.
+    const cached = lerFavoritosCache();
+    cachearFavoritos([favorito, ...cached]);
+  }, []);
+
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
@@ -304,6 +369,8 @@ function MapaConteudo() {
           onFechar={handleFecharPlanejador}
           veiculosPorLinha={veiculosPorLinha}
           rastreando={veiculos !== null}
+          favoritosIds={favoritosChaves}
+          onFavoritoSalvo={handleFavoritoSalvo}
         />
       ) : (
         <button
