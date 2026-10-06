@@ -228,7 +228,13 @@ def obter_parada(lat: float, lng: float, db: Session = Depends(get_db)):
         lat=resultado.lat,
         lng=resultado.lng,
         linhas=[
-            {"numero": l.numero, "nome": l.nome, "sentido": l.sentido}
+            {
+                "numero": l.numero,
+                "nome": l.nome,
+                "sentido": l.sentido,
+                "rota_sentido": l.rota_sentido,
+                "ordem": l.ordem,
+            }
             for l in resultado.linhas
         ],
         proximos_horarios=resultado.proximos_horarios,

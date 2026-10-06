@@ -135,6 +135,10 @@ class ParadaLinhaResponse(BaseModel):
     numero: str
     nome: str
     sentido: str
+    # US #173 — sentido da rota e posição da parada nela. Nulos quando a
+    # parada foi resolvida pelo caminho antigo (antes da reingestão).
+    rota_sentido: str | None = None
+    ordem: int | None = None
 
 
 class ParadaDetalheResponse(BaseModel):
