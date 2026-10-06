@@ -97,8 +97,8 @@ function MapaConteudo() {
   }, [painel]);
 
   // US #25 — ao abrir o planejador via favorito, pré-preenche origem/destino
-  // a partir dos query params e calcula a rota automaticamente.
-
+  // a partir dos query params. O cálculo automático é disparado pelo
+  // useEffect de auto-cálculo abaixo, declarado após handleCalcularRota.
   useEffect(() => {
     if (
       painel === "rotas" &&
@@ -108,20 +108,23 @@ function MapaConteudo() {
       destinoLngParam
     ) {
       const orig: PontoEscolhido = {
-        nome: origemNomeParam ?? `${parseFloat(origemLatParam).toFixed(4)}, ${parseFloat(origemLngParam).toFixed(4)}`,
+        nome:
+          origemNomeParam ??
+          `${parseFloat(origemLatParam).toFixed(4)}, ${parseFloat(origemLngParam).toFixed(4)}`,
         lat: parseFloat(origemLatParam),
         lng: parseFloat(origemLngParam),
       };
       const dest: PontoEscolhido = {
-        nome: destinoNomeParam ?? `${parseFloat(destinoLatParam).toFixed(4)}, ${parseFloat(destinoLngParam).toFixed(4)}`,
+        nome:
+          destinoNomeParam ??
+          `${parseFloat(destinoLatParam).toFixed(4)}, ${parseFloat(destinoLngParam).toFixed(4)}`,
         lat: parseFloat(destinoLatParam),
         lng: parseFloat(destinoLngParam),
       };
       setOrigem(orig);
       setDestino(dest);
-      // O cálculo será disparado pelo useEffect seguinte que observa origem/destino.
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [painel, origemLatParam, origemLngParam, destinoLatParam, destinoLngParam]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
@@ -285,6 +288,24 @@ function MapaConteudo() {
     } finally {
       setCalculandoRota(false);
     }
+  }, [origem, destino]);
+
+  // US #25 — auto-cálculo quando origem+destino chegam via query params
+  // (clique em favorito). Declarado APÓS handleCalcularRota para poder
+  // referenciá-la. Só dispara quando os query params estão preenchidos —
+  // não interfere com o fluxo manual onde o usuário digita os campos.
+  useEffect(() => {
+    if (
+      origem &&
+      destino &&
+      origemLatParam &&
+      destinoLatParam &&
+      !opcoes &&
+      !calculandoRota
+    ) {
+      handleCalcularRota();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origem, destino]);
 
   const handleFecharPlanejador = useCallback(() => {

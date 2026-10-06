@@ -48,8 +48,13 @@ jest.mock("@/lib/api", () => ({
   calcularRotas: jest.fn().mockResolvedValue([]),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
+  // US #25 — funções de favoritos usadas pelo MapaConteudo
+  listarFavoritos: jest.fn().mockResolvedValue([]),
+  cachearFavoritos: jest.fn(),
+  lerFavoritosCache: jest.fn().mockReturnValue([]),
   BuscarLinhaError: class BuscarLinhaError extends Error {},
   CalcularRotaError: class CalcularRotaError extends Error {},
+  SalvarFavoritoError: class SalvarFavoritoError extends Error {},
 }));
 
 const sugerirLinhasMock = sugerirLinhas as jest.Mock;

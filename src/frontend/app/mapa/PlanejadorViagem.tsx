@@ -549,55 +549,7 @@ export default function PlanejadorViagem({
                   <ResumoOpcao opcao={opcao} />
 
                   {indice === opcaoSelecionada && (
-                    <>
-                      {/* US #25 — botão de favorito */}
-                      <div className="plan-favorito-area">
-                        <button
-                          type="button"
-                          className={`plan-favorito-btn${jaFavoritado(opcao) ? " salvo" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!jaFavoritado(opcao)) handleSalvarFavorito(indice);
-                          }}
-                          disabled={salvando === indice || jaFavoritado(opcao)}
-                          aria-label={
-                            jaFavoritado(opcao)
-                              ? "Rota já salva nos favoritos"
-                              : "Salvar como favorita"
-                          }
-                          title={
-                            jaFavoritado(opcao)
-                              ? "Já está nos seus favoritos"
-                              : "Salvar rota como favorita"
-                          }
-                        >
-                          {salvando === indice ? (
-                            <LoaderCircle size={14} className="plan-girando" />
-                          ) : (
-                            <Star
-                              size={14}
-                              fill={jaFavoritado(opcao) ? "currentColor" : "none"}
-                            />
-                          )}
-                          <span>
-                            {jaFavoritado(opcao)
-                              ? "Salva nos favoritos"
-                              : salvando === indice
-                              ? "Salvando..."
-                              : "Salvar como favorita"}
-                          </span>
-                        </button>
-                        {erroFavorito && salvando === null && (
-                          <p
-                            className="plan-erro plan-favorito-erro"
-                            role="alert"
-                          >
-                            {erroFavorito}
-                          </p>
-                        )}
-                      </div>
-
-                      <ol className="plan-passos">
+                    <ol className="plan-passos">
                       {opcao.pernas.map((perna, i) => (
                         <li key={`${perna.numero}-${i}`}>
                           <div className="plan-passo-linha">
@@ -711,9 +663,56 @@ export default function PlanejadorViagem({
                         </li>
                       ))}
                     </ol>
-                    </>
                   )}
                 </button>
+                {/* US #25 — botão de favorito fora do <button> da opção
+                    para evitar button dentro de button (HTML inválido). */}
+                {indice === opcaoSelecionada && (
+                  <div className="plan-favorito-area">
+                    <button
+                      type="button"
+                      className={`plan-favorito-btn${jaFavoritado(opcao) ? " salvo" : ""}`}
+                      onClick={() => {
+                        if (!jaFavoritado(opcao)) handleSalvarFavorito(indice);
+                      }}
+                      disabled={salvando === indice || jaFavoritado(opcao)}
+                      aria-label={
+                        jaFavoritado(opcao)
+                          ? "Rota já salva nos favoritos"
+                          : "Salvar como favorita"
+                      }
+                      title={
+                        jaFavoritado(opcao)
+                          ? "Já está nos seus favoritos"
+                          : "Salvar rota como favorita"
+                      }
+                    >
+                      {salvando === indice ? (
+                        <LoaderCircle size={14} className="plan-girando" />
+                      ) : (
+                        <Star
+                          size={14}
+                          fill={jaFavoritado(opcao) ? "currentColor" : "none"}
+                        />
+                      )}
+                      <span>
+                        {jaFavoritado(opcao)
+                          ? "Salva nos favoritos"
+                          : salvando === indice
+                          ? "Salvando..."
+                          : "Salvar como favorita"}
+                      </span>
+                    </button>
+                    {erroFavorito && salvando === null && (
+                      <p
+                        className="plan-erro plan-favorito-erro"
+                        role="alert"
+                      >
+                        {erroFavorito}
+                      </p>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
