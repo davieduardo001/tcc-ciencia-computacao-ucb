@@ -355,8 +355,8 @@ export async function logoutUsuario(): Promise<void> {
     });
   } finally {
     clearTokens();
-    // US #25 — limpa o cache local de favoritos ao sair.
-    try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
+    // US #25 — limpa o cache local de favoritos ao sair (todas as chaves).
+    limparCacheFavoritos();
   }
 }
 
@@ -864,12 +864,17 @@ export class SalvarFavoritoError extends Error {
 }
 
 // Chave do localStorage — prefixo "movecity:" para evitar colisão.
+// Isolada por userId para que dois usuários no mesmo dispositivo
+// não compartilhem favoritos (apontamento #3 do review).
+const CACHE_FAVORITOS_PREFIX = "movecity:favoritos:";
+/** @deprecated Use as funções com userId. Mantida para compatibilidade com código legado. */
 const CACHE_FAVORITOS_KEY = "movecity:favoritos";
 
 /** Persiste a lista de favoritos no localStorage para acesso offline. */
-export function cachearFavoritos(lista: RotaFavorita[]): void {
+export function cachearFavoritos(lista: RotaFavorita[], userId?: string): void {
   try {
-    localStorage.setItem(CACHE_FAVORITOS_KEY, JSON.stringify(lista));
+    const chave = userId ? `${CACHE_FAVORITOS_PREFIX}${userId}` : CACHE_FAVORITOS_KEY;
+    localStorage.setItem(chave, JSON.stringify(lista));
   } catch {
     // localStorage pode estar indisponível (modo privado, storage cheio).
     // Falha silenciosa — o cache é best-effort.
@@ -877,9 +882,10 @@ export function cachearFavoritos(lista: RotaFavorita[]): void {
 }
 
 /** Lê favoritos do cache local. Retorna [] em qualquer erro de parse. */
-export function lerFavoritosCache(): RotaFavorita[] {
+export function lerFavoritosCache(userId?: string): RotaFavorita[] {
   try {
-    const raw = localStorage.getItem(CACHE_FAVORITOS_KEY);
+    const chave = userId ? `${CACHE_FAVORITOS_PREFIX}${userId}` : CACHE_FAVORITOS_KEY;
+    const raw = localStorage.getItem(chave);
     if (!raw) return [];
     return JSON.parse(raw) as RotaFavorita[];
   } catch {
@@ -887,10 +893,21 @@ export function lerFavoritosCache(): RotaFavorita[] {
   }
 }
 
-/** Remove o cache local de favoritos (chamado no logout). */
-export function limparCacheFavoritos(): void {
+/** Remove o cache local de favoritos (chamado no logout e no 401). */
+export function limparCacheFavoritos(userId?: string): void {
   try {
-    localStorage.removeItem(CACHE_FAVORITOS_KEY);
+    if (userId) {
+      localStorage.removeItem(`${CACHE_FAVORITOS_PREFIX}${userId}`);
+    } else {
+      // Sem userId: limpa chave legada e todas as chaves por userId.
+      localStorage.removeItem(CACHE_FAVORITOS_KEY);
+      const keysParaRemover: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(CACHE_FAVORITOS_PREFIX)) keysParaRemover.push(k);
+      }
+      keysParaRemover.forEach((k) => localStorage.removeItem(k));
+    }
   } catch {
     // Falha silenciosa.
   }
@@ -950,37 +967,38 @@ export async function salvarFavorito(
  * US #25 — Busca as favoritas direto do servidor. Lança em qualquer falha
  * (rede fora, 5xx) para o chamador saber que NÃO são dados frescos.
  *
- * Em 401 o cache é apagado e a lista vem vazia: a sessão acabou, e o cache
- * não é por usuário — mostrá-lo exporia as rotas de quem usou o aparelho antes.
+ * Em 401 o cache do userId é apagado (e o legado também) e a lista vem
+ * vazia: a sessão acabou, e manter o cache exporia rotas de quem usou
+ * o aparelho antes (apontamento #3 do review).
  */
-export async function listarFavoritosRemoto(): Promise<RotaFavorita[]> {
+export async function listarFavoritosRemoto(userId?: string): Promise<RotaFavorita[]> {
   const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
     credentials: "include",
     cache: "no-store",
   });
   if (response.status === 401) {
-    limparCacheFavoritos();
+    limparCacheFavoritos(userId);
     return [];
   }
   if (!response.ok) {
     throw new Error(`Falha ao listar favoritos (${response.status}).`);
   }
   const lista: RotaFavorita[] = await response.json();
-  cachearFavoritos(lista);
+  cachearFavoritos(lista, userId);
   return lista;
 }
 
 /**
  * US #25 — Lista as rotas favoritas do usuário autenticado.
  *
- * Nunca lança exceção: falha de rede ou do servidor retorna o cache local.
- * Quem precisa saber se os dados são frescos usa `listarFavoritosRemoto`.
+ * Nunca lança exceção: falha de rede ou do servidor retorna o cache local
+ * do userId. Quem precisa saber se os dados são frescos usa `listarFavoritosRemoto`.
  */
-export async function listarFavoritos(): Promise<RotaFavorita[]> {
+export async function listarFavoritos(userId?: string): Promise<RotaFavorita[]> {
   try {
-    return await listarFavoritosRemoto();
+    return await listarFavoritosRemoto(userId);
   } catch {
-    return lerFavoritosCache();
+    return lerFavoritosCache(userId);
   }
 }
 
