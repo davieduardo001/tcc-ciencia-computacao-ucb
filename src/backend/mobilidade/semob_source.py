@@ -268,6 +268,71 @@ def horarios_por_linha(horarios_brutos: list[dict]) -> dict[tuple[str, str], lis
     return {chave: sorted(valores) for chave, valores in indice.items()}
 
 
+@dataclass(frozen=True)
+class HorariosDaRota:
+    """Saídas por dia da semana e duração da viagem de uma linha × sentido."""
+
+    por_dia: dict[str, list[str]]  # "0" (segunda) .. "6" (domingo), como datetime.weekday()
+    tempo_percurso_min: int | None
+
+
+def _dias_do_registro(dias_semana: object) -> list[int]:
+    """
+    "SSSSSNN" (segunda..domingo, S = opera) → [0, 1, 2, 3, 4].
+
+    Registro sem o campo, ou fora do formato, vale para todos os dias: é
+    o comportamento anterior, e inventar um recorte seria pior do que
+    não recortar.
+    """
+    if isinstance(dias_semana, str) and len(dias_semana) == 7 and set(dias_semana) <= {"S", "N"}:
+        return [i for i, c in enumerate(dias_semana) if c == "S"]
+    return list(range(7))
+
+
+def horarios_por_dia(horarios_brutos: list[dict]) -> dict[tuple[str, str], HorariosDaRota]:
+    """
+    Indexa /horario por (numero, sentido por extenso) separando os
+    horários por dia da semana.
+
+    `horarios_por_linha` junta tudo num conjunto só, e por isso o
+    "próximo horário" pode mostrar uma saída de domingo numa segunda: no
+    payload real, 809 de 1.394 linha × sentido têm mais de um tipo de dia.
+    """
+    dias: dict[tuple[str, str], dict[int, set[str]]] = {}
+    percurso: dict[tuple[str, str], int | None] = {}
+
+    for registro in horarios_brutos:
+        sentido = SENTIDO_POR_INICIAL.get(registro.get("sentido", ""), "")
+        if not sentido:
+            continue
+        chave = (registro.get("numero", ""), sentido)
+        por_dia = dias.setdefault(chave, {d: set() for d in range(7)})
+
+        tempo = registro.get("tempo_percurso")
+        if isinstance(tempo, (int, float)) and tempo > 0:
+            percurso[chave] = int(tempo)
+        percurso.setdefault(chave, None)
+
+        for horario in registro.get("horarios", []):
+            if not horario.get("horario"):
+                continue
+            for dia in _dias_do_registro(horario.get("dias_semana")):
+                por_dia[dia].add(horario["horario"])
+
+    return {
+        chave: HorariosDaRota(
+            por_dia={str(d): sorted(h) for d, h in por_dia.items()},
+            tempo_percurso_min=percurso.get(chave),
+        )
+        for chave, por_dia in dias.items()
+    }
+
+
+def horarios_do_dia(por_dia: dict[str, list[str]] | None, dia_da_semana: int) -> list[str]:
+    """Saídas de um dia (0 = segunda). Vazio quando a rota ainda não tem o dado."""
+    return list((por_dia or {}).get(str(dia_da_semana), []))
+
+
 def escolher_sentido_principal(sentidos: list[str]) -> str:
     """CIRCULAR > IDA > VOLTA — ver PRIORIDADE_SENTIDO."""
     return min(sentidos, key=lambda s: PRIORIDADE_SENTIDO.get(s, 99))
