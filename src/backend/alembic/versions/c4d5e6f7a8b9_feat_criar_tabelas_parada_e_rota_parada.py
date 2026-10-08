@@ -1,7 +1,7 @@
 """feat: criar tabelas parada e rota_parada (US #173 - mapeamento entre paradas)
 
 Revision ID: c4d5e6f7a8b9
-Revises: a2b3c4d5e6f7
+Revises: d6e7f8a9b0c1
 Create Date: 2026-10-06 00:00:00.000000
 
 Migration só aditiva: nada existente é alterado ou apagado. Homolog e
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c4d5e6f7a8b9'
-down_revision: Union[str, None] = 'a2b3c4d5e6f7'
+down_revision: Union[str, None] = 'd6e7f8a9b0c1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
