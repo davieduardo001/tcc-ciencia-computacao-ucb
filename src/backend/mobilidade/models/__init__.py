@@ -3,6 +3,7 @@ from .linha import Linha
 from .rota import Rota, RotaCelula
 from .linha_acompanhada import LinhaAcompanhada
 from .alerta import AlertaAtraso
+from .alerta_proximidade import AlertaProximidade
 
 __all__ = [
     "TestLinha",
@@ -11,4 +12,5 @@ __all__ = [
     "RotaCelula",
     "LinhaAcompanhada",
     "AlertaAtraso",
+    "AlertaProximidade",
 ]

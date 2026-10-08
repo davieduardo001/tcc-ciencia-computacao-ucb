@@ -6,8 +6,12 @@ from shared.logs import instalar_redator_de_acesso
 from mobilidade.routes import router as mobilidade_router
 from mobilidade.workers.monitoramento import criar_worker
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
+from mobilidade.services.servico_proximidade import ServicoProximidade
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
+from mobilidade.providers.contratos_proximidade import ViagensAtivasProvisorias
+from mobilidade.providers.preferencias_banco import PreferenciasDoBanco
+from mobilidade.providers.veiculos_ao_vivo import VeiculosAoVivo
 
 instalar_redator_de_acesso()
 settings = get_settings()
@@ -32,8 +36,23 @@ app.include_router(mobilidade_router, prefix="/mobilidade", tags=["mobilidade"])
 @app.on_event("startup")
 def startup():
     servico = ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
+
+    # US #172 — alerta de proximidade da parada. `ViagensAtivasProvisorias`
+    # devolve [] até a US #171 entregar a entidade de viagem: é o único
+    # ponto de troca quando ela fechar (ver contratos_proximidade.py).
+    servico_proximidade = ServicoProximidade(
+        viagens=ViagensAtivasProvisorias(),
+        veiculos=VeiculosAoVivo(),
+        preferencias=PreferenciasDoBanco(),
+        notificador=NotificadorNulo(),
+    )
+
     intervalo = int(getattr(settings, "WORKER_INTERVAL_MINUTES", 5))
-    scheduler = criar_worker(servico, intervalo_minutos=intervalo)
+    scheduler = criar_worker(
+        servico,
+        intervalo_minutos=intervalo,
+        servico_proximidade=servico_proximidade,
+    )
     scheduler.start()
     app.state.scheduler = scheduler
 
