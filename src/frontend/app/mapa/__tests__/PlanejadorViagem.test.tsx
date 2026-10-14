@@ -331,3 +331,111 @@ describe("PlanejadorViagem — botão de favorito (US #25)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Card #179 (④a) — rótulos legíveis e estados do resultado
+// ---------------------------------------------------------------------------
+
+function opcaoComParadas(embarqueNome: string, desembarqueNome: string) {
+  const perna = pernaMockCompleta("0.110");
+  perna.embarque.parada_nome = embarqueNome;
+  perna.desembarque.parada_nome = desembarqueNome;
+  return { ...opcaoMock, pernas: [perna] };
+}
+
+describe("PlanejadorViagem — rótulo de parada sem nome (card #179)", () => {
+  it("parada sem nome na fonte vira 'Parada sem nome', e não coordenada crua", () => {
+    render(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoComParadas("", "")]}
+        opcaoSelecionada={0}
+      />
+    );
+
+    expect(screen.getAllByText("Parada sem nome")).toHaveLength(2);
+    expect(screen.queryByText(/Ponto em/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/-15.8300|-48.0400/);
+  });
+
+  it("a coordenada continua disponível no title, pra quem precisar conferir", () => {
+    render(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoComParadas("", "Parada B")]}
+        opcaoSelecionada={0}
+      />
+    );
+
+    expect(screen.getByText("Parada sem nome")).toHaveAttribute("title", "-15.83000, -48.04000");
+  });
+
+  it("parada com nome mostra o nome, sem title", () => {
+    render(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoComParadas("W3 Sul 502", "Rodoviária")]}
+        opcaoSelecionada={0}
+      />
+    );
+
+    expect(screen.getByText("W3 Sul 502")).not.toHaveAttribute("title");
+    expect(screen.queryByText("Parada sem nome")).not.toBeInTheDocument();
+  });
+});
+
+describe("PlanejadorViagem — ônibus rodando agora (card #179)", () => {
+  it("'ônibus' é invariável: 1 e N usam o mesmo texto", () => {
+    const { rerender } = render(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoMock]}
+        opcaoSelecionada={0}
+        veiculosPorLinha={{ "0.110": 1 }}
+        rastreando
+      />
+    );
+    expect(screen.getByText(/ônibus rodando agora/)).toHaveTextContent("1 ônibus rodando agora");
+
+    rerender(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoMock]}
+        opcaoSelecionada={0}
+        veiculosPorLinha={{ "0.110": 4 }}
+        rastreando
+      />
+    );
+    expect(screen.getByText(/ônibus rodando agora/)).toHaveTextContent("4 ônibus rodando agora");
+  });
+});
+
+describe("PlanejadorViagem — favorito dentro do cartão selecionado (card #179)", () => {
+  it("o botão de favorito vive numa área própria colada ao cartão, com o estado 'salvo' legível", () => {
+    const { container } = render(
+      <PlanejadorViagem
+        {...props}
+        origem={origemMock}
+        destino={destinoMock}
+        opcoes={[opcaoMock]}
+        opcaoSelecionada={0}
+        favoritosIds={new Set(["0.110:-15.8305,-48.0425:-15.7939,-47.8828"])}
+      />
+    );
+
+    const area = container.querySelector(".plan-favorito-area");
+    expect(area).not.toBeNull();
+    expect(area!.previousElementSibling).toHaveClass("plan-opcao", "selecionada");
+    expect(screen.getByRole("button", { name: /Rota já salva nos favoritos/ })).toHaveClass("salvo");
+  });
+});
