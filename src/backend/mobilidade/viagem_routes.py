@@ -1,6 +1,7 @@
 # Rotas da US #171 — Pegar o ônibus.
 #
 #   POST /viagens                  embarca (valida por proximidade, RN-16)
+#   PUT  /viagens/{id}/destino     escolhe/troca/remove a parada de destino
 #   POST /viagens/{id}/encerrar    desce / "Cheguei" (idempotente)
 #   GET  /viagens/ativa            estado + progresso ao vivo
 #
@@ -19,6 +20,7 @@ from mobilidade import viagem_service as servico
 from mobilidade.dependencies import get_usuario_atual_id
 from mobilidade.models.viagem import Viagem
 from mobilidade.schemas_viagem import (
+    DestinoRequest,
     DestinoViagemResponse,
     EmbarqueRequest,
     ParadaViagemResponse,
@@ -85,6 +87,40 @@ async def pegar_onibus(
             status_code=422, detail="A parada de destino não faz parte desta linha."
         )
 
+    return _viagem_response(viagem)
+
+
+@router.put("/viagens/{viagem_id}/destino", response_model=ViagemResponse)
+def definir_destino_da_viagem(
+    viagem_id: uuid.UUID,
+    corpo: DestinoRequest,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Escolhe, troca ou remove (`null`) a parada de destino da viagem ativa.
+    404 para viagem inexistente ou de outro usuário; 409 se já terminou;
+    422 para parada desconhecida ou que não é da linha.
+    """
+    try:
+        viagem = servico.definir_destino(
+            db,
+            usuario_id=usuario_id,
+            viagem_id=viagem_id,
+            parada_destino_codigo=corpo.parada_destino_codigo,
+            agora=servico.agora_utc(),
+        )
+    except servico.ViagemJaEncerrada:
+        raise HTTPException(status_code=409, detail="Esta viagem já foi encerrada.")
+    except servico.ParadaDesconhecida:
+        raise HTTPException(status_code=422, detail="Parada de destino não encontrada.")
+    except servico.ParadaForaDaLinha:
+        raise HTTPException(
+            status_code=422, detail="A parada de destino não faz parte desta linha."
+        )
+
+    if viagem is None:
+        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
     return _viagem_response(viagem)
 
 

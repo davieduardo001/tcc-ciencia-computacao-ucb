@@ -67,6 +67,10 @@ class ParadaForaDaLinha(ErroDeViagem):
     """A linha tem paradas ingeridas e o destino não é uma delas."""
 
 
+class ViagemJaEncerrada(ErroDeViagem):
+    """Não se muda o destino de uma viagem que já terminou."""
+
+
 def agora_utc() -> datetime:
     """UTC sem fuso — o formato das colunas de data do projeto."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -193,6 +197,35 @@ def embarcar(
         # o primeiro. O segundo é um "já está em viagem", não um erro 500.
         db.rollback()
         raise JaEmViagem()
+    return viagem
+
+
+def definir_destino(
+    db: Session, *, usuario_id, viagem_id, parada_destino_codigo: str | None, agora: datetime
+) -> Viagem | None:
+    """
+    Escolhe (ou troca, ou tira com `None`) a parada de destino da viagem em
+    andamento. `None` quando a viagem não existe ou é de outra pessoa.
+
+    Existe porque o jeito natural de escolher o destino é tocar na parada no
+    mapa DEPOIS de embarcar. Vale a mesma validação do embarque.
+    """
+    expirar_vencidas(db, agora, usuario_id)
+    viagem = (
+        db.query(Viagem)
+        .filter(Viagem.id == viagem_id, Viagem.usuario_id == usuario_id)
+        .one_or_none()
+    )
+    if viagem is None:
+        return None
+    if viagem.encerrada_em is not None:
+        raise ViagemJaEncerrada()
+
+    if parada_destino_codigo is not None:
+        _validar_destino(db, viagem.numero_linha, parada_destino_codigo)
+
+    viagem.parada_destino_codigo = parada_destino_codigo
+    db.commit()
     return viagem
 
 

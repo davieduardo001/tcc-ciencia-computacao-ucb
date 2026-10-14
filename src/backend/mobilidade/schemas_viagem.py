@@ -27,6 +27,12 @@ class EmbarqueRequest(BaseModel):
         return valor
 
 
+class DestinoRequest(BaseModel):
+    """Corpo do PUT /viagens/{id}/destino. `null` tira o destino."""
+
+    parada_destino_codigo: str | None = Field(default=None, min_length=1, max_length=12)
+
+
 class ParadaViagemResponse(BaseModel):
     codigo: str
     nome: str

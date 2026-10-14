@@ -450,6 +450,117 @@ class TestEncerrar:
 
 
 # ==========================================================================
+# Escolher o destino depois de embarcar
+# ==========================================================================
+
+
+def _destino(corpo, viagem_id, usuario=PASSAGEIRO):
+    return client.put(
+        f"/mobilidade/viagens/{viagem_id}/destino", json=corpo, headers=_h(usuario)
+    )
+
+
+class TestDefinirDestino:
+    def _criar(self, destino=None):
+        return _embarcar([_veiculo()], destino=destino).json()["id"]
+
+    def test_escolhe_o_destino_depois_de_embarcar(self, db):
+        id_ = self._criar()
+
+        r = _destino({"parada_destino_codigo": COD["C"]}, id_)
+
+        assert r.status_code == 200
+        assert r.json()["parada_destino_codigo"] == COD["C"]
+        db.expire_all()
+        assert db.query(Viagem).one().parada_destino_codigo == COD["C"]
+
+    def test_troca_o_destino(self, db):
+        id_ = self._criar(destino=COD["B"])
+        assert _destino({"parada_destino_codigo": COD["C"]}, id_).json()[
+            "parada_destino_codigo"
+        ] == COD["C"]
+
+    def test_null_tira_o_destino(self, db):
+        id_ = self._criar(destino=COD["B"])
+
+        r = _destino({"parada_destino_codigo": None}, id_)
+
+        assert r.status_code == 200
+        assert r.json()["parada_destino_codigo"] is None
+
+    def test_o_novo_destino_aparece_no_acompanhamento(self, db):
+        id_ = self._criar()
+        _destino({"parada_destino_codigo": COD["C"]}, id_)
+
+        corpo = _ativa([_veiculo(indice=60)]).json()
+
+        assert corpo["destino"]["codigo"] == COD["C"]
+        assert [p["codigo"] for p in corpo["paradas_restantes"]] == [COD["B"], COD["C"]]
+
+    def test_o_novo_destino_entra_no_alerta_da_172(self, db):
+        id_ = self._criar()
+        assert ViagensAtivasDoBanco().listar_ativas() == []
+
+        _destino({"parada_destino_codigo": COD["C"]}, id_)
+
+        assert [a.parada_destino_codigo for a in ViagensAtivasDoBanco().listar_ativas()] == [
+            COD["C"]
+        ]
+
+    def test_parada_desconhecida_e_422_e_nao_muda_nada(self, db):
+        id_ = self._criar(destino=COD["B"])
+
+        r = _destino({"parada_destino_codigo": "PR-NAOEXISTE"}, id_)
+
+        assert r.status_code == 422
+        db.expire_all()
+        assert db.query(Viagem).one().parada_destino_codigo == COD["B"]
+
+    def test_parada_de_outra_linha_e_422(self, db):
+        id_ = self._criar()
+        r = _destino({"parada_destino_codigo": COD_FORA}, id_)
+        assert r.status_code == 422
+        assert "não faz parte desta linha" in r.json()["detail"]
+
+    def test_viagem_encerrada_nao_muda_de_destino(self, db):
+        id_ = self._criar()
+        client.post(f"/mobilidade/viagens/{id_}/encerrar", headers=_h())
+
+        r = _destino({"parada_destino_codigo": COD["C"]}, id_)
+
+        assert r.status_code == 409
+        db.expire_all()
+        assert db.query(Viagem).one().parada_destino_codigo is None
+
+    def test_viagem_expirada_nao_muda_de_destino(self, db):
+        viagem = _inserir_viagem(db, embarcou_ha=timedelta(hours=6))
+        assert _destino({"parada_destino_codigo": COD["C"]}, viagem.id).status_code == 409
+
+    def test_viagem_de_outro_usuario_e_404_e_nao_muda(self, db):
+        id_ = self._criar(destino=COD["B"])
+
+        r = _destino({"parada_destino_codigo": COD["C"]}, id_, usuario=OUTRO)
+
+        assert r.status_code == 404
+        db.expire_all()
+        assert db.query(Viagem).one().parada_destino_codigo == COD["B"]
+
+    def test_id_inexistente_e_404(self, db):
+        assert _destino({"parada_destino_codigo": COD["C"]}, uuid.uuid4()).status_code == 404
+
+    def test_sem_identidade_e_401(self, db):
+        r = client.put(
+            f"/mobilidade/viagens/{uuid.uuid4()}/destino",
+            json={"parada_destino_codigo": COD["C"]},
+        )
+        assert r.status_code == 401
+
+    def test_codigo_vazio_e_422_do_schema(self, db):
+        id_ = self._criar()
+        assert _destino({"parada_destino_codigo": ""}, id_).status_code == 422
+
+
+# ==========================================================================
 # Expiração (Cenário 6)
 # ==========================================================================
 
@@ -831,4 +942,5 @@ def test_rotas_estao_registradas_sob_mobilidade():
     paths = client.get("/openapi.json").json()["paths"]
     assert "post" in paths["/mobilidade/viagens"]
     assert "post" in paths["/mobilidade/viagens/{viagem_id}/encerrar"]
+    assert "put" in paths["/mobilidade/viagens/{viagem_id}/destino"]
     assert "get" in paths["/mobilidade/viagens/ativa"]
