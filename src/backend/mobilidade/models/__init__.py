@@ -5,6 +5,7 @@ from .parada import Parada, RotaParada
 from .linha_acompanhada import LinhaAcompanhada
 from .alerta import AlertaAtraso
 from .alerta_proximidade import AlertaProximidade
+from .viagem import Viagem
 
 __all__ = [
     "TestLinha",
@@ -16,4 +17,5 @@ __all__ = [
     "LinhaAcompanhada",
     "AlertaAtraso",
     "AlertaProximidade",
+    "Viagem",
 ]
