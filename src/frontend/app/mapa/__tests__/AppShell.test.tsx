@@ -1,11 +1,21 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AppShell from "../AppShell";
-import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario } from "@/lib/api";
+import {
+  atualizarFirstAccess,
+  buscarUsuarioAtual,
+  buscarViagemAtiva,
+  logoutUsuario,
+  ViagemAtiva,
+} from "@/lib/api";
 
 jest.mock("@/lib/api", () => ({
   buscarUsuarioAtual: jest.fn(),
   logoutUsuario: jest.fn(),
   atualizarFirstAccess: jest.fn(),
+  // O AppShell consulta a viagem em andamento (US #171). Por padrão a
+  // consulta nunca responde: os testes antigos, síncronos, não esperam a
+  // resposta e gerariam avisos de `act`. Quem testa a viagem define o retorno.
+  buscarViagemAtiva: jest.fn(() => new Promise(() => {})),
 }));
 
 const pushMock = jest.fn();
@@ -426,5 +436,98 @@ describe("AppShell", () => {
       expect(screen.getByText("Visitante")).toBeInTheDocument();
     });
     expect(screen.queryByTitle("Rever o guia")).not.toBeInTheDocument();
+  });
+});
+
+describe("AppShell — viagem em andamento (US #171)", () => {
+  const buscarViagemMock = buscarViagemAtiva as jest.Mock;
+
+  const VIAGEM: ViagemAtiva = {
+    id: "v-1",
+    numeroLinha: "0.110",
+    sentido: "IDA",
+    veiculoPrefixo: "440001",
+    paradaDestinoCodigo: null,
+    embarcouEm: "2026-10-14T15:00:00Z",
+    sinal: "ao_vivo",
+    veiculo: null,
+    destino: null,
+    proximaParada: null,
+    paradasRestantes: [],
+  };
+
+  beforeEach(() => {
+    buscarUsuarioAtualMock.mockReset().mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    buscarViagemMock.mockReset().mockImplementation(() => new Promise(() => {}));
+  });
+
+  it("fora do mapa, em viagem: o chip lembra da viagem e leva de volta ao mapa", async () => {
+    buscarViagemMock.mockResolvedValue({ falhou: false, viagem: VIAGEM });
+
+    render(
+      <AppShell active="favoritos">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const chip = await screen.findByRole("link", { name: "Em viagem na linha 0.110. Voltar ao mapa" });
+    expect(chip).toHaveAttribute("href", "/mapa");
+    expect(chip).toHaveTextContent("0.110");
+  });
+
+  it("no mapa, o chip sai (a faixa do próprio mapa já diz isso)", async () => {
+    buscarViagemMock.mockResolvedValue({ falhou: false, viagem: VIAGEM });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(buscarViagemMock).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector(".ms-content.com-viagem")).not.toBeNull());
+    expect(screen.queryByRole("link", { name: /Em viagem na linha/ })).not.toBeInTheDocument();
+  });
+
+  it("aguardando: nem chip nem a marca de viagem no conteúdo", async () => {
+    buscarViagemMock.mockResolvedValue({ falhou: false, viagem: null });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(buscarViagemMock).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: /Em viagem na linha/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".ms-content")).not.toHaveClass("com-viagem");
+  });
+
+  it("em viagem no mapa, o conteúdo ganha 'com-viagem' — é o que desce o planejador e os painéis", async () => {
+    buscarViagemMock.mockResolvedValue({ falhou: false, viagem: VIAGEM });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(document.querySelector(".ms-content")).toHaveClass("com-viagem"));
+  });
+
+  it("em viagem, fora do mapa, o conteúdo NÃO ganha 'com-viagem' (não há faixa para abrir espaço)", async () => {
+    buscarViagemMock.mockResolvedValue({ falhou: false, viagem: VIAGEM });
+
+    render(
+      <AppShell active="favoritos">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    await screen.findByRole("link", { name: /Em viagem na linha/ });
+    expect(document.querySelector(".ms-content")).not.toHaveClass("com-viagem");
   });
 });

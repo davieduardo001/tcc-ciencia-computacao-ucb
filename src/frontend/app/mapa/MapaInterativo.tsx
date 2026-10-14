@@ -16,6 +16,9 @@ import BadgeLinha from "./BadgeLinha";
 import SeloFonte, { legendaDaFonte } from "./SeloFonte";
 import { formatarMinutos, minutosInteiros } from "./tempo";
 import { useChegadasDaParada } from "./useChegadasDaParada";
+import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
+import FaixaDaViagem from "./FaixaDaViagem";
+import { useViagem } from "./ViagemContext";
 import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
@@ -369,6 +372,11 @@ export default function MapaInterativo({
     detalheParada?.detalhes?.codigo ?? null
   );
 
+  // US #171 (RN-05) — quem já está a bordo não espera mais: some o ETA de
+  // espera (pílula, popup e painel da parada) e entra a faixa de viagem.
+  const { viagem: viagemEmCurso } = useViagem();
+  const emViagem = viagemEmCurso !== null;
+
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       setStatus("indisponivel");
@@ -570,6 +578,8 @@ export default function MapaInterativo({
         (emZoom ? " em-zoom" : "")
       }
     >
+      <FaixaDaViagem />
+
       {escolhendoNoMapa && (
         <div className="mapa-aviso destaque" role="status">
           Toque no mapa para escolher o ponto.
@@ -729,7 +739,7 @@ export default function MapaInterativo({
                 veiculo.direcao,
                 parado,
                 veiculo.linha,
-                veiculo.etaMinutos
+                emViagem ? null : veiculo.etaMinutos
               )}
             >
               <Popup>
@@ -746,7 +756,7 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
-                {veiculo.etaMinutos != null && veiculo.paradaNome && (
+                {!emViagem && veiculo.etaMinutos != null && veiculo.paradaNome && (
                   <>
                     <br />
                     Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
@@ -755,6 +765,11 @@ export default function MapaInterativo({
                 )}
                 <br />
                 <small>{descreverIdade(veiculo.atualizadoEm)}</small>
+                <BotaoPegueiOnibus
+                  numeroLinha={veiculo.linha}
+                  prefixo={veiculo.prefixo}
+                  posicaoDoUsuario={coordenadas}
+                />
               </Popup>
             </Marker>
           );
@@ -817,6 +832,11 @@ export default function MapaInterativo({
 
             {detalheParada.detalhes && (
               <>
+                <BotaoDescerNestaParada
+                  codigoDaParada={detalheParada.detalhes.codigo}
+                  numerosDasLinhas={detalheParada.detalhes.linhas.map((l) => l.numero)}
+                />
+
                 <div className="mapa-painel-titulo">
                   Linhas que passam por aqui ·{" "}
                   {detalheParada.detalhes.linhas.length}
@@ -838,7 +858,7 @@ export default function MapaInterativo({
                     ônibus a caminho, o horário previsto de passagem. Cada
                     linha diz de onde veio o número (RN-10). Sem dado, diz
                     isso: não inventa (RN-09). */}
-                {chegadasDaParada && chegadasDaParada.chegadas.length > 0 && (
+                {!emViagem && chegadasDaParada && chegadasDaParada.chegadas.length > 0 && (
                   <>
                     <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
                       Chegando nesta parada

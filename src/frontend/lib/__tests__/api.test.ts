@@ -10,6 +10,11 @@ import {
   nomearLugar,
   buscarPosicoesDaLinha,
   buscarChegadasParada,
+  buscarViagemAtiva,
+  definirDestinoDaViagem,
+  embarcarNoOnibus,
+  encerrarViagem,
+  ViagemError,
   solicitarResetSenha,
   redefinirSenha,
 } from "../api";
@@ -903,5 +908,266 @@ describe("api.ts — cache de favoritos (US #25)", () => {
     cachearFavoritos([FAVORITO_RESPONSE]);
     limparCacheFavoritos();
     expect(localStorage.getItem("movecity:favoritos")).toBeNull();
+  });
+});
+
+describe("api.ts — pegar o ônibus (US #171)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  function resposta(status: number, corpo: unknown = {}) {
+    return { ok: status >= 200 && status < 300, status, json: async () => corpo };
+  }
+
+  const ATIVA = {
+    ativa: true,
+    viagem: {
+      id: "v-1",
+      numero_linha: "0.110",
+      sentido: "IDA",
+      veiculo_prefixo: "440001",
+      parada_destino_codigo: "PR-C",
+      embarcou_em: "2026-10-14T15:00:00Z",
+      encerrada_em: null,
+      motivo_encerramento: null,
+    },
+    sinal: "ao_vivo",
+    veiculo: { prefixo: "440001", lat: -15.8, lng: -48.0, direcao: 90, atualizado_em: "2026-10-14T12:00:00-03:00" },
+    destino: { codigo: "PR-C", nome: "Parada C", lat: -15.8, lng: -48.1, ultrapassado: false },
+    proxima_parada: { codigo: "PR-B", nome: "Parada B", lat: -15.8, lng: -48.05 },
+    paradas_restantes: [
+      { codigo: "PR-B", nome: "Parada B", lat: -15.8, lng: -48.05 },
+      { codigo: "PR-C", nome: "Parada C", lat: -15.8, lng: -48.1 },
+    ],
+  };
+
+  describe("buscarViagemAtiva", () => {
+    it("chama /viagens/ativa pelo Gateway, com sessão e sem cache", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, { ativa: false })) as jest.Mock;
+
+      await buscarViagemAtiva();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/api\/mobilidade\/viagens\/ativa$/),
+        expect.objectContaining({ credentials: "include", cache: "no-store" })
+      );
+    });
+
+    it("converte o payload para camelCase", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, ATIVA)) as jest.Mock;
+
+      const r = await buscarViagemAtiva();
+
+      expect(r.falhou).toBe(false);
+      if (r.falhou || !r.viagem) throw new Error("esperava viagem");
+      expect(r.viagem).toMatchObject({
+        id: "v-1",
+        numeroLinha: "0.110",
+        sentido: "IDA",
+        veiculoPrefixo: "440001",
+        paradaDestinoCodigo: "PR-C",
+        sinal: "ao_vivo",
+        veiculo: { prefixo: "440001", direcao: 90 },
+        destino: { codigo: "PR-C", ultrapassado: false },
+        proximaParada: { codigo: "PR-B" },
+      });
+      expect(r.viagem.paradasRestantes.map((p) => p.codigo)).toEqual(["PR-B", "PR-C"]);
+    });
+
+    it("`ativa: false` é 'aguardando', não falha", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, { ativa: false })) as jest.Mock;
+      expect(await buscarViagemAtiva()).toEqual({ falhou: false, viagem: null });
+    });
+
+    it("sem sessão (401) também é 'aguardando'", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(401)) as jest.Mock;
+      expect(await buscarViagemAtiva()).toEqual({ falhou: false, viagem: null });
+    });
+
+    it("erro do servidor é FALHA — quem chama mantém o que mostrava", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(502)) as jest.Mock;
+      expect(await buscarViagemAtiva()).toEqual({ falhou: true });
+    });
+
+    it("rede fora do ar é FALHA e nunca lança", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error("offline")) as jest.Mock;
+      expect(await buscarViagemAtiva()).toEqual({ falhou: true });
+    });
+
+    it("sinal desconhecido vira 'sem_sinal' (na dúvida, não afirma ao vivo)", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(200, { ...ATIVA, sinal: "qualquer-coisa" })) as jest.Mock;
+      const r = await buscarViagemAtiva();
+      expect(!r.falhou && r.viagem?.sinal).toBe("sem_sinal");
+    });
+
+    it("tolera os campos opcionais ausentes", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          resposta(200, {
+            ativa: true,
+            viagem: { id: "v", numero_linha: "1", veiculo_prefixo: "9", embarcou_em: "2026-10-14T15:00:00Z" },
+            sinal: "sem_sinal",
+          })
+        ) as jest.Mock;
+
+      const r = await buscarViagemAtiva();
+
+      if (r.falhou || !r.viagem) throw new Error("esperava viagem");
+      expect(r.viagem.sentido).toBeNull();
+      expect(r.viagem.paradaDestinoCodigo).toBeNull();
+      expect(r.viagem.veiculo).toBeNull();
+      expect(r.viagem.destino).toBeNull();
+      expect(r.viagem.proximaParada).toBeNull();
+      expect(r.viagem.paradasRestantes).toEqual([]);
+    });
+  });
+
+  describe("embarcarNoOnibus", () => {
+    it("faz POST /viagens com os nomes de campo do backend", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
+
+      await embarcarNoOnibus({ numeroLinha: "0.110", lat: -15.8, lng: -48.05, paradaDestinoCodigo: "PR-C" });
+
+      const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/api\/mobilidade\/viagens$/);
+      expect(opcoes).toMatchObject({ method: "POST", credentials: "include" });
+      expect(JSON.parse(opcoes.body)).toEqual({
+        numero_linha: "0.110",
+        lat: -15.8,
+        lng: -48.05,
+        parada_destino_codigo: "PR-C",
+      });
+    });
+
+    it("sem destino, não manda o campo", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
+
+      await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 });
+
+      expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).not.toHaveProperty(
+        "parada_destino_codigo"
+      );
+    });
+
+    it("422: usa a frase em português do servidor e guarda o status", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(422, { detail: "Não conseguimos confirmar seu embarque." })) as jest.Mock;
+
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+
+      expect(erro).toBeInstanceOf(ViagemError);
+      expect(erro.message).toBe("Não conseguimos confirmar seu embarque.");
+      expect(erro.status).toBe(422);
+    });
+
+    it("409: já está em viagem", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(409, { detail: "Você já está em uma viagem." })) as jest.Mock;
+
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+
+      expect(erro.status).toBe(409);
+      expect(erro.message).toBe("Você já está em uma viagem.");
+    });
+
+    it("422 do schema (detail é lista) não vaza estrutura técnica", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(422, { detail: [{ loc: ["body", "lat"], msg: "x" }] })) as jest.Mock;
+
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+
+      expect(erro.message).toBe("Não foi possível registrar o embarque. Tente novamente.");
+    });
+
+    it("401: pede login", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(401)) as jest.Mock;
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+      expect(erro.message).toBe("Faça login para registrar a viagem.");
+    });
+
+    it("500 não vaza texto técnico do servidor", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(500, { detail: "Traceback ..." })) as jest.Mock;
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+      expect(erro.message).toBe("Não foi possível registrar o embarque. Tente novamente.");
+    });
+
+    it("rede fora do ar vira ViagemError, não TypeError", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch")) as jest.Mock;
+      const erro = await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 }).catch((e) => e);
+      expect(erro).toBeInstanceOf(ViagemError);
+      expect(erro.message).toMatch(/conexão/);
+    });
+  });
+
+  describe("definirDestinoDaViagem", () => {
+    it("faz PUT no destino da viagem, com o código", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, {})) as jest.Mock;
+
+      await definirDestinoDaViagem("v-1", "PR-C");
+
+      const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/api\/mobilidade\/viagens\/v-1\/destino$/);
+      expect(opcoes.method).toBe("PUT");
+      expect(JSON.parse(opcoes.body)).toEqual({ parada_destino_codigo: "PR-C" });
+    });
+
+    it("`null` tira o destino (vai como null, não some do corpo)", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, {})) as jest.Mock;
+
+      await definirDestinoDaViagem("v-1", null);
+
+      expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({
+        parada_destino_codigo: null,
+      });
+    });
+
+    it("codifica o id na URL", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, {})) as jest.Mock;
+      await definirDestinoDaViagem("a/b", "PR-C");
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain("/viagens/a%2Fb/destino");
+    });
+
+    it("422: frase do servidor", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(422, { detail: "A parada de destino não faz parte desta linha." })) as jest.Mock;
+      const erro = await definirDestinoDaViagem("v-1", "PR-Z").catch((e) => e);
+      expect(erro.message).toBe("A parada de destino não faz parte desta linha.");
+      expect(erro.status).toBe(422);
+    });
+  });
+
+  describe("encerrarViagem", () => {
+    it("faz POST em /encerrar", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(200, {})) as jest.Mock;
+
+      await encerrarViagem("v-1");
+
+      const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/api\/mobilidade\/viagens\/v-1\/encerrar$/);
+      expect(opcoes).toMatchObject({ method: "POST", credentials: "include" });
+    });
+
+    it("404 não é erro: a viagem já não existe, e era isso que a pessoa queria", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(404, { detail: "Viagem não encontrada." })) as jest.Mock;
+      await expect(encerrarViagem("v-1")).resolves.toBeUndefined();
+    });
+
+    it("500 é erro", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(500)) as jest.Mock;
+      await expect(encerrarViagem("v-1")).rejects.toThrow(/encerrar a viagem/);
+    });
+
+    it("rede fora do ar é erro com mensagem", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch")) as jest.Mock;
+      await expect(encerrarViagem("v-1")).rejects.toBeInstanceOf(ViagemError);
+    });
   });
 });
