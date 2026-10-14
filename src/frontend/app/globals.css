@@ -57,6 +57,16 @@
   --mc-erro-forte: #f4603e;
   --mc-erro-fundo: #fdece8;
 
+  /* Variantes de TEXTO e de BORDA DE CAMPO que passam em WCAG 2.2 AA.
+     As cores de estado acima servem de fundo, ícone e destaque; como texto
+     pequeno sobre o fundo claro correspondente ficam abaixo de 4,5:1
+     (sucesso 3,1 · alerta 2,6 · erro 3,8). A razão de cada par está
+     travada em app/__tests__/contraste.test.ts. */
+  --mc-sucesso-texto: #0e6b64; /* sobre --mc-sucesso-fundo */
+  --mc-alerta-texto: #7a4a0b; /* sobre --mc-alerta-fundo */
+  --mc-erro-texto: #a8321c; /* sobre --mc-erro-fundo */
+  --mc-borda-campo: #7d8b91; /* 3,5:1 sobre branco — borda de campo (WCAG 1.4.11) */
+
   /* --- Raios ------------------------------------------------------------ */
   --mc-r-xs: 9px;
   --mc-r-sm: 12px;
