@@ -36,6 +36,7 @@ import {
   salvarFavorito,
 } from "@/lib/api";
 import { corDaLinha } from "./corDaLinha";
+import SeloFonte from "./SeloFonte";
 import {
   Destaque,
   destaquesDasOpcoes,
@@ -398,6 +399,7 @@ function Chegada({
           Chega em <strong>{perna.espera_min} min</strong>
           {perna.prefixo_veiculo ? ` (carro ${perna.prefixo_veiculo})` : ""}
         </span>
+        <SeloFonte fonte="ao_vivo" />
       </p>
     );
   }
@@ -409,6 +411,22 @@ function Chegada({
           Passa a cada ~<strong>{perna.intervalo_medio_min} min</strong>
           {perna.espera_min != null ? ` (espera estimada ~${perna.espera_min} min)` : ""}
         </span>
+        <SeloFonte fonte="media" />
+      </p>
+    );
+  }
+
+  // Espera fixa da baldeação (sem intervalo medido para a linha): entra na
+  // duração total da opção, mas a tela não dizia nada sobre ela — a pessoa
+  // via "Nenhum ônibus reportando posição" e não sabia que havia uma espera
+  // somada ao tempo.
+  if (perna.fonte_espera === "teorica" && perna.espera_min != null) {
+    return (
+      <p className="plan-chegada">
+        <span>
+          Espera estimada ~<strong>{perna.espera_min} min</strong>
+        </span>
+        <SeloFonte fonte="estimado" />
       </p>
     );
   }
@@ -423,6 +441,7 @@ function Chegada({
         <span>
           <strong>{rodando}</strong> ônibus rodando agora
         </span>
+        <SeloFonte fonte="ao_vivo" />
       </p>
     );
   }
@@ -993,8 +1012,13 @@ export default function PlanejadorViagem({
             })}
           </ul>
 
+          {/* Legenda do selo "ao vivo": ele cobre só a espera pelo 1º
+              ônibus. Antes a ressalva dizia "tempo estimado por velocidade
+              média" logo abaixo de opções marcadas "ao vivo". */}
           <p className="plan-ressalva">
-            Tempo estimado por velocidade média, sem horário de tabela.
+            <strong>Ao vivo</strong> vale só para a espera pelo primeiro ônibus
+            (posição real). O tempo dentro do ônibus e as baldeações são
+            estimados por velocidade e intervalo médios, sem horário de tabela.
             Planejamento por horário de partida está em desenvolvimento.
           </p>
         </div>

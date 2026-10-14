@@ -311,6 +311,13 @@ describe("MapaInterativo", () => {
     expect(
       screen.getByText(/0\.110 — Taguatinga \/ Rodoviária/)
     ).toBeInTheDocument();
+
+    // Card #179 (RN-10): são saídas do TERMINAL, e o painel diz isso — com o
+    // título "Próximos horários" parecia que o ônibus passava ali na hora.
+    expect(screen.getByText("Próximas saídas do terminal")).toBeInTheDocument();
+    expect(screen.queryByText("Próximos horários")).not.toBeInTheDocument();
+    expect(screen.getByText(/não é a hora em que passa nesta parada/)).toBeInTheDocument();
+
     expect(buscarDetalhesParadaMock).toHaveBeenCalledWith(
       LINHA_TESTE.paradas[0].lat,
       LINHA_TESTE.paradas[0].lng
@@ -329,7 +336,7 @@ describe("MapaInterativo", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Nenhum horário previsto disponível para esta parada no momento."
+          "Nenhuma saída prevista disponível para esta parada no momento."
         )
       ).toBeInTheDocument();
     });
@@ -633,7 +640,7 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Próximo horário previsto: 06:20/)
+        screen.getByText(/Próxima saída prevista do terminal: 06:20/)
       ).toBeInTheDocument();
     });
   });

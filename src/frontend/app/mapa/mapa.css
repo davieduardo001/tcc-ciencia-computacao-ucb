@@ -1563,6 +1563,34 @@
   margin: 8px 0 0;
 }
 
+/* Selo da origem de um número de tempo (RN-10). Neutro por padrão; só o
+   "ao vivo" ganha o verde — é o único que promete dado em tempo real. */
+.selo-fonte {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid var(--mc-borda-3);
+  border-radius: 999px;
+  /* Branco sólido: com a tinta translúcida o contraste dependia do fundo
+     (5,1:1 no cartão branco, 4,54:1 no selecionado). Assim são 5,8:1. */
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selo-fonte.ao-vivo {
+  color: var(--mc-sucesso-texto);
+}
+
+.mapa-painel-dica {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
 .plan-ressalva {
   margin: 12px 0 0;
   font-size: 12.5px;
