@@ -99,6 +99,39 @@ end
 deactivate Gateway
 deactivate View
 
+== Escolher o Destino (opcional, depois de embarcar) ==
+
+Passageiro -> View : tocarDescerNestaParada(paradaTocadaNoMapa)
+activate View
+View -> Gateway : requisicao(token, viagemId, paradaDestino)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+
+Service -> Model : definirDestino(viagemId, identidadeUsuario, paradaDestino)
+activate Model
+
+alt viagem ativa do passageiro e parada pertence a linha
+  Model --> Service : viagemAtualizada
+  deactivate Model
+  Service --> Gateway : resposta(viagemAtualizada)
+  deactivate Service
+  Gateway --> View : retornarResposta(viagemAtualizada)
+  View -> View : exibirParadasRestantesAteODestino()
+
+else viagem encerrada, de outro passageiro ou parada invalida
+  Model --> Service : recusada(motivo)
+  deactivate Model
+  Service --> Gateway : respostaErro(409 | 404 | 422)
+  deactivate Service
+  Gateway --> View : retornarResposta(erro)
+  View -> View : exibirAviso(motivo)
+end
+
+deactivate Gateway
+deactivate View
+
 == Acompanhar a Viagem ==
 
 loop enquanto em viagem (a cada atualizacao da posicao ao vivo)
