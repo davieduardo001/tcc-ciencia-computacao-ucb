@@ -12,7 +12,10 @@ import {
 import L from "leaflet";
 import Link from "next/link";
 import { corDaLinha } from "./corDaLinha";
-import { legendaDaFonte } from "./SeloFonte";
+import BadgeLinha from "./BadgeLinha";
+import SeloFonte, { legendaDaFonte } from "./SeloFonte";
+import { formatarMinutos, minutosInteiros } from "./tempo";
+import { useChegadasDaParada } from "./useChegadasDaParada";
 import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
@@ -193,7 +196,7 @@ function criarIconeOnibus(
       : "";
   const tempo =
     typeof etaMinutos === "number" && Number.isFinite(etaMinutos)
-      ? ` · ${etaMinutos} min`
+      ? ` · ${minutosInteiros(etaMinutos)} min`
       : "";
   const rotulo = escaparHtml(numeroLinha) + tempo;
 
@@ -358,6 +361,13 @@ export default function MapaInterativo({
     carregando: boolean;
     erro: string | null;
   } | null>(null);
+
+  // Card #179 (⑤b) — quando cada linha chega NESTA parada. Só liga quando o
+  // painel tem o código de uma parada física (o hook cuida do polling e de
+  // descartar resposta de parada anterior).
+  const { chegadas: chegadasDaParada } = useChegadasDaParada(
+    detalheParada?.detalhes?.codigo ?? null
+  );
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -736,6 +746,13 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
+                {veiculo.etaMinutos != null && veiculo.paradaNome && (
+                  <>
+                    <br />
+                    Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
+                    {formatarMinutos(veiculo.etaMinutos)}
+                  </>
+                )}
                 <br />
                 <small>{descreverIdade(veiculo.atualizadoEm)}</small>
               </Popup>
@@ -815,6 +832,46 @@ export default function MapaInterativo({
                     </div>
                   ))}
                 </div>
+
+                {/* Card #179 (⑤b): quando o ônibus chega AQUI — ao vivo
+                    (posição real até esta parada, no sentido dela) ou, sem
+                    ônibus a caminho, o horário previsto de passagem. Cada
+                    linha diz de onde veio o número (RN-10). Sem dado, diz
+                    isso: não inventa (RN-09). */}
+                {chegadasDaParada && chegadasDaParada.chegadas.length > 0 && (
+                  <>
+                    <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
+                      Chegando nesta parada
+                    </div>
+                    <ul className="mapa-chegadas" aria-live="polite">
+                      {chegadasDaParada.chegadas.map((c) => (
+                        <li key={`${c.numero}-${c.rotaSentido}`} className="mapa-chegada">
+                          <BadgeLinha numero={c.numero} />
+                          <span className="mapa-chegada-texto">
+                            {c.fonte === "ao_vivo" && c.etaMinutos !== null && (
+                              <>
+                                Chega em <strong>{formatarMinutos(c.etaMinutos)}</strong>
+                                <SeloFonte fonte="ao_vivo" />
+                              </>
+                            )}
+                            {c.fonte === "previsto" && c.etaMinutos !== null && (
+                              <>
+                                Previsto às <strong>{c.horarioPrevisto}</strong> (em{" "}
+                                {formatarMinutos(c.etaMinutos)})
+                                <SeloFonte fonte="previsto" />
+                              </>
+                            )}
+                            {c.fonte === null && (
+                              <span className="mapa-chegada-sem-dado">
+                                Sem previsão no momento
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
                 {/* Card #179 (RN-10): estes horários são de SAÍDA DO
                     TERMINAL (a origem da linha), não de passagem nesta

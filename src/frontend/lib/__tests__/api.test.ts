@@ -9,6 +9,7 @@ import {
   CalcularRotaError,
   nomearLugar,
   buscarPosicoesDaLinha,
+  buscarChegadasParada,
   solicitarResetSenha,
   redefinirSenha,
 } from "../api";
@@ -392,6 +393,178 @@ describe("api.ts — posição ao vivo (US #16)", () => {
       veiculos: [],
       proximoHorarioPrevisto: null,
     });
+  });
+});
+
+describe("api.ts — parada de referência do ETA (card #179)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  function respostaComVeiculo(extra: Record<string, unknown>) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        numero: "0.110",
+        veiculos: [
+          {
+            prefixo: "440001",
+            lat: -15.8,
+            lng: -48.0,
+            sentido: "IDA",
+            velocidade: 30,
+            atualizado_em: "2026-10-14T12:00:00",
+            operadora: "VIAÇÃO TESTE",
+            eta_minutos: 4.3,
+            ...extra,
+          },
+        ],
+      }),
+    };
+  }
+
+  it("traz a parada até a qual o ETA foi medido", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(respostaComVeiculo({ parada_codigo: "PR-12345", parada_nome: "W3 Sul 502" })) as jest.Mock;
+
+    const { veiculos } = await buscarPosicoesDaLinha("0.110", { lat: -15.8, lng: -47.9 });
+
+    expect(veiculos[0].paradaCodigo).toBe("PR-12345");
+    expect(veiculos[0].paradaNome).toBe("W3 Sul 502");
+    expect(veiculos[0].etaMinutos).toBe(4.3);
+  });
+
+  it("backend antigo, sem os campos novos, continua funcionando", async () => {
+    global.fetch = jest.fn().mockResolvedValue(respostaComVeiculo({})) as jest.Mock;
+
+    const { veiculos } = await buscarPosicoesDaLinha("0.110");
+
+    expect(veiculos[0].paradaCodigo).toBeNull();
+    expect(veiculos[0].paradaNome).toBeNull();
+  });
+});
+
+describe("api.ts — chegadas numa parada (card #179, ⑤b)", () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  const PAYLOAD = {
+    parada_codigo: "PR-12345",
+    parada_nome: "W3 Sul 502",
+    calculado_em: "2026-10-14T15:00:00+00:00",
+    chegadas: [
+      {
+        numero: "0.110",
+        nome: "0.110 — Taguatinga",
+        rota_sentido: "IDA",
+        eta_minutos: 4.3,
+        fonte: "ao_vivo",
+        prefixo: "440001",
+        veiculos_a_caminho: 2,
+        horario_previsto: null,
+      },
+      {
+        numero: "875A",
+        nome: "875A — Perdizes",
+        rota_sentido: "VOLTA",
+        eta_minutos: 17.6,
+        fonte: "previsto",
+        prefixo: null,
+        veiculos_a_caminho: 0,
+        horario_previsto: "15:18",
+      },
+      {
+        numero: "106.2",
+        nome: "106.2",
+        rota_sentido: "IDA",
+        eta_minutos: null,
+        fonte: null,
+      },
+    ],
+  };
+
+  it("chama o endpoint da parada pelo CÓDIGO (estável), com sessão e sem cache", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => PAYLOAD }) as jest.Mock;
+
+    await buscarChegadasParada("PR-12345");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/mobilidade\/paradas\/PR-12345\/chegadas$/),
+      expect.objectContaining({ credentials: "include", cache: "no-store" })
+    );
+  });
+
+  it("codifica o código na URL", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => PAYLOAD }) as jest.Mock;
+
+    await buscarChegadasParada("PR 1/2");
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain("/paradas/PR%201%2F2/chegadas");
+  });
+
+  it("converte o payload para camelCase, preservando a fonte de cada número", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => PAYLOAD }) as jest.Mock;
+
+    const resultado = await buscarChegadasParada("PR-12345");
+
+    expect(resultado?.paradaCodigo).toBe("PR-12345");
+    expect(resultado?.paradaNome).toBe("W3 Sul 502");
+    expect(resultado?.chegadas[0]).toEqual({
+      numero: "0.110",
+      nome: "0.110 — Taguatinga",
+      rotaSentido: "IDA",
+      etaMinutos: 4.3,
+      fonte: "ao_vivo",
+      prefixo: "440001",
+      veiculosACaminho: 2,
+      horarioPrevisto: null,
+    });
+    expect(resultado?.chegadas[1]).toMatchObject({ fonte: "previsto", horarioPrevisto: "15:18", prefixo: null });
+  });
+
+  it("campos opcionais ausentes viram null/0, e sem dado continua sem dado", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => PAYLOAD }) as jest.Mock;
+
+    const resultado = await buscarChegadasParada("PR-12345");
+
+    expect(resultado?.chegadas[2]).toMatchObject({
+      etaMinutos: null,
+      fonte: null,
+      prefixo: null,
+      veiculosACaminho: 0,
+      horarioPrevisto: null,
+    });
+  });
+
+  it("404 (código que não é de parada física) devolve null, sem lançar", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404 }) as jest.Mock;
+
+    await expect(buscarChegadasParada("PR-NAO-EXISTE")).resolves.toBeNull();
+  });
+
+  it("erro do servidor devolve null, sem lançar", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 }) as jest.Mock;
+
+    await expect(buscarChegadasParada("PR-12345")).resolves.toBeNull();
+  });
+
+  it("falha de rede devolve null — o painel da parada não pode quebrar por causa de um extra", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("rede fora")) as jest.Mock;
+
+    await expect(buscarChegadasParada("PR-12345")).resolves.toBeNull();
+  });
+
+  it("lista de chegadas ausente vira lista vazia", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ ...PAYLOAD, chegadas: undefined }) }) as jest.Mock;
+
+    const resultado = await buscarChegadasParada("PR-12345");
+
+    expect(resultado?.chegadas).toEqual([]);
   });
 });
 

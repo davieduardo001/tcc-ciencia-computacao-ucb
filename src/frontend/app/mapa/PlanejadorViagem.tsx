@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CSSProperties,
   KeyboardEvent,
   useCallback,
   useEffect,
@@ -35,7 +34,7 @@ import {
   SalvarFavoritoError,
   salvarFavorito,
 } from "@/lib/api";
-import { corDaLinha } from "./corDaLinha";
+import BadgeLinha from "./BadgeLinha";
 import SeloFonte from "./SeloFonte";
 import {
   Destaque,
@@ -299,19 +298,6 @@ function rotuloDoPonto(nome: string): string {
 
 function dicaDoPonto(nome: string, lat: number, lng: number): string | undefined {
   return nome ? undefined : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
-/** Número da linha na cor dela no mapa (RN-14). O fundo continua escuro
- *  pra o número ser legível (14,8:1); a cor da linha vai na barra lateral. */
-function BadgeLinha({ numero }: { numero: string }) {
-  return (
-    <em
-      className="plan-badge-linha"
-      style={{ "--cor-linha": corDaLinha(numero) } as CSSProperties}
-    >
-      {numero}
-    </em>
-  );
 }
 
 function ResumoOpcao({ opcao, destaques }: { opcao: OpcaoViagem; destaques: Destaque[] }) {

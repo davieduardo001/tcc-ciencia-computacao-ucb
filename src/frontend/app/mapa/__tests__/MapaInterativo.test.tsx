@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
-import { DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
-import { buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
+import { ChegadasDaParada, DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
+import { buscarChegadasParada, buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
 
 // US #16 e #18: o componente busca posição ao vivo e detalhes de parada
 // sozinho — precisam de dublê. `BuscarParadaError` é uma classe usada em
@@ -13,6 +13,7 @@ jest.mock("@/lib/api", () => ({
     .fn()
     .mockResolvedValue({ veiculos: [], proximoHorarioPrevisto: null }),
   buscarDetalhesParada: jest.fn().mockResolvedValue(null),
+  buscarChegadasParada: jest.fn().mockResolvedValue(null),
   BuscarParadaError: class BuscarParadaError extends Error {},
 }));
 
@@ -26,6 +27,7 @@ function resultadoPosicoes(
 
 const buscarPosicoesMock = buscarPosicoesDaLinha as jest.Mock;
 const buscarDetalhesParadaMock = buscarDetalhesParada as jest.Mock;
+const buscarChegadasParadaMock = buscarChegadasParada as jest.Mock;
 
 jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -140,6 +142,7 @@ describe("MapaInterativo", () => {
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
     buscarDetalhesParadaMock.mockClear().mockResolvedValue(null);
+    buscarChegadasParadaMock.mockClear().mockResolvedValue(null);
   });
 
   it("centraliza o mapa e exibe o marcador quando a localização é concedida", async () => {
@@ -341,6 +344,133 @@ describe("MapaInterativo", () => {
       ).toBeInTheDocument();
     });
   });
+
+
+  // ---------------------------------------------------------------------
+  // Card #179 (⑤b) — Chegando nesta parada
+  // ---------------------------------------------------------------------
+
+  const CHEGADAS_TESTE: ChegadasDaParada = {
+    paradaCodigo: "PR-12345",
+    paradaNome: "W3 Sul — 502",
+    calculadoEm: "2026-10-14T15:00:00+00:00",
+    chegadas: [
+      {
+        numero: "0.110",
+        nome: "0.110 — Taguatinga / Rodoviária",
+        rotaSentido: "IDA",
+        etaMinutos: 4.3,
+        fonte: "ao_vivo",
+        prefixo: "440001",
+        veiculosACaminho: 1,
+        horarioPrevisto: null,
+      },
+      {
+        numero: "875A",
+        nome: "875A — Perdizes",
+        rotaSentido: "IDA",
+        etaMinutos: 17.6,
+        fonte: "previsto",
+        prefixo: null,
+        veiculosACaminho: 0,
+        horarioPrevisto: "15:18",
+      },
+      {
+        numero: "106.2",
+        nome: "106.2 — Aeroporto",
+        rotaSentido: "IDA",
+        etaMinutos: null,
+        fonte: null,
+        prefixo: null,
+        veiculosACaminho: 0,
+        horarioPrevisto: null,
+      },
+    ],
+  };
+
+  async function abrirPainelDaParada() {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+    await screen.findByText("Parada PR-12345");
+  }
+
+  it("mostra quando cada linha chega na parada, dizendo de onde vem o número", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText("Chegando nesta parada")).toBeInTheDocument();
+    expect(buscarChegadasParadaMock).toHaveBeenCalledWith("PR-12345");
+
+    const linhas = screen.getAllByRole("listitem").filter((li) => li.classList.contains("mapa-chegada"));
+    expect(linhas).toHaveLength(3);
+
+    // ao vivo: minutos inteiros (4,3 → 4) e o selo
+    expect(linhas[0]).toHaveTextContent("0.110");
+    expect(linhas[0]).toHaveTextContent("Chega em 4 min");
+    expect(linhas[0].querySelector(".selo-fonte")).toHaveTextContent("ao vivo");
+
+    // previsto: o horário em que passa AQUI, e o selo "previsto"
+    expect(linhas[1]).toHaveTextContent("Previsto às 15:18 (em 18 min)");
+    expect(linhas[1].querySelector(".selo-fonte")).toHaveTextContent("previsto");
+
+    // sem dado: diz isso, sem inventar número
+    expect(linhas[2]).toHaveTextContent("Sem previsão no momento");
+    expect(linhas[2].querySelector(".selo-fonte")).toBeNull();
+  });
+
+  it("menos de 1 minuto não vira '0 min'", async () => {
+    buscarChegadasParadaMock.mockResolvedValue({
+      ...CHEGADAS_TESTE,
+      chegadas: [{ ...CHEGADAS_TESTE.chegadas[0], etaMinutos: 0.3 }],
+    });
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText(/menos de 1 min/)).toBeInTheDocument();
+    expect(screen.queryByText(/\b0 min\b/)).not.toBeInTheDocument();
+  });
+
+  it("sem chegadas da API (404/falha), o painel segue igual e sem a seção", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(null);
+
+    await abrirPainelDaParada();
+
+    await waitFor(() => expect(buscarChegadasParadaMock).toHaveBeenCalled());
+    expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument();
+    // o resto do painel continua lá
+    expect(screen.getByText("06:20 · 06:40 · 07:00")).toBeInTheDocument();
+  });
+
+  it("parada com lista de chegadas vazia não mostra a seção", async () => {
+    buscarChegadasParadaMock.mockResolvedValue({ ...CHEGADAS_TESTE, chegadas: [] });
+
+    await abrirPainelDaParada();
+
+    await waitFor(() => expect(buscarChegadasParadaMock).toHaveBeenCalled());
+    expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument();
+  });
+
+  it("as saídas do terminal continuam rotuladas como saídas, ao lado das chegadas", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText("Chegando nesta parada")).toBeInTheDocument();
+    expect(screen.getByText("Próximas saídas do terminal")).toBeInTheDocument();
+  });
+
+  it("fechar o painel da parada para de buscar chegadas", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+    await abrirPainelDaParada();
+    await screen.findByText("Chegando nesta parada");
+
+    fireEvent.click(screen.getAllByTitle("Fechar")[0]);
+
+    await waitFor(() => expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument());
+  });
+
 
   it("fecha o painel de detalhes e volta ao painel da linha (cenário 3)", async () => {
     buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
@@ -912,4 +1042,48 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
     });
     expect(canvas.className).not.toContain("em-zoom");
   });
+  // ---------------------------------------------------------------------
+  // Card #179 (⑤b) — pílula e popup do ônibus
+  // ---------------------------------------------------------------------
+
+  it("a pílula mostra minutos inteiros, e não '4.3 min'", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 4.3 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    expect(marcador.getAttribute("data-html")).toContain(">0.110 · 4 min<");
+  });
+
+  it("menos de 1 minuto na pílula vira '<1 min'", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 0.4 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    expect(marcador.getAttribute("data-html")).toContain(">0.110 · <1 min<");
+  });
+
+  it("o popup do ônibus diz até QUAL parada o tempo foi medido", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na parada W3 Sul — 502 em 4 min");
+  });
+
+  it("sem parada de referência (projeção no traçado), o popup não afirma nenhuma", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 4 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).not.toHaveTextContent(/Chega na parada/);
+  });
+
 });
