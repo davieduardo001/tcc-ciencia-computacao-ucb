@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import OcorrenciasPage from "../page";
+import ReportarOcorrenciaPage from "../page";
 import { reportarOcorrencia, ReportarOcorrenciaError } from "@/lib/api";
 
 jest.mock("@/lib/api", () => {
@@ -33,7 +33,7 @@ function preencherEEnviar() {
   fireEvent.click(screen.getByRole("button", { name: /Enviar reporte/ }));
 }
 
-describe("OcorrenciasPage", () => {
+describe("ReportarOcorrenciaPage", () => {
   beforeEach(() => {
     pushMock.mockReset();
     reportarOcorrenciaMock.mockReset();
@@ -42,13 +42,13 @@ describe("OcorrenciasPage", () => {
 
   it("vindo do atalho 'Reportar nesta linha', já chega com a linha preenchida", () => {
     paramsLinha = "0.312";
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
 
     expect(screen.getByPlaceholderText("Ex: 0.110")).toHaveValue("0.312");
   });
 
   it("renderiza os 7 tipos de ocorrência do protótipo v3", () => {
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
 
     [
       "Atraso",
@@ -64,7 +64,7 @@ describe("OcorrenciasPage", () => {
   });
 
   it("exige linha e tipo antes de enviar", () => {
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
 
     fireEvent.click(screen.getByRole("button", { name: /Enviar reporte/ }));
 
@@ -85,7 +85,7 @@ describe("OcorrenciasPage", () => {
       expiraEm: "2026-10-01T00:30:00Z",
     });
 
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
     preencherEEnviar();
 
     await waitFor(() => expect(reportarOcorrenciaMock).toHaveBeenCalledWith(
@@ -101,7 +101,7 @@ describe("OcorrenciasPage", () => {
       new ReportarOcorrenciaError("Faça login para reportar uma ocorrência.")
     );
 
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
     preencherEEnviar();
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/login"));
@@ -112,7 +112,7 @@ describe("OcorrenciasPage", () => {
       new ReportarOcorrenciaError("Você atingiu o limite de reportes. Tente novamente mais tarde.")
     );
 
-    render(<OcorrenciasPage />);
+    render(<ReportarOcorrenciaPage />);
     preencherEEnviar();
 
     expect(

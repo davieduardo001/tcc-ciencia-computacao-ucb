@@ -2,19 +2,9 @@
 
 import { FormEvent, Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Ban,
-  Clock,
-  Construction,
-  LocateFixed,
-  LucideIcon,
-  Send,
-  ShieldAlert,
-  Siren,
-  Users,
-  Wrench,
-} from "lucide-react";
-import AppShell from "../mapa/AppShell";
+import Link from "next/link";
+import { ArrowLeft, LocateFixed, Send } from "lucide-react";
+import AppShell from "../../mapa/AppShell";
 import {
   LinhaResumo,
   nomearLugar,
@@ -23,33 +13,24 @@ import {
   sugerirLinhas,
   TipoOcorrencia,
 } from "@/lib/api";
-import "./ocorrencias.css";
+import { TIPOS } from "../tipos";
+import "../ocorrencias.css";
 
 const DEBOUNCE_BUSCA_MS = 250;
-
-const TIPOS: { id: TipoOcorrencia; label: string; Icone: LucideIcon }[] = [
-  { id: "atraso", label: "Atraso", Icone: Clock },
-  { id: "nao_passou", label: "Ônibus não passou", Icone: Ban },
-  { id: "lotacao", label: "Lotação", Icone: Users },
-  { id: "obra_via", label: "Obra na via", Icone: Construction },
-  { id: "onibus_quebrou", label: "Ônibus quebrou", Icone: Wrench },
-  { id: "acidente", label: "Acidente", Icone: Siren },
-  { id: "seguranca", label: "Segurança", Icone: ShieldAlert },
-];
 
 /**
  * `useSearchParams` exige renderização no cliente — sem o Suspense o
  * `next build` falha na geração estática (mesmo padrão de app/mapa/page.tsx).
  */
-export default function OcorrenciasPage() {
+export default function ReportarOcorrenciaPage() {
   return (
     <Suspense fallback={null}>
-      <OcorrenciasConteudo />
+      <ReportarConteudo />
     </Suspense>
   );
 }
 
-function OcorrenciasConteudo() {
+function ReportarConteudo() {
   const router = useRouter();
   // US #23 — vindo do atalho "Reportar ocorrência nesta linha" (detalhe
   // da linha no mapa), a linha já chega preenchida; quem abre a tela
@@ -153,6 +134,10 @@ function OcorrenciasConteudo() {
   return (
     <AppShell active="ocorrencias">
       <div className="ocor-page">
+        <Link href="/ocorrencias" className="ocor-voltar">
+          <ArrowLeft size={15} />
+          Ver ocorrências
+        </Link>
         <h1>Reportar ocorrência</h1>
         <p className="ocor-sub">
           Ajude outros passageiros. Ocorrências como atraso, lotação e obra na via são
