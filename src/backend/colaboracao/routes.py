@@ -2,7 +2,9 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -23,6 +25,7 @@ from colaboracao.schemas import (
     RespostaGenerica,
     OcorrenciaInput,
     OcorrenciaResponse,
+    OcorrenciaListaResponse,
     RotaFavoritaInput,
     RotaFavoritaResponse,
 )
@@ -283,6 +286,69 @@ def reportar_ocorrencia(
         criado_em=ocorrencia.criado_em,
         expira_em=ocorrencia.expira_em,
     )
+
+
+# ---------------------------------------------------------------------------
+# US #24 — Visualizar Ocorrências Reportadas por Outros Passageiros
+# ---------------------------------------------------------------------------
+
+LIMITE_LISTAGEM_OCORRENCIAS = 100
+
+
+@router.get("/ocorrencias", response_model=list[OcorrenciaListaResponse])
+def listar_ocorrencias(
+    linha: Optional[str] = Query(None, min_length=1, max_length=20),
+    _usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """Ocorrências ativas (não expiradas), da mais recente pra mais antiga.
+
+    Exige sessão (o Gateway já validou o JWT) mas não filtra por usuário —
+    a ideia é justamente ver o que *outros* passageiros reportaram.
+
+    Expiração resolvida na leitura, não por job agendado: os serviços do
+    Fly escalam a zero (`min_machines_running = 0`), então um job em
+    processo não rodaria de forma confiável. Quem passou de `expira_em`
+    nunca aparece e é marcado `expirada` aqui mesmo (o registro não é
+    apagado — a retenção é de 30 dias).
+    """
+    agora = datetime.utcnow()
+
+    db.query(Ocorrencia).filter(
+        Ocorrencia.expira_em <= agora,
+        Ocorrencia.status != "expirada",
+    ).update({"status": "expirada"}, synchronize_session=False)
+    db.commit()
+
+    consulta = db.query(Ocorrencia).filter(
+        Ocorrencia.expira_em > agora,
+        Ocorrencia.status != "expirada",
+    )
+    if linha:
+        consulta = consulta.filter(Ocorrencia.linha_numero == linha)
+
+    ocorrencias = (
+        consulta.order_by(Ocorrencia.criado_em.desc())
+        .limit(LIMITE_LISTAGEM_OCORRENCIAS)
+        .all()
+    )
+
+    return [
+        OcorrenciaListaResponse(
+            id=str(o.id),
+            linha_numero=o.linha_numero,
+            tipo=o.tipo,
+            descricao=o.descricao,
+            local=o.local,
+            lat=o.lat,
+            lng=o.lng,
+            status=o.status,
+            contador_confirmacoes=o.contador_confirmacoes,
+            criado_em=o.criado_em,
+            expira_em=o.expira_em,
+        )
+        for o in ocorrencias
+    ]
 
 
 # ---------------------------------------------------------------------------
