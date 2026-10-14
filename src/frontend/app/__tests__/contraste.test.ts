@@ -50,6 +50,8 @@ const PARES: [string, string, number, string][] = [
   ["--mc-alerta-texto", "--mc-alerta-fundo", 4.5, "botão de favorito salvo / selo pendente"],
   ["--mc-erro-texto", "--mc-erro-fundo", 4.5, "mensagens de erro — eram âmbar, 2,6:1"],
   ["--mc-texto-2", "--mc-areia-clara", 4.5, "texto secundário no cartão selecionado"],
+  [BRANCO, "--mc-embarque", 4.5, "número do passo de embarque (marcador azul)"],
+  ["--mc-embarque", BRANCO, 4.5, "ícone/borda do passo de baldeação"],
   // componentes de interface e contornos: 3:1 (WCAG 1.4.11)
   ["--mc-borda-campo", BRANCO, 3, "borda dos campos de texto — era 1,15:1"],
   ["--mc-borda-campo", "--mc-areia-clara", 3, "borda do campo sobre o fundo do app"],
