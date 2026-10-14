@@ -925,8 +925,9 @@
 
 .plan-atalho:hover:not(:disabled),
 .plan-atalho.ativo {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--primary-700);
+  /* Texto de 12px: --primary (#2ba69b) sobre branco dá 2,99:1. */
+  color: var(--primary-700);
 }
 
 .plan-atalho:disabled {
@@ -950,8 +951,8 @@
 }
 
 .plan-inverter:hover:not(:disabled) {
-  color: var(--primary);
-  border-color: var(--primary);
+  color: var(--primary-700);
+  border-color: var(--primary-700);
 }
 
 .plan-inverter:disabled {
