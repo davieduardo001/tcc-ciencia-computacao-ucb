@@ -66,6 +66,9 @@
   --mc-alerta-texto: #7a4a0b; /* sobre --mc-alerta-fundo */
   --mc-erro-texto: #a8321c; /* sobre --mc-erro-fundo */
   --mc-borda-campo: #7d8b91; /* 3,5:1 sobre branco — borda de campo (WCAG 1.4.11) */
+  /* Azul dos marcadores de embarque/baldeação do mapa (#2f72e8 dá 4,48:1 com
+     texto branco; este dá 4,95:1 e é visualmente o mesmo azul). */
+  --mc-embarque: #2b6ae0;
 
   /* --- Raios ------------------------------------------------------------ */
   --mc-r-xs: 9px;

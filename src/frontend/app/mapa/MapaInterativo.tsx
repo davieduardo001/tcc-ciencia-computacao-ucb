@@ -11,6 +11,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import Link from "next/link";
+import { corDaLinha } from "./corDaLinha";
 import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
@@ -214,20 +215,6 @@ const iconeParada = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 });
-
-// Paleta pra diferenciar o trajeto por cor quando houver mais de uma
-// linha selecionada no mapa (PRD da US #17) — hoje só uma linha por
-// vez é buscada, mas a cor já é derivada da própria linha em vez de
-// fixa, então múltiplas linhas simultâneas não colidiriam visualmente.
-const CORES_TRAJETO = ["#1aa0ad", "#c9760a", "#2f72e8", "#1aa05a", "#d6453d"];
-
-function corDaLinha(numero: string): string {
-  let hash = 0;
-  for (let i = 0; i < numero.length; i++) {
-    hash = (hash * 31 + numero.charCodeAt(i)) >>> 0;
-  }
-  return CORES_TRAJETO[hash % CORES_TRAJETO.length];
-}
 
 /**
  * 582 dos 7.142 abrigos do SEMOB não têm nome utilizável na fonte — o

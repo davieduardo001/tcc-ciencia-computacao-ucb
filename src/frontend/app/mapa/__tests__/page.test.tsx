@@ -293,7 +293,7 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     // A linha aparece duas vezes: no resumo da opção e no passo
     // expandido logo abaixo (a primeira opção abre já expandida).
     expect(screen.getAllByText("0.382")).toHaveLength(2);
-    expect(screen.getByText("~76 min")).toBeInTheDocument();
+    expect(screen.getByText("76 min")).toBeInTheDocument();
     expect(screen.getByText(/Avenida Hélio Prates/)).toBeInTheDocument();
     expect(screen.getByText(/Eixo L Central/)).toBeInTheDocument();
     expect(screen.getByText(/33 paradas/)).toBeInTheDocument();

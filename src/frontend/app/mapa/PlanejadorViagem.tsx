@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  CSSProperties,
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowDown,
   ArrowRight,
   ArrowUpDown,
   Bus,
@@ -9,12 +18,33 @@ import {
   Footprints,
   LoaderCircle,
   MapPin,
+  Pencil,
   Repeat,
+  RotateCw,
   Search,
+  SearchX,
   Star,
   X,
 } from "lucide-react";
-import { buscarLugares, Lugar, OpcaoViagem, RotaFavorita, SalvarFavoritoError, salvarFavorito } from "@/lib/api";
+import {
+  buscarLugares,
+  Lugar,
+  OpcaoViagem,
+  PernaViagem,
+  RotaFavorita,
+  SalvarFavoritoError,
+  salvarFavorito,
+} from "@/lib/api";
+import { corDaLinha } from "./corDaLinha";
+import {
+  Destaque,
+  destaquesDasOpcoes,
+  duracaoDaOpcao,
+  minutosAPe,
+  Passo,
+  passosDaOpcao,
+  ROTULO_DESTAQUE,
+} from "./resumoViagem";
 
 const DEBOUNCE_MS = 350;
 const MIN_CARACTERES = 3;
@@ -82,10 +112,14 @@ function CampoLugar({
   const [sugestoes, setSugestoes] = useState<Lugar[]>([]);
   const [abertas, setAbertas] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  // Opção destacada pelas setas do teclado (-1 = nenhuma). O foco real
+  // continua no input; a opção ativa é anunciada via aria-activedescendant.
+  const [indiceAtivo, setIndiceAtivo] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mesmo problema do autocomplete de linhas: uma busca antiga que
   // demore mais pra responder sobrescreveria a atual.
   const sequenciaRef = useRef(0);
+  const listaId = useId();
 
   // Quando o ponto é definido por fora (GPS, clique no mapa, inversão),
   // o campo precisa refletir isso.
@@ -102,6 +136,7 @@ function CampoLugar({
 
       if (novo.trim().length < MIN_CARACTERES) {
         setSugestoes([]);
+        setIndiceAtivo(-1);
         setBuscando(false);
         return;
       }
@@ -111,12 +146,51 @@ function CampoLugar({
         const resultado = await buscarLugares(novo);
         if (sequencia !== sequenciaRef.current) return;
         setSugestoes(resultado);
+        setIndiceAtivo(-1);
         setBuscando(false);
         setAbertas(true);
       }, DEBOUNCE_MS);
     },
     []
   );
+
+  const listaAberta = abertas && sugestoes.length > 0;
+
+  function escolher(lugar: Lugar) {
+    onDefinir(extremo, { nome: lugar.nome, lat: lugar.lat, lng: lugar.lng });
+    setSugestoes([]);
+    setIndiceAtivo(-1);
+    setAbertas(false);
+  }
+
+  // Padrão ARIA "combobox com lista": setas percorrem, Enter escolhe,
+  // Esc fecha. Sem isso, quem navega por teclado digitava e não alcançava
+  // nenhuma sugestão.
+  function aoTeclar(evento: KeyboardEvent<HTMLInputElement>) {
+    if (!listaAberta) {
+      if (evento.key === "ArrowDown" && sugestoes.length > 0) {
+        evento.preventDefault();
+        setAbertas(true);
+        setIndiceAtivo(0);
+      }
+      return;
+    }
+
+    if (evento.key === "ArrowDown") {
+      evento.preventDefault();
+      setIndiceAtivo((i) => (i + 1) % sugestoes.length);
+    } else if (evento.key === "ArrowUp") {
+      evento.preventDefault();
+      setIndiceAtivo((i) => (i <= 0 ? sugestoes.length - 1 : i - 1));
+    } else if (evento.key === "Enter" && indiceAtivo >= 0) {
+      // Enter com opção ativa escolhe a opção — não envia o formulário.
+      evento.preventDefault();
+      escolher(sugestoes[indiceAtivo]);
+    } else if (evento.key === "Escape") {
+      setAbertas(false);
+      setIndiceAtivo(-1);
+    }
+  }
 
   return (
     <div className={`plan-campo${escolhendo ? " escolhendo" : ""}`}>
@@ -129,10 +203,18 @@ function CampoLugar({
         <input
           id={`plan-${extremo}`}
           className="plan-input"
+          role="combobox"
+          aria-expanded={listaAberta}
+          aria-controls={listaAberta ? listaId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            listaAberta && indiceAtivo >= 0 ? `${listaId}-op-${indiceAtivo}` : undefined
+          }
           value={texto}
           placeholder={escolhendo ? "Toque no mapa..." : placeholder}
           autoComplete="off"
           onChange={(e) => digitar(e.target.value)}
+          onKeyDown={aoTeclar}
           onFocus={() => setAbertas(true)}
           onBlur={() => setTimeout(() => setAbertas(false), 150)}
         />
@@ -142,6 +224,7 @@ function CampoLugar({
             type="button"
             className="plan-botao-campo"
             title="Limpar"
+            aria-label={`Limpar ${rotulo.toLowerCase()}`}
             onClick={() => {
               setTexto("");
               setSugestoes([]);
@@ -152,7 +235,7 @@ function CampoLugar({
           </button>
         )}
 
-        {buscando && <LoaderCircle size={14} className="plan-girando" />}
+        {buscando && <LoaderCircle size={14} className="plan-girando" aria-hidden="true" />}
       </div>
 
       <div className="plan-atalhos">
@@ -178,26 +261,20 @@ function CampoLugar({
         </button>
       </div>
 
-      {abertas && sugestoes.length > 0 && (
-        <ul className="plan-sugestoes" role="listbox">
+      {listaAberta && (
+        <ul className="plan-sugestoes" role="listbox" id={listaId} aria-label={`Sugestões de ${rotulo.toLowerCase()}`}>
           {sugestoes.map((lugar, indice) => (
-            <li key={`${lugar.lat}-${lugar.lng}-${indice}`}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onDefinir(extremo, {
-                    nome: lugar.nome,
-                    lat: lugar.lat,
-                    lng: lugar.lng,
-                  });
-                  setSugestoes([]);
-                  setAbertas(false);
-                }}
-              >
-                <strong>{lugar.nome}</strong>
-                <span>{lugar.endereco}</span>
-              </button>
+            <li
+              key={`${lugar.lat}-${lugar.lng}-${indice}`}
+              id={`${listaId}-op-${indice}`}
+              role="option"
+              aria-selected={indice === indiceAtivo}
+              className={indice === indiceAtivo ? "ativa" : undefined}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => escolher(lugar)}
+            >
+              <strong>{lugar.nome}</strong>
+              <span>{lugar.endereco}</span>
             </li>
           ))}
         </ul>
@@ -223,47 +300,254 @@ function dicaDoPonto(nome: string, lat: number, lng: number): string | undefined
   return nome ? undefined : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
-  // US #159 — "tempo_real"/"parcial" têm ao menos a 1ª perna medida a
-  // partir de um ônibus real; "teorica" (ou backend antigo, sem o
-  // campo) continua mostrando a duração por velocidade média de sempre.
-  const temEtaReal =
-    opcao.tipo_estimativa && opcao.tipo_estimativa !== "teorica" && opcao.duracao_real_min != null;
-  const minutos = temEtaReal ? opcao.duracao_real_min! : opcao.duracao_estimada_min;
-
+/** Número da linha na cor dela no mapa (RN-14). O fundo continua escuro
+ *  pra o número ser legível (14,8:1); a cor da linha vai na barra lateral. */
+function BadgeLinha({ numero }: { numero: string }) {
   return (
-    <div className="plan-opcao-resumo">
-      <div className="plan-opcao-linhas">
-        {opcao.pernas.map((perna, indice) => (
-          <span key={`${perna.numero}-${perna.sentido}-${indice}`}>
-            {indice > 0 && <Repeat size={12} className="plan-opcao-troca" />}
-            <em className="plan-badge-linha">{perna.numero}</em>
+    <em
+      className="plan-badge-linha"
+      style={{ "--cor-linha": corDaLinha(numero) } as CSSProperties}
+    >
+      {numero}
+    </em>
+  );
+}
+
+function ResumoOpcao({ opcao, destaques }: { opcao: OpcaoViagem; destaques: Destaque[] }) {
+  const { minutos, aoVivo } = duracaoDaOpcao(opcao);
+  const aPe = minutosAPe(opcao.caminhada_metros);
+
+  // Só <span> aqui dentro: o resumo vive dentro de um <button>, que só
+  // aceita conteúdo de fraseado (um <div> ali é HTML inválido).
+  return (
+    <span className="plan-opcao-resumo">
+      <span className="plan-opcao-topo">
+        <span className="plan-opcao-linhas">
+          {opcao.pernas.map((perna, indice) => (
+            <span
+              className="plan-opcao-linha-item"
+              key={`${perna.numero}-${perna.sentido}-${indice}`}
+            >
+              {indice > 0 && <Repeat size={12} className="plan-opcao-troca" aria-hidden="true" />}
+              <BadgeLinha numero={perna.numero} />
+            </span>
+          ))}
+        </span>
+
+        <span className="plan-opcao-duracao">
+          <strong>{minutos} min</strong>
+          <span
+            className={aoVivo ? "plan-opcao-selo-ao-vivo" : "plan-opcao-selo-estimado"}
+            title={
+              aoVivo
+                ? "Calculado a partir da posição ao vivo dos ônibus"
+                : "Sem ônibus rastreado se aproximando; estimativa por velocidade média"
+            }
+          >
+            {aoVivo && <span className="mapa-pulso" />}
+            {aoVivo ? "ao vivo" : "estimado"}
           </span>
-        ))}
-      </div>
-      <div className="plan-opcao-metricas">
-        <strong>~{minutos} min</strong>
-        <span
-          className={temEtaReal ? "plan-opcao-selo-ao-vivo" : "plan-opcao-selo-estimado"}
-          title={
-            temEtaReal
-              ? "Calculado a partir da posição ao vivo dos ônibus"
-              : "Sem ônibus rastreado se aproximando; estimativa por velocidade média"
-          }
-        >
-          {temEtaReal && <span className="mapa-pulso" />}
-          {temEtaReal ? "ao vivo" : "estimado"}
         </span>
-        <span>
-          <Footprints size={12} /> {opcao.caminhada_metros} m
+      </span>
+
+      <span className="plan-opcao-chips">
+        <span className="plan-chip">
+          <Footprints size={13} aria-hidden="true" />
+          {aPe > 0 ? `${aPe} min a pé` : "sem caminhada"}
+          {aPe > 0 && <span className="plan-chip-detalhe">{opcao.caminhada_metros} m</span>}
         </span>
-        <span>
+        <span className="plan-chip">
           {opcao.baldeacoes === 0
             ? "direto"
             : `${opcao.baldeacoes} ${opcao.baldeacoes === 1 ? "baldeação" : "baldeações"}`}
         </span>
-      </div>
-    </div>
+        {destaques.map((destaque) => (
+          <span className="plan-chip destaque" key={destaque}>
+            {ROTULO_DESTAQUE[destaque]}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Quando o ônibus chega — a informação acionável do passo de embarque, por
+ * isso é um bloco próprio e destacado, e não mais uma linha de 12,5px acima
+ * do texto. US #16 no contexto da US #20: quem planeja a viagem quer saber
+ * onde está o ônibus que vai pegar, sem buscar a linha de novo. US #159 —
+ * quando a rota já trouxe uma espera calculada para esta perna, ela é mais
+ * específica que a contagem de US #16 (fala do ônibus que serve *esta*
+ * viagem, não de todos os que rodam a linha agora) e aparece antes.
+ */
+function Chegada({
+  perna,
+  veiculosPorLinha,
+  rastreando,
+}: {
+  perna: PernaViagem;
+  veiculosPorLinha: Record<string, number>;
+  rastreando: boolean;
+}) {
+  if (perna.fonte_espera === "tempo_real" && perna.espera_min != null) {
+    return (
+      <p className="plan-chegada ao-vivo">
+        <span className="mapa-pulso" />
+        <Bus size={14} aria-hidden="true" />
+        <span>
+          Chega em <strong>{perna.espera_min} min</strong>
+          {perna.prefixo_veiculo ? ` (carro ${perna.prefixo_veiculo})` : ""}
+        </span>
+      </p>
+    );
+  }
+
+  if (perna.fonte_espera === "intervalo_medio" && perna.intervalo_medio_min != null) {
+    return (
+      <p className="plan-chegada">
+        <span>
+          Passa a cada ~<strong>{perna.intervalo_medio_min} min</strong>
+          {perna.espera_min != null ? ` (espera estimada ~${perna.espera_min} min)` : ""}
+        </span>
+      </p>
+    );
+  }
+
+  const rodando = veiculosPorLinha[perna.numero] ?? 0;
+  if (rodando > 0) {
+    return (
+      <p className="plan-chegada ao-vivo">
+        <span className="mapa-pulso" />
+        <Bus size={14} aria-hidden="true" />
+        {/* "ônibus" é invariável: singular e plural têm o mesmo texto. */}
+        <span>
+          <strong>{rodando}</strong> ônibus rodando agora
+        </span>
+      </p>
+    );
+  }
+
+  return (
+    <p className="plan-chegada sem-onibus">
+      {rastreando
+        ? "Nenhum ônibus desta linha reportando posição agora"
+        : "Procurando ônibus..."}
+    </p>
+  );
+}
+
+function kmParaTexto(km: number): string {
+  return String(km).replace(".", ",");
+}
+
+function Metros({ metros }: { metros: number }) {
+  return (
+    <>
+      <strong>{minutosAPe(metros)} min</strong> <span className="plan-tempo-metros">({metros} m)</span>
+    </>
+  );
+}
+
+/**
+ * Detalhe da opção como linha do tempo — era texto corrido de três linhas
+ * iguais. Cada passo tem marcador próprio: o número do marcador do mapa no
+ * embarque (a tela e o mapa dizem o mesmo), seta no desembarque, pegadas na
+ * caminhada, setas de troca na baldeação.
+ */
+function LinhaDoTempo({
+  passos,
+  veiculosPorLinha,
+  rastreando,
+}: {
+  passos: Passo[];
+  veiculosPorLinha: Record<string, number>;
+  rastreando: boolean;
+}) {
+  return (
+    <ol className="plan-tempo">
+      {passos.map((passo, posicao) => (
+        <li key={passo.chave} className={`plan-tempo-passo ${passo.tipo}`}>
+          <span className="plan-tempo-marcador" aria-hidden="true">
+            {passo.tipo === "caminhar" && <Footprints size={14} />}
+            {passo.tipo === "embarcar" && passo.numeroDoPasso}
+            {passo.tipo === "viajar" && <Bus size={14} />}
+            {passo.tipo === "descer" && <ArrowDown size={14} />}
+            {passo.tipo === "baldear" && <Repeat size={14} />}
+          </span>
+
+          <div className="plan-tempo-corpo">
+            {passo.tipo === "caminhar" && (
+              <p className="plan-tempo-titulo">
+                Caminhe <Metros metros={passo.metros} />{" "}
+                {posicao === 0 ? "até o embarque" : "até o destino"}
+              </p>
+            )}
+
+            {passo.tipo === "embarcar" && (
+              <>
+                <p className="plan-tempo-titulo">
+                  Embarque em{" "}
+                  <strong
+                    title={dicaDoPonto(
+                      passo.perna.embarque.parada_nome,
+                      passo.perna.embarque.lat,
+                      passo.perna.embarque.lng
+                    )}
+                  >
+                    {rotuloDoPonto(passo.perna.embarque.parada_nome)}
+                  </strong>
+                </p>
+                <p className="plan-tempo-linha">
+                  <BadgeLinha numero={passo.perna.numero} />
+                  <span className="plan-tempo-nome">{passo.perna.nome}</span>
+                </p>
+                <Chegada
+                  perna={passo.perna}
+                  veiculosPorLinha={veiculosPorLinha}
+                  rastreando={rastreando}
+                />
+              </>
+            )}
+
+            {passo.tipo === "viajar" && (
+              <p className="plan-tempo-detalhe">
+                {passo.perna.paradas_no_trecho > 0
+                  ? `${passo.perna.paradas_no_trecho} paradas · `
+                  : ""}
+                {kmParaTexto(passo.perna.distancia_km)} km
+              </p>
+            )}
+
+            {passo.tipo === "descer" && (
+              <p className="plan-tempo-titulo">
+                Desça em{" "}
+                <strong
+                  title={dicaDoPonto(
+                    passo.perna.desembarque.parada_nome,
+                    passo.perna.desembarque.lat,
+                    passo.perna.desembarque.lng
+                  )}
+                >
+                  {rotuloDoPonto(passo.perna.desembarque.parada_nome)}
+                </strong>
+              </p>
+            )}
+
+            {passo.tipo === "baldear" && (
+              <p className="plan-tempo-titulo">
+                Baldeação
+                {passo.metros > 0 && (
+                  <>
+                    : caminhe <Metros metros={passo.metros} />
+                  </>
+                )}{" "}
+                e pegue a linha <BadgeLinha numero={passo.para} />
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -378,6 +662,17 @@ export default function PlanejadorViagem({
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
   const folha = useFolhaArrastavel();
+  const idBase = useId();
+
+  // Mobile: depois de calcular, o formulário recolhe numa linha
+  // "Origem → Destino [Editar]" pra rota continuar visível no mapa. Um novo
+  // resultado sempre volta ao modo resumido.
+  const [editando, setEditando] = useState(false);
+  useEffect(() => {
+    setEditando(false);
+  }, [opcoes]);
+  const comResultado = opcoes !== null && opcoes.length > 0;
+  const destaques = opcoes ? destaquesDasOpcoes(opcoes) : [];
 
   // US #25 — estado do botão de favorito por índice de opção.
   const [salvando, setSalvando] = useState<number | null>(null);
@@ -428,12 +723,22 @@ export default function PlanejadorViagem({
     return favoritosIds.has(chaveOpcao(opcao, origem, destino));
   }
 
+  // Anunciado a leitores de tela: o resultado chega sem mover o foco, e um
+  // texto de botão que muda não avisa ninguém.
+  const anuncio = calculando
+    ? "Calculando rotas..."
+    : opcoes === null
+      ? ""
+      : opcoes.length === 0
+        ? "Nenhuma opção encontrada."
+        : `${opcoes.length} ${opcoes.length === 1 ? "opção encontrada" : "opções encontradas"}.`;
+
   return (
     <aside
       ref={folha.ref}
       className={`plan-painel${folha.recolhida ? " recolhida" : ""}${
         folha.arrastando ? " arrastando" : ""
-      }`}
+      }${comResultado ? " com-resultado" : ""}${editando ? " editando" : ""}`}
       style={folha.altura !== null ? { height: `${folha.altura}px` } : undefined}
     >
       {/* Alça da folha (mobile). O botão existe porque arrastar não é
@@ -455,11 +760,33 @@ export default function PlanejadorViagem({
           type="button"
           className="mapa-botao-icone"
           title="Fechar"
+          aria-label="Fechar planejador de viagem"
           onClick={onFechar}
         >
           <X size={16} />
         </button>
       </div>
+
+      {/* Só no mobile (o CSS esconde no desktop): o formulário some depois
+          de calcular e este resumo o substitui. */}
+      {comResultado && (
+        <div className="plan-resumo-rota">
+          <span className="plan-resumo-rota-trecho">
+            <strong>{origem?.nome}</strong>
+            <ArrowRight size={14} aria-hidden="true" />
+            <strong>{destino?.nome}</strong>
+          </span>
+          <button
+            type="button"
+            className="plan-editar"
+            aria-expanded={editando}
+            onClick={() => setEditando((v) => !v)}
+          >
+            <Pencil size={14} aria-hidden="true" />
+            {editando ? "Fechar edição" : "Editar"}
+          </button>
+        </div>
+      )}
 
       <form
         className="plan-formulario"
@@ -484,6 +811,7 @@ export default function PlanejadorViagem({
           type="button"
           className="plan-inverter"
           title="Inverter origem e destino"
+          aria-label="Inverter origem e destino"
           onClick={onInverter}
           disabled={!origem && !destino}
         >
@@ -515,17 +843,44 @@ export default function PlanejadorViagem({
         </button>
       </form>
 
+      <p className="sr-only" role="status">
+        {anuncio}
+      </p>
+
+      {calculando && (
+        <div className="plan-esqueletos" aria-hidden="true">
+          <div className="plan-esqueleto" />
+          <div className="plan-esqueleto" />
+          <div className="plan-esqueleto" />
+        </div>
+      )}
+
       {erro && (
-        <p className="plan-erro" role="alert">
-          {erro}
-        </p>
+        <div className="plan-erro" role="alert">
+          <p>{erro}</p>
+          {podeBuscar && (
+            <button type="button" className="plan-acao-erro" onClick={onBuscar}>
+              <RotateCw size={14} aria-hidden="true" /> Tentar de novo
+            </button>
+          )}
+        </div>
       )}
 
       {opcoes !== null && opcoes.length === 0 && !calculando && !erro && (
-        <p className="plan-vazio">
-          Nenhuma linha liga esses dois pontos, nem com uma baldeação.
-          Tente um ponto de referência mais próximo de uma via principal.
-        </p>
+        <div className="plan-vazio">
+          <SearchX size={22} aria-hidden="true" />
+          <p>Nenhuma linha liga esses dois pontos — nem com troca de ônibus.</p>
+          <p className="plan-vazio-dica">
+            Tente um ponto de referência mais próximo de uma via principal.
+          </p>
+          <button
+            type="button"
+            className="plan-acao-secundaria"
+            onClick={() => onDefinir("destino", null)}
+          >
+            Escolher outro destino
+          </button>
+        </div>
       )}
 
       {opcoes !== null && opcoes.length > 0 && (
@@ -547,188 +902,95 @@ export default function PlanejadorViagem({
           </div>
 
           <ul className="plan-opcoes">
-            {opcoes.map((opcao, indice) => (
-              <li key={indice}>
-                <button
-                  type="button"
-                  className={`plan-opcao${
-                    indice === opcaoSelecionada ? " selecionada" : ""
-                  }`}
-                  onClick={() => onSelecionarOpcao(indice)}
-                  aria-expanded={indice === opcaoSelecionada}
+            {opcoes.map((opcao, indice) => {
+              const selecionada = indice === opcaoSelecionada;
+              const idDetalhe = `${idBase}-detalhe-${indice}`;
+
+              return (
+                <li
+                  key={indice}
+                  className={`plan-opcao-card${selecionada ? " selecionada" : ""}`}
                 >
-                  <ResumoOpcao opcao={opcao} />
+                  {/* O botão contém só o resumo. Os passos ficam num
+                      irmão: lista e <div> dentro de <button> é HTML
+                      inválido e derruba a semântica pra quem usa leitor
+                      de tela. */}
+                  <button
+                    type="button"
+                    className="plan-opcao"
+                    onClick={() => onSelecionarOpcao(indice)}
+                    aria-expanded={selecionada}
+                    aria-controls={selecionada ? idDetalhe : undefined}
+                  >
+                    <ResumoOpcao opcao={opcao} destaques={destaques[indice] ?? []} />
+                  </button>
 
-                  {indice === opcaoSelecionada && (
-                    <ol className="plan-passos">
-                      {opcao.pernas.map((perna, i) => (
-                        <li key={`${perna.numero}-${i}`}>
-                          <div className="plan-passo-linha">
-                            <em className="plan-badge-linha">{perna.numero}</em>
-                            <span className="plan-passo-nome">{perna.nome}</span>
-                          </div>
-
-                          {/* US #16 no contexto da US #20: quem planeja a
-                              viagem quer saber onde está o ônibus que vai
-                              pegar, sem ter que buscar a linha de novo.
-                              US #159 — quando a rota já trouxe uma espera
-                              calculada para esta perna, ela é mais
-                              específica que a contagem de US #16 (fala do
-                              ônibus que serve *esta* viagem, não de todos
-                              os que rodam a linha agora) e aparece antes. */}
-                          <div className="plan-passo-aovivo">
-                            {(() => {
-                              if (perna.fonte_espera === "tempo_real" && perna.espera_min != null) {
-                                return (
-                                  <>
-                                    <span className="mapa-pulso" />
-                                    <Bus size={12} />
-                                    <span>
-                                      Chega em <strong>{perna.espera_min} min</strong>
-                                      {perna.prefixo_veiculo
-                                        ? ` (carro ${perna.prefixo_veiculo})`
-                                        : ""}
-                                    </span>
-                                  </>
-                                );
-                              }
-                              if (
-                                perna.fonte_espera === "intervalo_medio" &&
-                                perna.intervalo_medio_min != null
-                              ) {
-                                return (
-                                  <span>
-                                    Passa a cada ~<strong>{perna.intervalo_medio_min} min</strong>
-                                    {perna.espera_min != null
-                                      ? ` (espera estimada ~${perna.espera_min} min)`
-                                      : ""}
-                                  </span>
-                                );
-                              }
-
-                              const rodando = veiculosPorLinha[perna.numero] ?? 0;
-                              if (rodando > 0) {
-                                return (
-                                  <>
-                                    <span className="mapa-pulso" />
-                                    <Bus size={12} />
-                                    <span>
-                                      {/* "ônibus" é invariável: singular e
-                                          plural têm o mesmo texto. */}
-                                      <strong>{rodando}</strong> ônibus rodando agora
-                                    </span>
-                                  </>
-                                );
-                              }
-                              return (
-                                <span className="plan-passo-sem-onibus">
-                                  {rastreando
-                                    ? "Nenhum ônibus desta linha reportando posição agora"
-                                    : "Procurando ônibus..."}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <div className="plan-passo-detalhe">
-                            <span>
-                              Embarque em{" "}
-                              <strong
-                                title={dicaDoPonto(
-                                  perna.embarque.parada_nome,
-                                  perna.embarque.lat,
-                                  perna.embarque.lng
-                                )}
-                              >
-                                {rotuloDoPonto(perna.embarque.parada_nome)}
-                              </strong>
-                              {perna.embarque.caminhada_metros > 0 && (
-                                <em>
-                                  {" "}
-                                  ({perna.embarque.caminhada_metros} m a pé)
-                                </em>
-                              )}
-                            </span>
-                            <span className="plan-passo-meio">
-                              <ArrowRight size={12} />
-                              {perna.paradas_no_trecho > 0
-                                ? `${perna.paradas_no_trecho} paradas · `
-                                : ""}
-                              {perna.distancia_km} km
-                            </span>
-                            <span>
-                              Desça em{" "}
-                              <strong
-                                title={dicaDoPonto(
-                                  perna.desembarque.parada_nome,
-                                  perna.desembarque.lat,
-                                  perna.desembarque.lng
-                                )}
-                              >
-                                {rotuloDoPonto(perna.desembarque.parada_nome)}
-                              </strong>
-                              {perna.desembarque.caminhada_metros > 0 && (
-                                <em>
-                                  {" "}
-                                  ({perna.desembarque.caminhada_metros} m a pé)
-                                </em>
-                              )}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </button>
-                {/* US #25 — botão de favorito fora do <button> da opção
-                    para evitar button dentro de button (HTML inválido). */}
-                {indice === opcaoSelecionada && (
-                  <div className="plan-favorito-area">
-                    <button
-                      type="button"
-                      className={`plan-favorito-btn${jaFavoritado(opcao) ? " salvo" : ""}`}
-                      onClick={() => {
-                        if (!jaFavoritado(opcao)) handleSalvarFavorito(indice);
-                      }}
-                      disabled={salvando === indice || jaFavoritado(opcao)}
-                      aria-label={
-                        jaFavoritado(opcao)
-                          ? "Rota já salva nos favoritos"
-                          : "Salvar como favorita"
-                      }
-                      title={
-                        jaFavoritado(opcao)
-                          ? "Já está nos seus favoritos"
-                          : "Salvar rota como favorita"
-                      }
+                  {selecionada && (
+                    <div
+                      id={idDetalhe}
+                      className="plan-opcao-detalhe"
+                      role="group"
+                      aria-label={`Passos da opção ${indice + 1}`}
                     >
-                      {salvando === indice ? (
-                        <LoaderCircle size={14} className="plan-girando" />
-                      ) : (
-                        <Star
-                          size={14}
-                          fill={jaFavoritado(opcao) ? "currentColor" : "none"}
-                        />
-                      )}
-                      <span>
-                        {jaFavoritado(opcao)
-                          ? "Salva nos favoritos"
-                          : salvando === indice
-                          ? "Salvando..."
-                          : "Salvar como favorita"}
-                      </span>
-                    </button>
-                    {erroFavorito && salvando === null && (
-                      <p
-                        className="plan-erro plan-favorito-erro"
-                        role="alert"
+                      <LinhaDoTempo
+                        passos={passosDaOpcao(opcao)}
+                        veiculosPorLinha={veiculosPorLinha}
+                        rastreando={rastreando}
+                      />
+                    </div>
+                  )}
+
+                  {/* US #25 — botão de favorito fora do <button> da opção
+                      para evitar button dentro de button (HTML inválido). */}
+                  {selecionada && (
+                    <div className="plan-favorito-area">
+                      <button
+                        type="button"
+                        className={`plan-favorito-btn${jaFavoritado(opcao) ? " salvo" : ""}`}
+                        onClick={() => {
+                          if (!jaFavoritado(opcao)) handleSalvarFavorito(indice);
+                        }}
+                        disabled={salvando === indice || jaFavoritado(opcao)}
+                        aria-label={
+                          jaFavoritado(opcao)
+                            ? "Rota já salva nos favoritos"
+                            : "Salvar como favorita"
+                        }
+                        title={
+                          jaFavoritado(opcao)
+                            ? "Já está nos seus favoritos"
+                            : "Salvar rota como favorita"
+                        }
                       >
-                        {erroFavorito}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
+                        {salvando === indice ? (
+                          <LoaderCircle size={14} className="plan-girando" />
+                        ) : (
+                          <Star
+                            size={14}
+                            fill={jaFavoritado(opcao) ? "currentColor" : "none"}
+                          />
+                        )}
+                        <span>
+                          {jaFavoritado(opcao)
+                            ? "Salva nos favoritos"
+                            : salvando === indice
+                            ? "Salvando..."
+                            : "Salvar como favorita"}
+                        </span>
+                      </button>
+                      {erroFavorito && salvando === null && (
+                        <p
+                          className="plan-erro plan-favorito-erro"
+                          role="alert"
+                        >
+                          {erroFavorito}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           <p className="plan-ressalva">
