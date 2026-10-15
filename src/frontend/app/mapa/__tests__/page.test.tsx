@@ -11,8 +11,8 @@ import {
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
-  // A página lê ?painel= pra abrir o planejador quando o usuário chega
-  // pelo item "Rotas" da navegação.
+  // A página lê ?painel=rotas pra abrir o planejador quando o usuário
+  // chega por uma rota favorita (/favoritos → "Ir").
   useSearchParams: () => new URLSearchParams(parametrosDaUrl),
 }));
 

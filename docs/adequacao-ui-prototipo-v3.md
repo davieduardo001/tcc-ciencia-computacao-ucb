@@ -25,6 +25,15 @@ Hoje existe **um único breakpoint**, em `src/frontend/app/mapa/mapa.css`:
   (`.ms-bottomnav`) + botão de ação central com arco (`.ms-fab-area`) aparecem.
 - **`≥ 920px`**: layout "desktop" — sidebar com todos os itens de navegação, sem bottomnav/FAB.
 
+> **Atualização (card #179).** O app real **não tem mais** os itens "Linhas de Ônibus" e "Rotas"
+> (sidebar e navegação inferior), embora o protótipo v3 ainda os liste como telas próprias
+> (`buscar-linha.html`, `calcular-rota.html`). No app, as duas funções vivem no mapa — busca de linha
+> na barra do topo, planejador pelo botão "Para onde você vai?" — e os itens só repetiam essas
+> entradas. A navegação inferior ficou com **dois destinos (Mapa, Perfil)** de cada lado do botão
+> central; a sidebar, com Mapa Interativo, Rotas Salvas, Ocorrências e Alertas. O deep link
+> `/mapa?painel=rotas` permanece (é o que os Favoritos usam). Onde este documento fala em "4 itens"
+> na navegação inferior, leia o estado anterior a essa mudança.
+
 **Não existe uma faixa "tablet" própria.** Uma tela de tablet em retrato (ex.: iPad, 768×1024)
 cai inteira no bucket "mobile" — e é exatamente aí que os problemas aparecem.
 

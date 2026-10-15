@@ -241,8 +241,15 @@ describe("MapaInterativo", () => {
     const atalho = screen.getByText("Reportar ocorrência nesta linha");
     expect(atalho.closest("a")).toHaveAttribute(
       "href",
-      "/ocorrencias?linha=0.110"
+      "/ocorrencias/reportar?linha=0.110"
     );
+  });
+
+  it("tem um atalho pra ver as ocorrências já filtradas pela linha (US #24)", () => {
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const atalho = screen.getByText("Ver ocorrências desta linha");
+    expect(atalho.closest("a")).toHaveAttribute("href", "/ocorrencias?linha=0.110");
   });
 
   it("chama onFecharLinha ao clicar em fechar o painel", () => {
