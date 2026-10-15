@@ -651,6 +651,42 @@
   color: #fff;
 }
 
+/* US #24 — "Ver ocorrências" e "Reportar" lado a lado no detalhe da linha:
+   o primeiro é neutro (leitura), o segundo mantém o tom de alerta (ação). */
+.mapa-painel-ocorrencias {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.mapa-painel-ocorrencias .mapa-painel-reportar {
+  margin-bottom: 0;
+}
+
+.mapa-painel-ver-ocorrencias {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--mc-petroleo);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mc-petroleo);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: 0.14s;
+}
+
+.mapa-painel-ver-ocorrencias:hover {
+  background: var(--mc-petroleo);
+  color: #fff;
+}
+
 .mapa-painel-titulo {
   font-size: 12px;
   font-weight: 700;
