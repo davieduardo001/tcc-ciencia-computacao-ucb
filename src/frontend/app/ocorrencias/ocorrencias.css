@@ -227,3 +227,181 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* ===== US #24 — Visualizar Ocorrências ===== */
+
+.ocor-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  max-width: 640px;
+  margin-bottom: 18px;
+}
+
+.ocor-cabecalho .ocor-sub {
+  margin-bottom: 0;
+}
+
+.ocor-btn-reportar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--mc-teal-escuro);
+  border-radius: 999px;
+  padding: 0 16px;
+  min-height: 44px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ocor-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mc-teal-escuro);
+  text-decoration: none;
+  min-height: 44px;
+}
+
+.ocor-filtro {
+  max-width: 640px;
+  margin-bottom: 18px;
+}
+
+.ocor-filtro-linha {
+  position: relative;
+  display: flex;
+}
+
+.ocor-filtro-linha input {
+  flex: 1;
+  padding-right: 44px;
+}
+
+.ocor-filtro-limpar {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: none;
+  border: none;
+  color: var(--mc-texto-2);
+  cursor: pointer;
+}
+
+.ocor-estado {
+  font-size: 14px;
+  color: var(--mc-texto-2);
+  max-width: 640px;
+  margin: 8px 0;
+}
+
+.ocor-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ocor-card {
+  display: flex;
+  gap: 12px;
+  background: var(--mc-superficie);
+  border: 1.5px solid var(--mc-borda);
+  border-radius: var(--mc-r-md);
+  padding: 14px;
+}
+
+/* Confirmada por mais de um usuário ganha destaque em vermelho (PRD da
+   US #24); a que só tem um reporte fica neutra, "aguardando". */
+.ocor-card.confirmada {
+  border-color: var(--mc-erro);
+  background: var(--mc-erro-fundo);
+}
+
+.ocor-card-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--mc-superficie-2);
+  color: var(--mc-petroleo);
+}
+
+.ocor-card.confirmada .ocor-card-icone {
+  background: var(--mc-erro);
+  color: #fff;
+}
+
+.ocor-card-corpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ocor-card-topo {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--mc-petroleo);
+}
+
+.ocor-card-tempo {
+  flex-shrink: 0;
+  font-size: 12px;
+  /* --mc-texto-3 sobre o fundo vermelho claro da confirmada mantém contraste AA */
+  color: var(--mc-texto-2);
+}
+
+.ocor-card-local {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--mc-texto-2);
+}
+
+.ocor-card-desc {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--mc-petroleo);
+  overflow-wrap: anywhere;
+}
+
+.ocor-badge {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.ocor-badge.pendente {
+  background: var(--mc-alerta-fundo);
+  color: #7a4a0b;
+}
+
+.ocor-badge.confirmada {
+  background: var(--mc-erro);
+  color: #fff;
+}

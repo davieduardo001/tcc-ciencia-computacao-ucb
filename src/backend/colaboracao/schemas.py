@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -54,6 +54,43 @@ class OcorrenciaResponse(BaseModel):
     contador_confirmacoes: int
     criado_em: datetime
     expira_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# US #24 — Visualizar Ocorrências Reportadas por Outros Passageiros
+# ---------------------------------------------------------------------------
+
+
+class OcorrenciaListaResponse(BaseModel):
+    """Item da listagem de ocorrências ativas.
+
+    Deliberadamente sem `usuario_id`: quem reportou não é informação que
+    outros passageiros precisem (nem devam) ter — LGPD.
+
+    O banco guarda `criado_em`/`expira_em` em UTC *sem fuso* (naive). Sem
+    marcar o fuso aqui, o JSON sairia sem "Z" e o navegador leria o horário
+    como local — "há 3 horas" num reporte de agora, no fuso de Brasília.
+    """
+
+    id: str
+    linha_numero: str
+    tipo: str
+    descricao: Optional[str] = None
+    local: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    status: str
+    contador_confirmacoes: int
+    criado_em: datetime
+    expira_em: datetime
+
+    @field_validator("criado_em", "expira_em")
+    @classmethod
+    def _marcar_utc(cls, valor: datetime) -> datetime:
+        return valor.replace(tzinfo=timezone.utc) if valor.tzinfo is None else valor
 
     class Config:
         from_attributes = True
