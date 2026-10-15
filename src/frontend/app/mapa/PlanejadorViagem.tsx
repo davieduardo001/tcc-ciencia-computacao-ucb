@@ -206,10 +206,21 @@ function CampoLugar({
   );
 }
 
-function rotuloDoPonto(nome: string, lat: number, lng: number): string {
-  // 582 dos 7.142 abrigos do SEMOB vêm sem nome utilizável na fonte
-  // (só o CEP). Nesses casos o backend manda string vazia de propósito.
-  return nome || `Ponto em ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+/**
+ * 582 dos 7.142 abrigos do SEMOB vêm sem nome utilizável na fonte (só o
+ * CEP). Nesses casos o backend manda string vazia de propósito. Coordenada
+ * crua ("Ponto em -15.8131, -48.0123") não diz nada a quem vai embarcar, e
+ * o metro de caminhada já está ao lado — por isso o rótulo é um texto
+ * humano; a coordenada fica só no `title`, pra quem precisar conferir.
+ */
+const ROTULO_PARADA_SEM_NOME = "Parada sem nome";
+
+function rotuloDoPonto(nome: string): string {
+  return nome || ROTULO_PARADA_SEM_NOME;
+}
+
+function dicaDoPonto(nome: string, lat: number, lng: number): string | undefined {
+  return nome ? undefined : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
 function ResumoOpcao({ opcao }: { opcao: OpcaoViagem }) {
@@ -602,10 +613,9 @@ export default function PlanejadorViagem({
                                     <span className="mapa-pulso" />
                                     <Bus size={12} />
                                     <span>
-                                      <strong>{rodando}</strong>{" "}
-                                      {rodando === 1
-                                        ? "ônibus rodando agora"
-                                        : "ônibus rodando agora"}
+                                      {/* "ônibus" é invariável: singular e
+                                          plural têm o mesmo texto. */}
+                                      <strong>{rodando}</strong> ônibus rodando agora
                                     </span>
                                   </>
                                 );
@@ -622,12 +632,14 @@ export default function PlanejadorViagem({
                           <div className="plan-passo-detalhe">
                             <span>
                               Embarque em{" "}
-                              <strong>
-                                {rotuloDoPonto(
+                              <strong
+                                title={dicaDoPonto(
                                   perna.embarque.parada_nome,
                                   perna.embarque.lat,
                                   perna.embarque.lng
                                 )}
+                              >
+                                {rotuloDoPonto(perna.embarque.parada_nome)}
                               </strong>
                               {perna.embarque.caminhada_metros > 0 && (
                                 <em>
@@ -645,12 +657,14 @@ export default function PlanejadorViagem({
                             </span>
                             <span>
                               Desça em{" "}
-                              <strong>
-                                {rotuloDoPonto(
+                              <strong
+                                title={dicaDoPonto(
                                   perna.desembarque.parada_nome,
                                   perna.desembarque.lat,
                                   perna.desembarque.lng
                                 )}
+                              >
+                                {rotuloDoPonto(perna.desembarque.parada_nome)}
                               </strong>
                               {perna.desembarque.caminhada_metros > 0 && (
                                 <em>

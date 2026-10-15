@@ -31,6 +31,10 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 
 const DEBOUNCE_SUGESTOES_MS = 250;
 
+/** Rótulo de um ponto escolhido no mapa/por link cujo nome ainda não existe
+ *  (ou nunca vai existir, se a geocodificação reversa falhar). */
+const ROTULO_PONTO_NO_MAPA = "Ponto no mapa";
+
 /** Converte um query param em coordenada; `null` se não for número finito. */
 function lerCoordenada(valor: string | null): number | null {
   if (valor === null || valor.trim() === "") return null;
@@ -128,12 +132,12 @@ function MapaConteudo() {
       return;
     }
     setOrigem({
-      nome: origemNomeParam ?? `${origemLat.toFixed(4)}, ${origemLng.toFixed(4)}`,
+      nome: origemNomeParam ?? ROTULO_PONTO_NO_MAPA,
       lat: origemLat,
       lng: origemLng,
     });
     setDestino({
-      nome: destinoNomeParam ?? `${destinoLat.toFixed(4)}, ${destinoLng.toFixed(4)}`,
+      nome: destinoNomeParam ?? ROTULO_PONTO_NO_MAPA,
       lat: destinoLat,
       lng: destinoLng,
     });
@@ -270,11 +274,9 @@ function MapaConteudo() {
       if (!extremo) return;
 
       setEscolhendoNoMapa(null);
-      definirPonto(extremo, {
-        nome: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-        lat,
-        lng,
-      });
+      // Nome provisório humano, e não "-15.8131, -48.0123": se o Nominatim
+      // não responder, é isso que fica no campo.
+      definirPonto(extremo, { nome: ROTULO_PONTO_NO_MAPA, lat, lng });
 
       const lugar = await nomearLugar(lat, lng);
       if (lugar) {
