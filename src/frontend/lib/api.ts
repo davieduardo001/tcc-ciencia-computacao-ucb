@@ -599,6 +599,9 @@ export interface LinhaNaParada {
   numero: string;
   nome: string;
   sentido: string;
+  /** Issue #174 — próximos horários DESTA linha (até 3). Ausente num
+   * backend antigo: o painel cai de volta na lista combinada da parada. */
+  proximosHorarios?: string[];
 }
 
 export interface DetalhesParada {
@@ -647,7 +650,12 @@ export async function buscarDetalhesParada(
     codigo: data.codigo,
     lat: data.lat,
     lng: data.lng,
-    linhas: data.linhas,
+    linhas: (data.linhas as Record<string, unknown>[]).map(
+      ({ proximos_horarios: porLinha, ...linha }) =>
+        (Array.isArray(porLinha)
+          ? { ...linha, proximosHorarios: porLinha }
+          : linha) as unknown as LinhaNaParada
+    ),
     proximosHorarios: data.proximos_horarios,
   };
 }
