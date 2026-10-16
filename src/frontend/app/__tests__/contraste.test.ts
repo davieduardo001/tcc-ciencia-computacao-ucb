@@ -59,6 +59,11 @@ const PARES: [string, string, number, string][] = [
   ["--mc-borda-campo", "--mc-areia-clara", 3, "borda do campo sobre o fundo do app"],
   ["--mc-teal-escuro", BRANCO, 3, "contorno de foco (outline) sobre branco"],
   ["--mc-teal-escuro", "--mc-areia-clara", 3, "contorno de foco sobre o fundo do app"],
+  // faixa de viagem em andamento (US #171)
+  ["--mc-petroleo", "--mc-mint", 4.5, "botão Cheguei (texto escuro sobre menta)"],
+  ["--mc-alerta-fundo", "--mc-petroleo", 4.5, "texto de alerta da faixa (sem sinal, destino ultrapassado)"],
+  ["--mc-erro-texto", BRANCO, 4.5, "erro dentro do popup do ônibus (fundo branco)"],
+  ["--mc-teal-escuro", BRANCO, 4.5, "rótulo 'seu destino' e botão 'Tirar destino' (texto)"],
 ];
 
 describe("contraste dos tokens da tela de rotas (WCAG 2.2 AA)", () => {
@@ -70,6 +75,29 @@ describe("contraste dos tokens da tela de rotas (WCAG 2.2 AA)", () => {
     expect(razao("#000000", "#ffffff")).toBeCloseTo(21, 0);
     // o par que provou o problema original
     expect(razao(BRANCO, "--mc-mint")).toBeLessThan(2);
+  });
+});
+
+describe("escopo do CSS da viagem em andamento (US #171)", () => {
+  // Mesma lição do botão de favorito: o CSS é dividido por rota, e a faixa,
+  // o botão do popup e o chip do topo vivem em /mapa. Teste de componente
+  // (jsdom) não vê CSS ausente; este guarda vê.
+  it.each([
+    ".mapa-viagem-faixa",
+    ".mapa-viagem-cheguei",
+    ".mapa-pegar-onibus-btn",
+    ".mapa-descer-btn",
+    ".ms-viagem-chip",
+    ".ms-content.com-viagem",
+  ])("%s está definido em mapa.css", (seletor) => {
+    expect(MAPA_CSS).toContain(seletor);
+  });
+
+  it("o planejador e os painéis descem a altura da faixa quando ela aparece", () => {
+    for (const painel of [".plan-abrir", ".plan-painel", ".mapa-painel-linha"]) {
+      expect(MAPA_CSS).toContain(`.ms-content.com-viagem ${painel}`);
+    }
+    expect(MAPA_CSS).toMatch(/top:\s*calc\(20px \+ var\(--viagem-faixa\)\)/);
   });
 });
 

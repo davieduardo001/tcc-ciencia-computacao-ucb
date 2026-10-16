@@ -50,6 +50,8 @@ jest.mock("@/lib/api", () => ({
   calcularRotas: jest.fn().mockResolvedValue([]),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
+  // O AppShell consulta a viagem em andamento (US #171): sem viagem.
+  buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
   // US #25 — funções de favoritos usadas pelo MapaConteudo
   listarFavoritos: jest.fn().mockResolvedValue([]),
   cachearFavoritos: jest.fn(),

@@ -1166,3 +1166,206 @@ export async function removerFavorito(id: string): Promise<void> {
   }
   // 204 No Content — sem corpo.
 }
+
+// ---------------------------------------------------------------------------
+// US #171 — Pegar o ônibus: embarcar, acompanhar e encerrar a viagem
+// ---------------------------------------------------------------------------
+
+export interface ParadaDaViagem {
+  codigo: string;
+  nome: string;
+  lat: number;
+  lng: number;
+}
+
+export interface ViagemAtiva {
+  id: string;
+  numeroLinha: string;
+  sentido: string | null;
+  veiculoPrefixo: string;
+  paradaDestinoCodigo: string | null;
+  embarcouEm: string;
+  /** "sem_sinal": o ônibus não está no feed ou a posição é velha — a tela
+   * diz isso em vez de estimar (RN-09). */
+  sinal: "ao_vivo" | "sem_sinal";
+  veiculo: {
+    prefixo: string;
+    lat: number;
+    lng: number;
+    direcao: number | null;
+    atualizadoEm: string;
+  } | null;
+  destino: (ParadaDaViagem & { ultrapassado: boolean }) | null;
+  proximaParada: ParadaDaViagem | null;
+  paradasRestantes: ParadaDaViagem[];
+}
+
+/** `falhou` separa "o servidor disse que não há viagem" de "não consegui
+ * perguntar": no segundo caso quem chama mantém o que já mostrava. */
+export type ResultadoViagemAtiva =
+  | { falhou: true }
+  | { falhou: false; viagem: ViagemAtiva | null };
+
+/** `status` deixa a tela distinguir 409 (já em viagem) de 422 (sem veículo
+ * perto). `message` já vem em português do servidor nesses dois casos. */
+export class ViagemError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function paradaDaViagem(p: {
+  codigo: string;
+  nome: string;
+  lat: number;
+  lng: number;
+}): ParadaDaViagem {
+  return { codigo: p.codigo, nome: p.nome, lat: p.lat, lng: p.lng };
+}
+
+/**
+ * Viagem em andamento do usuário, com o progresso ao vivo. Nunca lança:
+ * é uma consulta periódica de fundo e não deve quebrar a tela.
+ */
+export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
+  try {
+    const response = await fetch(`${API_URL}/api/mobilidade/viagens/ativa`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    // Sem sessão não há viagem: é o estado "aguardando", não uma falha.
+    if (response.status === 401) return { falhou: false, viagem: null };
+    if (!response.ok) return { falhou: true };
+
+    const data = await response.json();
+    if (!data.ativa || !data.viagem) return { falhou: false, viagem: null };
+
+    return {
+      falhou: false,
+      viagem: {
+        id: data.viagem.id,
+        numeroLinha: data.viagem.numero_linha,
+        sentido: data.viagem.sentido ?? null,
+        veiculoPrefixo: data.viagem.veiculo_prefixo,
+        paradaDestinoCodigo: data.viagem.parada_destino_codigo ?? null,
+        embarcouEm: data.viagem.embarcou_em,
+        sinal: data.sinal === "ao_vivo" ? "ao_vivo" : "sem_sinal",
+        veiculo: data.veiculo
+          ? {
+              prefixo: data.veiculo.prefixo,
+              lat: data.veiculo.lat,
+              lng: data.veiculo.lng,
+              direcao: data.veiculo.direcao ?? null,
+              atualizadoEm: data.veiculo.atualizado_em,
+            }
+          : null,
+        destino: data.destino
+          ? { ...paradaDaViagem(data.destino), ultrapassado: !!data.destino.ultrapassado }
+          : null,
+        proximaParada: data.proxima_parada ? paradaDaViagem(data.proxima_parada) : null,
+        paradasRestantes: (data.paradas_restantes ?? []).map(paradaDaViagem),
+      },
+    };
+  } catch {
+    return { falhou: true };
+  }
+}
+
+async function erroDaViagem(response: Response, padrao: string): Promise<ViagemError> {
+  if (response.status === 401) {
+    return new ViagemError("Faça login para registrar a viagem.", 401);
+  }
+  // 404/409/422 trazem uma frase pronta em português no `detail`. Qualquer
+  // outra coisa (500, 502 do Gateway) não deve vazar texto técnico.
+  if ([404, 409, 422].includes(response.status)) {
+    try {
+      const data = await response.json();
+      if (typeof data.detail === "string") {
+        return new ViagemError(data.detail, response.status);
+      }
+    } catch {
+      // cai no texto padrão
+    }
+  }
+  return new ViagemError(padrao, response.status);
+}
+
+export interface EmbarquePayload {
+  numeroLinha: string;
+  /** Só confirma que o usuário está perto do ônibus; o servidor não guarda. */
+  lat: number;
+  lng: number;
+  paradaDestinoCodigo?: string;
+}
+
+/**
+ * Cenários 1 e 4 — registra o embarque. Lança `ViagemError` com `status`
+ * 409 (já em viagem) ou 422 (sem veículo perto / parada inválida).
+ */
+export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/mobilidade/viagens`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        numero_linha: dados.numeroLinha,
+        lat: dados.lat,
+        lng: dados.lng,
+        parada_destino_codigo: dados.paradaDestinoCodigo,
+      }),
+    });
+  } catch {
+    throw new ViagemError("Não foi possível registrar o embarque. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(response, "Não foi possível registrar o embarque. Tente novamente.");
+  }
+}
+
+/** Escolhe, troca ou tira (`null`) a parada de destino da viagem. */
+export async function definirDestinoDaViagem(
+  viagemId: string,
+  paradaDestinoCodigo: string | null
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/destino`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parada_destino_codigo: paradaDestinoCodigo }),
+      }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível salvar o destino. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(response, "Não foi possível salvar o destino. Tente novamente.");
+  }
+}
+
+/** Cenário 3 — "Cheguei". Idempotente no servidor: repetir não dá erro. */
+export async function encerrarViagem(viagemId: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/encerrar`,
+      { method: "POST", credentials: "include" }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível encerrar a viagem. Verifique sua conexão.");
+  }
+  // 404 = a viagem já não existe para este usuário (expirou, ou foi
+  // encerrada em outro aparelho): o objetivo de quem tocou em "Cheguei"
+  // está cumprido, então não é erro.
+  if (!response.ok && response.status !== 404) {
+    throw await erroDaViagem(response, "Não foi possível encerrar a viagem. Tente novamente.");
+  }
+}

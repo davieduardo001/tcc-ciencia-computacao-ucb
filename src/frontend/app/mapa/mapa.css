@@ -2331,3 +2331,272 @@
     max-width: none;
   }
 }
+
+/* ===== Viagem em andamento (US #171) =====
+   A faixa tem altura FIXA: o planejador e os painéis de linha/parada descem
+   exatamente --viagem-faixa quando ela aparece, e não se sobrepõem. A
+   variável vive em .ms-content (e não em .mapa-canvas) porque o planejador
+   é irmão do mapa, não filho dele. */
+.ms-content {
+  --viagem-faixa: 0px;
+}
+
+.ms-content.com-viagem {
+  --viagem-faixa: 56px;
+}
+
+.ms-content.com-viagem .plan-abrir,
+.ms-content.com-viagem .plan-painel,
+.ms-content.com-viagem .mapa-painel-linha {
+  top: calc(20px + var(--viagem-faixa));
+}
+
+.ms-content.com-viagem .mapa-aviso {
+  top: calc(16px + var(--viagem-faixa));
+}
+
+.mapa-viagem-faixa {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-folha) + 1);
+  background: var(--mc-petroleo);
+  color: #fff;
+  box-shadow: var(--mc-sombra-sm);
+}
+
+.mapa-viagem-linha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--viagem-faixa, 56px);
+  padding: 0 16px;
+}
+
+.mapa-viagem-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--mc-r-pill);
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.mapa-viagem-texto {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+
+.mapa-viagem-texto.alerta {
+  color: var(--mc-alerta-fundo);
+  font-weight: 700;
+}
+
+.mapa-viagem-detalhes-btn,
+.mapa-viagem-cheguei {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--mc-r-pill);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mapa-viagem-detalhes-btn {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.mapa-viagem-detalhes-btn svg {
+  transition: transform 0.14s;
+}
+
+.mapa-viagem-detalhes-btn svg.aberto {
+  transform: rotate(180deg);
+}
+
+.mapa-viagem-cheguei {
+  background: var(--mc-mint);
+  color: var(--mc-petroleo);
+  border: 1px solid transparent;
+}
+
+.mapa-viagem-cheguei:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mapa-viagem-erro {
+  margin: 0;
+  padding: 8px 16px 10px;
+  background: var(--mc-erro-fundo);
+  color: var(--mc-erro-texto);
+  font-size: 13px;
+}
+
+.mapa-viagem-detalhes {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 45vh;
+  overflow: auto;
+  padding: 16px;
+  background: #fff;
+  color: var(--mc-texto);
+  border-bottom: 1px solid var(--border-2);
+  box-shadow: var(--shadow);
+}
+
+.mapa-viagem-paradas {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.mapa-viagem-paradas li.destino {
+  font-weight: 700;
+}
+
+.mapa-viagem-destino-rotulo {
+  font-weight: 600;
+  color: var(--mc-teal-escuro);
+}
+
+/* Botão dentro do popup do ônibus */
+.mapa-pegar-onibus {
+  margin-top: 10px;
+}
+
+.mapa-pegar-onibus-btn,
+.mapa-descer-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--mc-teal-escuro);
+  border-radius: var(--mc-r-pill);
+  background: var(--mc-teal-escuro);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mapa-pegar-onibus-btn:disabled,
+.mapa-descer-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mapa-descer-btn.secundario {
+  background: #fff;
+  color: var(--mc-teal-escuro);
+}
+
+.mapa-pegar-onibus-aviso {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--mc-texto-2);
+}
+
+.mapa-pegar-onibus-erro {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mc-erro-texto);
+}
+
+.mapa-descer {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: var(--mc-r-md);
+  background: var(--mc-areia-clara);
+}
+
+.mapa-descer-contexto {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--mc-texto-2);
+}
+
+/* Chip do topo, nas telas que não são o mapa */
+.ms-viagem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--mc-r-pill);
+  background: var(--mc-petroleo);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 920px) {
+  /* Duas linhas: selo + botões em cima, o que está acontecendo embaixo. */
+  .ms-content.com-viagem {
+    --viagem-faixa: 104px;
+  }
+
+  .ms-content.com-viagem .plan-abrir {
+    top: calc(14px + var(--viagem-faixa));
+  }
+
+  .mapa-viagem-linha {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas:
+      "selo detalhes cheguei"
+      "texto texto texto";
+    align-content: center;
+    gap: 6px 8px;
+    padding: 0 14px;
+  }
+
+  .mapa-viagem-selo {
+    grid-area: selo;
+    justify-self: start;
+  }
+
+  .mapa-viagem-detalhes-btn {
+    grid-area: detalhes;
+  }
+
+  .mapa-viagem-cheguei {
+    grid-area: cheguei;
+  }
+
+  .mapa-viagem-texto {
+    grid-area: texto;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+  }
+
+  .mapa-viagem-detalhes-rotulo {
+    display: none;
+  }
+
+  .ms-viagem-chip-rotulo {
+    display: none;
+  }
+}

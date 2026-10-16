@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  Bus,
   HelpCircle,
   LogOut,
   Map as MapIcon,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
 import AvisoEmBreve from "../AvisoEmBreve";
+import { useViagem, ViagemProvider } from "./ViagemContext";
 import "./mapa.css";
 
 function iniciais(nome: string): string {
@@ -124,7 +126,7 @@ function ItemNav({
   );
 }
 
-export default function AppShell({
+function AppShellConteudo({
   active,
   children,
   onBuscarLinha,
@@ -134,6 +136,7 @@ export default function AppShell({
   onSelecionarSugestaoLinha,
 }: AppShellProps) {
   const router = useRouter();
+  const { viagem } = useViagem();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
   const [saindo, setSaindo] = useState(false);
@@ -341,6 +344,20 @@ export default function AppShell({
           )}
         </form>
         <div className="ms-actions">
+          {/* US #171 — nas outras telas o usuário não vê a faixa do mapa; o
+              chip lembra que há uma viagem em andamento e leva de volta a
+              ela. No mapa a faixa já diz isso, então o chip sai. */}
+          {viagem && active !== "mapa" && (
+            <Link
+              href="/mapa"
+              className="ms-viagem-chip"
+              aria-label={`Em viagem na linha ${viagem.numeroLinha}. Voltar ao mapa`}
+            >
+              <Bus size={16} aria-hidden="true" />
+              <span className="ms-viagem-chip-rotulo">Em viagem · </span>
+              <strong>{viagem.numeroLinha}</strong>
+            </Link>
+          )}
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
           </button>
@@ -353,7 +370,9 @@ export default function AppShell({
         </div>
       </header>
 
-      <main className="ms-content">{children}</main>
+      <main className={`ms-content${viagem && active === "mapa" ? " com-viagem" : ""}`}>
+        {children}
+      </main>
 
       <nav className="ms-bottomnav" aria-label="Navegação principal">
         {NAV_INFERIOR.map(({ id, href, label, Icone, disponivel }, indice) => (
@@ -434,5 +453,18 @@ export default function AppShell({
         Essa seção ainda está sendo construída. Em breve ela aparece por aqui.
       </AvisoEmBreve>
     </div>
+  );
+}
+
+/**
+ * O estado de viagem (Aguardando × Em viagem) mora aqui, no AppShell, e não
+ * numa tela só: o chip do topo e o mapa leem o mesmo estado, e todas as
+ * telas autenticadas passam por este componente.
+ */
+export default function AppShell(props: AppShellProps) {
+  return (
+    <ViagemProvider>
+      <AppShellConteudo {...props} />
+    </ViagemProvider>
   );
 }
