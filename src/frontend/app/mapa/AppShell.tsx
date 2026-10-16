@@ -240,11 +240,6 @@ function AppShellConteudo({
 
         <div className="ms-spacer" />
 
-        <span className="ms-nova-viagem indisponivel" aria-disabled="true" title="Ainda não disponível">
-          <Plus size={17} /> Nova Viagem
-          <em className="ms-badge-em-breve">Em breve</em>
-        </span>
-
         <div className="ms-user">
           <div className="ms-avatar">
             {usuario ? iniciais(usuario.nome) : <User size={16} />}

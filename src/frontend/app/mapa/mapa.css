@@ -162,39 +162,6 @@
   flex: 1;
 }
 
-.ms-nova-viagem {
-  margin: 8px 4px 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--primary);
-  color: #fff;
-  border-radius: var(--pill);
-  padding: 12px 20px;
-  font-size: 14.5px;
-  font-weight: 600;
-  text-decoration: none;
-  box-shadow: 0 6px 16px rgba(43, 166, 155, 0.25);
-  transition: 0.16s;
-}
-
-.ms-nova-viagem:not(.indisponivel):hover {
-  background: var(--primary-700);
-}
-
-.ms-nova-viagem.indisponivel {
-  background: var(--bg-soft);
-  color: var(--muted);
-  cursor: not-allowed;
-  box-shadow: none;
-  border: 1px solid var(--border-2);
-}
-
-.ms-nova-viagem.indisponivel .ms-badge-em-breve {
-  background: #fff;
-}
-
 .ms-user {
   display: flex;
   align-items: center;
