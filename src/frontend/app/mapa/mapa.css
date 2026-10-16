@@ -651,6 +651,42 @@
   color: #fff;
 }
 
+/* US #24 — "Ver ocorrências" e "Reportar" lado a lado no detalhe da linha:
+   o primeiro é neutro (leitura), o segundo mantém o tom de alerta (ação). */
+.mapa-painel-ocorrencias {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.mapa-painel-ocorrencias .mapa-painel-reportar {
+  margin-bottom: 0;
+}
+
+.mapa-painel-ver-ocorrencias {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--mc-petroleo);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mc-petroleo);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: 0.14s;
+}
+
+.mapa-painel-ver-ocorrencias:hover {
+  background: var(--mc-petroleo);
+  color: #fff;
+}
+
 .mapa-painel-titulo {
   font-size: 12px;
   font-weight: 700;
@@ -788,6 +824,49 @@
   font-size: 16px;
 }
 
+.plan-resumo-rota {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.plan-resumo-rota-trecho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+.plan-resumo-rota-trecho strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.plan-editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--mc-borda-campo);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .plan-formulario {
   padding: 16px 18px 18px;
   display: flex;
@@ -806,7 +885,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -839,7 +918,9 @@
   flex: 1;
   min-width: 0;
   padding: 11px 12px;
-  border: 1px solid var(--border-2);
+  /* --border-2 (#f2efe9) dá 1,15:1 contra o branco: o campo "flutuava".
+     Borda de campo precisa de 3:1 (WCAG 1.4.11). */
+  border: 1px solid var(--mc-borda-campo);
   border-radius: var(--radius-sm, 10px);
   background: #fff;
   font-size: 14px;
@@ -852,6 +933,19 @@
   /* Só a cor da borda era um indicador de foco fraco pra quem navega
      por teclado — reforça com o mesmo anel usado nos campos de auth. */
   box-shadow: var(--mc-foco);
+}
+
+/* O anel suave (--mc-foco, 14% de alfa) sozinho é quase imperceptível; o
+   contorno sólido é o indicador de foco de verdade (WCAG 2.4.7 / 2.4.13). */
+.plan-input:focus-visible {
+  outline: 2px solid var(--primary-700);
+  outline-offset: 1px;
+}
+
+.plan-painel button:focus-visible,
+.plan-painel a:focus-visible {
+  outline: 2px solid var(--primary-700);
+  outline-offset: 2px;
 }
 
 .plan-campo.escolhendo .plan-input {
@@ -898,20 +992,23 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px;
-  border: 1px solid var(--border-2);
+  /* Era 28px de altura a 12px de fonte (alvo e texto pequenos demais). */
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--mc-borda-campo);
   border-radius: 999px;
   background: #fff;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   transition: 0.14s;
 }
 
 .plan-atalho:hover:not(:disabled),
 .plan-atalho.ativo {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--primary-700);
+  /* Texto de 12px: --primary (#2ba69b) sobre branco dá 2,99:1. */
+  color: var(--primary-700);
 }
 
 .plan-atalho:disabled {
@@ -935,8 +1032,8 @@
 }
 
 .plan-inverter:hover:not(:disabled) {
-  color: var(--primary);
-  border-color: var(--primary);
+  color: var(--primary-700);
+  border-color: var(--primary-700);
 }
 
 .plan-inverter:disabled {
@@ -961,19 +1058,23 @@
   overflow: auto;
 }
 
-.plan-sugestoes button {
+.plan-sugestoes li {
   display: block;
-  width: 100%;
-  text-align: left;
+  min-height: 44px;
   padding: 8px 10px;
-  border: none;
-  background: transparent;
   border-radius: 8px;
   cursor: pointer;
 }
 
-.plan-sugestoes button:hover {
+.plan-sugestoes li:hover,
+.plan-sugestoes li.ativa {
   background: var(--bg-soft);
+}
+
+/* Opção ativa pelas setas do teclado: só a cor de fundo não basta. */
+.plan-sugestoes li.ativa {
+  outline: 2px solid var(--primary-700);
+  outline-offset: -2px;
 }
 
 .plan-sugestoes strong {
@@ -998,7 +1099,8 @@
   padding: 12px 16px;
   border: none;
   border-radius: var(--radius-sm, 10px);
-  background: var(--primary);
+  /* Era --primary (#2ba69b): branco sobre ele dá 2,99:1, abaixo dos 4,5:1. */
+  background: var(--primary-700);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -1020,8 +1122,9 @@
 }
 
 .plan-erro {
-  background: var(--amber-bg);
-  color: var(--amber);
+  /* Era âmbar sobre âmbar-claro (2,6:1) — e erro com a cor de "alerta". */
+  background: var(--mc-erro-fundo);
+  color: var(--mc-erro-texto);
 }
 
 .plan-vazio {
@@ -1035,7 +1138,7 @@
 }
 
 .plan-resultados-titulo {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1052,48 +1155,62 @@
   gap: 8px;
 }
 
-.plan-opcao {
-  width: 100%;
-  text-align: left;
-  /* Era 12px 14px — card ficava com pouco respiro, texto parecia mais
-     espremido do que já é (achado de uso real: "letras muito pequenas,
-     nada bem distribuído"). */
-  padding: 14px 16px;
-  border: 1px solid var(--border-2);
+.plan-opcao-card {
+  /* O cartão é o <li>; o <button> dentro dele só carrega o resumo. A borda
+     usa --mc-borda-3: com o --border-2 (#f2efe9, 1,15:1) o cartão "flutuava"
+     sobre o painel branco. */
+  border: 1px solid var(--mc-borda-3);
   border-radius: var(--radius-sm, 10px);
   background: #fff;
-  cursor: pointer;
-  transition: 0.14s;
+  transition: border-color 0.14s;
 }
 
-.plan-opcao:hover {
-  border-color: var(--primary);
+.plan-opcao-card:hover {
+  border-color: var(--primary-700);
 }
 
-.plan-opcao.selecionada {
-  border-color: var(--primary);
+.plan-opcao-card.selecionada {
+  border-color: var(--primary-700);
   background: var(--bg-soft);
+  /* Sobre o fundo areia-clara o --muted dá 4,33:1; --text-2 dá 5,2:1. */
+  --muted: var(--text-2);
+}
+
+.plan-opcao {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 .plan-opcao-resumo {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
+}
+
+.plan-opcao-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .plan-opcao-linhas {
   display: flex;
   align-items: center;
-  gap: 4px;
-  /* Itinerário com várias pernas (muitos badges + ícone de troca entre
-     eles) podia ultrapassar a largura do painel sem ter pra onde
-     quebrar. */
   flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
-.plan-opcao-linhas > span {
+.plan-opcao-linha-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1103,148 +1220,450 @@
   color: var(--muted);
 }
 
+/* A duração é o dado que decide a escolha: maior texto do cartão, no alto
+   à direita. Era 15px contra 13px das métricas (diferença de 2px), e o "~"
+   só fazia ruído — o selo ao lado já diz se é ao vivo ou estimado. */
+.plan-opcao-duracao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.plan-opcao-duracao strong {
+  font-family: var(--mc-fonte-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+  white-space: nowrap;
+}
+
 .plan-badge-linha {
   display: inline-block;
-  padding: 4px 9px;
+  padding: 4px 9px 4px 7px;
   border-radius: 6px;
-  background: var(--accent, #1aa0ad);
+  /* Era --accent (mint #4fd6c7): branco sobre ele dá 1,78:1 — o número da
+     linha, a informação mais importante do card, era o mais ilegível. O
+     fundo fica escuro (14,8:1) e a COR DA LINHA, a mesma do traçado no
+     mapa, vai na barra lateral. */
+  background: var(--mc-petroleo);
+  border-left: 6px solid var(--cor-linha, transparent);
   color: #fff;
-  /* Era 12px — pequeno demais pro número da linha, a informação mais
-     importante do card. */
   font-size: 13px;
   font-weight: 700;
   font-style: normal;
 }
 
-.plan-opcao-metricas {
+.plan-opcao-chips {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Era 12px. */
-  font-size: 13px;
-  color: var(--muted);
-  /* .plan-opcao-resumo distribui os dois grupos com space-between, mas
-     quando .plan-opcao-linhas é longo o bastante pra empurrar este grupo
-     pra uma segunda linha, ele fica sozinho nela — e space-between, com
-     um item só por linha, alinha à esquerda, não à direita. margin-left
-     auto garante a direita nos dois casos (quebrando ou não). */
-  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.plan-opcao-metricas strong {
-  color: var(--text);
-  /* Era 13.5px — a duração é o dado que mais importa pra escolher entre
-     as opções, merece ser o maior texto do card. */
-  font-size: 15px;
-}
-
-.plan-opcao-metricas span {
+.plan-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--mc-borda-3);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.plan-chip-detalhe {
+  color: var(--text-2);
+  opacity: 0.85;
+}
+
+.plan-chip.destaque {
+  border-color: transparent;
+  background: var(--mc-sucesso-fundo);
+  color: var(--mc-sucesso-texto);
+  font-weight: 700;
 }
 
 /* US #159 — selo que diferencia ETA real (medido a partir de um ônibus
    ao vivo) da duração estimada por velocidade média de sempre. */
 .plan-opcao-selo-ao-vivo,
 .plan-opcao-selo-estimado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 2px 8px;
   border-radius: 999px;
-  /* Era 10.5px. */
-  font-size: 11.5px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .plan-opcao-selo-ao-vivo {
-  background: rgba(26, 160, 90, 0.12);
-  color: #1aa05a;
+  /* Era #1aa05a sobre tinta verde: 2,96:1 em texto pequeno. */
+  background: var(--mc-sucesso-fundo);
+  color: var(--mc-sucesso-texto);
 }
 
 .plan-opcao-selo-estimado {
   background: var(--surface-muted, rgba(0, 0, 0, 0.06));
-  color: var(--muted);
+  color: var(--text-2);
 }
 
-.plan-passos {
+/* ===== Detalhe da opção como linha do tempo (card #179) ===== */
+.plan-opcao-detalhe {
+  padding: 0 16px 6px;
+}
+
+.plan-tempo {
   list-style: none;
-  margin: 12px 0 0;
-  padding: 12px 0 0;
-  border-top: 1px dashed var(--border-2);
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px dashed var(--mc-borda-3);
+}
+
+.plan-tempo-passo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 12px;
+  padding-bottom: 14px;
+}
+
+.plan-tempo-passo:last-child {
+  padding-bottom: 6px;
+}
+
+/* Trilho que liga um marcador ao seguinte; pontilhado quando é caminhada. */
+.plan-tempo-passo::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--mc-borda-3);
+}
+
+.plan-tempo-passo.caminhar::before {
+  width: 0;
+  background: none;
+  border-left: 2px dotted var(--mc-borda-campo);
+}
+
+.plan-tempo-passo:last-child::before {
+  display: none;
+}
+
+.plan-tempo-marcador {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--mc-borda-campo);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Mesmas cores dos marcadores do mapa: o passo "1" aqui é o "1" lá. */
+.plan-tempo-passo.embarcar .plan-tempo-marcador {
+  border-color: var(--mc-embarque);
+  background: var(--mc-embarque);
+  color: #fff;
+}
+
+.plan-tempo-passo.descer .plan-tempo-marcador {
+  border-color: #1a2b33;
+  background: #1a2b33;
+  color: #fff;
+}
+
+.plan-tempo-passo.baldear .plan-tempo-marcador {
+  border-color: var(--mc-embarque);
+  color: var(--mc-embarque);
+}
+
+.plan-tempo-corpo {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 3px;
 }
 
-.plan-passo-linha {
+.plan-tempo-corpo p {
+  margin: 0;
+}
+
+.plan-tempo-titulo {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.plan-tempo-titulo strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.plan-tempo-metros {
+  color: var(--text-2);
+}
+
+.plan-tempo-linha {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-2);
 }
 
-.plan-passo-nome {
-  /* Eram 11.5-12.5px em toda esta seção — pequeno demais pro detalhe de
-     embarque/desembarque, que é o texto que a pessoa precisa ler com
-     mais atenção (onde entrar e onde sair do ônibus). */
-  font-size: 13.5px;
-  color: var(--text-2);
+.plan-tempo-nome {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.plan-passo-detalhe {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13.5px;
+.plan-tempo-detalhe {
+  font-size: 13px;
   color: var(--text-2);
-  padding-left: 4px;
 }
 
-.plan-passo-detalhe strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.plan-passo-detalhe em {
-  font-style: normal;
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.plan-passo-meio {
+/* "Chega em X min": a informação acionável do embarque. Era uma linha de
+   12,5px acima do texto, com a mesma cara de todo o resto. */
+.plan-chegada {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12.5px;
-  padding: 2px 0;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--mc-borda-3);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13.5px;
 }
 
-/* Ônibus ao vivo dentro de um passo do itinerário (US #16 + #20) */
-.plan-passo-aovivo {
+.plan-chegada.ao-vivo {
+  border-color: transparent;
+  background: var(--mc-sucesso-fundo);
+  color: var(--mc-sucesso-texto);
+}
+
+.plan-chegada.ao-vivo strong {
+  font-size: 15px;
+}
+
+.plan-chegada.sem-onibus {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ===== Estados do resultado: carregando, vazio, erro (card #179) ===== */
+.plan-esqueletos {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px 4px;
-  font-size: 12.5px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--border-2);
+}
+
+.plan-esqueleto {
+  height: 84px;
+  border-radius: var(--radius-sm, 10px);
+  background: linear-gradient(
+    90deg,
+    var(--mc-superficie-2) 25%,
+    #fff 50%,
+    var(--mc-superficie-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: plan-brilho 1.2s linear infinite;
+}
+
+@keyframes plan-brilho {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-esqueleto {
+    animation: none;
+  }
+}
+
+.plan-erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-erro p,
+.plan-vazio p {
+  margin: 0;
+}
+
+.plan-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-vazio-dica {
   color: var(--text-2);
 }
 
-.plan-passo-aovivo strong {
+.plan-acao-erro,
+.plan-acao-secundaria {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-acao-secundaria {
+  color: var(--primary-700);
+}
+
+/* ===== Botão de favorito do resultado (US #25) =====
+   Estas regras viviam em favoritos/favoritos.css, que o Next só carrega na
+   rota /favoritos: no /mapa o botão renderizava como botão padrão do
+   navegador (cinza, borda outset, ~22px de altura). Moradia certa: junto do
+   componente que as usa. */
+.plan-favorito-area {
+  padding: 8px 16px 14px;
+}
+
+.plan-favorito-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid var(--mc-borda-campo);
+  border-radius: var(--pill);
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.14s;
+}
+
+.plan-favorito-btn:hover:not(:disabled),
+.plan-favorito-btn.salvo {
+  border-color: var(--mc-alerta-texto);
+  background: var(--amber-bg);
+  color: var(--mc-alerta-texto);
+}
+
+.plan-favorito-btn.salvo {
+  cursor: default;
+}
+
+.plan-favorito-btn:disabled {
+  opacity: 0.7;
+}
+
+/* "Salva nos favoritos" também é desabilitado, mas é informação — não pode
+   ficar esmaecido. */
+.plan-favorito-btn.salvo:disabled {
+  opacity: 1;
+}
+
+.plan-favorito-erro {
+  margin: 8px 0 0;
+}
+
+/* Selo da origem de um número de tempo (RN-10). Neutro por padrão; só o
+   "ao vivo" ganha o verde — é o único que promete dado em tempo real. */
+.selo-fonte {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid var(--mc-borda-3);
+  border-radius: 999px;
+  /* Branco sólido: com a tinta translúcida o contraste dependia do fundo
+     (5,1:1 no cartão branco, 4,54:1 no selecionado). Assim são 5,8:1. */
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selo-fonte.ao-vivo {
+  color: var(--mc-sucesso-texto);
+}
+
+.mapa-chegadas {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapa-chegada {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mapa-chegada-texto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+.mapa-chegada-texto strong {
   color: var(--text);
 }
 
-.plan-passo-sem-onibus {
-  color: var(--muted);
+.mapa-chegada-sem-dado {
   font-style: italic;
+}
+
+.mapa-painel-dica {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
 }
 
 .plan-ressalva {
   margin: 12px 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--muted);
   line-height: 1.5;
 }
@@ -1329,9 +1748,39 @@
     transition: height 0.5s cubic-bezier(0.3, 1, 0.35, 1);
   }
 
+  /* Card #179 — com o resultado na tela, o formulário recolhe numa linha
+     "Origem → Destino [Editar]" e a folha cai pra ~48%: antes ela seguia
+     com 62vh, formulário inteiro, e a rota ficava numa faixa de ~220px. */
+  .plan-painel.com-resultado {
+    height: 48vh;
+  }
+
+  .plan-painel.com-resultado.editando {
+    height: 62vh;
+  }
+
+  .plan-painel.com-resultado:not(.editando) .plan-formulario {
+    display: none;
+  }
+
+  .plan-painel.com-resultado .plan-resumo-rota {
+    display: flex;
+  }
+
+  /* O botão central "+" avança sobre o fim da folha: sem esta folga, o
+     último cartão ficava escondido atrás dele. */
+  .plan-resultados {
+    padding-bottom: 44px;
+  }
+
+  .plan-atalho {
+    min-height: 44px;
+  }
+
   /* Recolhida: sobra a faixa da alça e do cabeçalho, para ver o trajeto
      no mapa e puxar de volta quando for escolher. */
-  .plan-painel.recolhida {
+  .plan-painel.recolhida,
+  .plan-painel.com-resultado.recolhida {
     height: 96px;
   }
 

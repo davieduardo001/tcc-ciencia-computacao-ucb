@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -28,7 +29,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
-from mobilidade.semob_source import URL_POSICAO
+from mobilidade.semob_source import URL_POSICAO, _distancia_metros
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,34 @@ IDADE_MAXIMA_MINUTOS = 15.0
 # ~25 s pro mesmo payload. Como a renovação roda em segundo plano, um
 # timeout generoso não prejudica ninguém — só desiste do que travou.
 TIMEOUT_SEGUNDOS = 25.0
+
+# ---------------------------------------------------------------------------
+# Velocidade efetivamente percorrida (card #179, ⑤b / D3b).
+#
+# O feed traz a velocidade do INSTANTE. Dividir a distância restante por
+# ela oscila muito — 60 km/h numa avenida livre, 5 km/h no semáforo — e
+# faz o ETA sumir (< 3 km/h) justo quando o ônibus está só parado num
+# ponto. Quanto o ônibus REALMENTE andou nos últimos minutos, parada e
+# trânsito inclusos, é um preditor melhor do que ele ainda vai levar.
+#
+# O histórico fica em memória do processo, com janela curta, e NUNCA é
+# persistido: é um cache como o do feed (ADR-04). Processo recém-iniciado
+# (o Fly escala a zero) não tem histórico — e então o ETA cai de volta pra
+# velocidade instantânea, sem nada quebrar.
+# ---------------------------------------------------------------------------
+
+# Quanto do passado entra na média, e quanto de dado é o mínimo pra ela
+# valer: com menos que isso, ela só repetiria o ruído do instante.
+JANELA_MEDIA_S = 300.0
+JANELA_MINIMA_S = 90.0
+LEITURAS_MINIMAS_MEDIA = 3
+
+# Quanto histórico guardar por veículo (além disso, é memória à toa).
+HISTORICO_MAXIMO_S = 600.0
+LEITURAS_MAXIMAS = 40
+
+# Teto de sanidade: deslocamento de GPS com salto não vira "130 km/h".
+VELOCIDADE_MEDIA_MAXIMA_KMH = 90.0
 
 _FORMATO_DATA_SEMOB = "%Y-%m-%d %H:%M:%S"
 
@@ -90,6 +119,10 @@ class PosicaoVeiculo:
     direcao: float | None
     atualizado_em: datetime
     operadora: str
+    # Velocidade média realmente percorrida nos últimos minutos (km/h), a
+    # partir do histórico em memória. `None` quando ainda não há histórico
+    # suficiente — quem usa cai para `velocidade`. Ver JANELA_MEDIA_S.
+    velocidade_media_kmh: float | None = None
 
 
 class PosicaoService:
@@ -110,6 +143,9 @@ class PosicaoService:
         # garbage collector pode cancelá-la no meio, e sem a checagem
         # dez usuários simultâneos disparariam dez downloads iguais.
         self._renovando: asyncio.Task | None = None
+        # prefixo → leituras recentes (instante, lat, lng), da mais antiga
+        # para a mais nova. Só veículos com linha atribuída.
+        self._historico: dict[str, deque[tuple[datetime, float, float]]] = {}
 
     async def posicoes_da_linha(self, numero_linha: str) -> list[PosicaoVeiculo]:
         """
@@ -168,9 +204,10 @@ class PosicaoService:
                     continue
 
                 lng, lat = coordenadas[0], coordenadas[1]
+                prefixo = (veiculo.get("prefixo") or "").strip()
                 posicoes[numero].append(
                     PosicaoVeiculo(
-                        prefixo=(veiculo.get("prefixo") or "").strip(),
+                        prefixo=prefixo,
                         lat=lat,
                         lng=lng,
                         sentido=(veiculo.get("sentido") or None),
@@ -178,10 +215,77 @@ class PosicaoService:
                         direcao=_converter_numero(propriedades.get("direcao")),
                         atualizado_em=registrado_em,
                         operadora=nome_operadora,
+                        velocidade_media_kmh=self._velocidade_media_kmh(prefixo, registrado_em),
                     )
                 )
 
         return posicoes
+
+    def _registrar_historico(self, feed: list[dict]) -> None:
+        """
+        Guarda, por veículo com linha atribuída, a posição de cada leitura
+        nova do feed. Chamado a cada download — o histórico cresce com o
+        tempo de vida do processo, e a janela curta o mantém pequeno.
+        """
+        agora = datetime.now(timezone.utc)
+        limite = agora - timedelta(seconds=HISTORICO_MAXIMO_S)
+
+        for operadora in feed:
+            for feature in operadora.get("features", []):
+                propriedades = feature.get("properties", {})
+                veiculo = propriedades.get("veiculo") or {}
+
+                prefixo = (veiculo.get("prefixo") or "").strip()
+                if not prefixo or not (veiculo.get("numero") or "").strip():
+                    continue  # frota parada, sem viagem atribuída
+
+                coordenadas = (feature.get("geometry") or {}).get("coordinates")
+                if not coordenadas or len(coordenadas) < 2:
+                    continue
+
+                registrado_em = _converter_data(propriedades.get("datalocal"))
+                if registrado_em is None or registrado_em < limite:
+                    continue
+
+                fila = self._historico.get(prefixo)
+                if fila is None:
+                    fila = self._historico[prefixo] = deque(maxlen=LEITURAS_MAXIMAS)
+                # A mesma leitura reaparece enquanto o veículo não reporta
+                # de novo; só entra o que é mais novo que o último.
+                if fila and fila[-1][0] >= registrado_em:
+                    continue
+                fila.append((registrado_em, coordenadas[1], coordenadas[0]))
+
+        # Poda quem parou de reportar (garagem, fim de turno).
+        for prefixo in [p for p, fila in self._historico.items() if not fila or fila[-1][0] < limite]:
+            del self._historico[prefixo]
+
+    def _velocidade_media_kmh(self, prefixo: str, ate: datetime) -> float | None:
+        """
+        Média do que o veículo percorreu nos últimos JANELA_MEDIA_S, somando
+        o deslocamento entre leituras consecutivas — então parada e
+        semáforo entram na conta, ao contrário da velocidade instantânea.
+
+        `None` com histórico insuficiente (poucas leituras, ou menos de
+        JANELA_MINIMA_S de intervalo entre a primeira e a última).
+        """
+        fila = self._historico.get(prefixo)
+        if not fila:
+            return None
+
+        desde = ate - timedelta(seconds=JANELA_MEDIA_S)
+        leituras = [leitura for leitura in fila if desde <= leitura[0] <= ate]
+        if len(leituras) < LEITURAS_MINIMAS_MEDIA:
+            return None
+
+        duracao_s = (leituras[-1][0] - leituras[0][0]).total_seconds()
+        if duracao_s < JANELA_MINIMA_S:
+            return None
+
+        metros = sum(
+            _distancia_metros(a[1], a[2], b[1], b[2]) for a, b in zip(leituras, leituras[1:])
+        )
+        return min(metros / duracao_s * 3.6, VELOCIDADE_MEDIA_MAXIMA_KMH)
 
     async def _obter_feed(self) -> list[dict]:
         """
@@ -235,6 +339,10 @@ class PosicaoService:
 
         self._feed = feed
         self._baixado_em = time.monotonic()
+        try:
+            self._registrar_historico(feed)
+        except Exception:  # noqa: BLE001 — o histórico é um extra; nunca derruba o feed
+            logger.warning("Falha ao registrar o histórico de posições", exc_info=True)
         return feed
 
 

@@ -1,11 +1,18 @@
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from mobilidade.eta_service import eta_minutos_veiculo, estimar_viagem, proximo_horario_previsto
+from mobilidade.chegada_service import chegadas_da_parada, paradas_proximas_do_usuario
+from mobilidade.eta_service import (
+    eta_ate_indice,
+    eta_minutos_veiculo,
+    estimar_viagem,
+    proximo_horario_previsto,
+)
 from mobilidade.geocode_service import GeocodeService
 from mobilidade.geometria import TrajetoMedido
 from mobilidade.linha_service import LinhaService
@@ -19,6 +26,8 @@ from mobilidade.rota_service import RotaService
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.schemas import (
+    ChegadaResponse,
+    ChegadasParadaResponse,
     LinhaResponse,
     LinhaResumoResponse,
     LugarResponse,
@@ -241,6 +250,34 @@ def obter_parada(lat: float, lng: float, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/paradas/{codigo}/chegadas", response_model=ChegadasParadaResponse)
+async def chegadas_na_parada(codigo: str, db: Session = Depends(get_db)):
+    """
+    Card #179 (⑤b) — Quando o ônibus chega NESTA parada.
+
+    Uma entrada por linha que passa aqui, as mais próximas primeiro. Cada
+    uma diz de onde vem o número (`fonte`): `ao_vivo` (posição real do
+    ônibus até a parada, no sentido dela), `previsto` (saída + tempo de
+    percurso, quando não há ônibus a caminho) ou `None` (sem dado — não
+    inventa). Não confundir com os "próximos horários" de `GET /paradas`,
+    que são saídas do TERMINAL.
+
+    404 quando o código não é de uma parada física conhecida.
+    """
+    agora = datetime.now(timezone.utc)
+    resultado = await chegadas_da_parada(db, codigo, _posicao_service, _rota_service, agora)
+
+    if resultado is None:
+        raise HTTPException(status_code=404, detail="Parada não encontrada.")
+
+    return ChegadasParadaResponse(
+        parada_codigo=resultado.parada.codigo,
+        parada_nome=resultado.parada.nome or "Parada sem nome cadastrado",
+        calculado_em=agora.isoformat(),
+        chegadas=[ChegadaResponse(**asdict(c)) for c in resultado.chegadas],
+    )
+
+
 @router.get("/linhas/{numero_linha}", response_model=LinhaResponse)
 async def buscar_linha(numero_linha: str, db: Session = Depends(get_db)):
     """
@@ -293,43 +330,84 @@ async def posicoes_da_linha(
     veiculos = await _posicao_service.posicoes_da_linha(numero_linha)
     tem_localizacao_usuario = lat is not None and lng is not None
 
-    # US #19 — quando dá para resolver a geometria da linha, o ETA é
-    # medido ao longo do trajeto real (e descarta veículo de sentido
-    # errado ou que já passou), não em linha reta. Sem rota ingerida
-    # para esta linha, `eta_minutos_veiculo` cai sozinho para a
-    # estimativa em linha reta original.
+    agora = datetime.now(timezone.utc)
+
+    # Card #179 (⑤b) — o alvo do ETA é a PARADA do usuário (a mais próxima
+    # dele, no sentido de cada ônibus), e não o ponto do GPS: quem espera,
+    # espera na parada. O sentido vem do vínculo parada↔rota, e não do
+    # sentido "principal" da linha — que fazia quem esperava no lado da
+    # VOLTA ver ônibus da IDA.
+    alvos = (
+        paradas_proximas_do_usuario(db, numero_linha, lat, lng)
+        if tem_localizacao_usuario
+        else {}
+    )
+
+    # Sem parada ingerida por perto, vale o que já existia (US #19): projetar
+    # o GPS no traçado da linha. A diferença é que agora o fallback em linha
+    # reta saiu do caminho do usuário (D4) — ela ignora direção e não sabe se
+    # o ônibus já passou, então não é número que se mostre como ETA.
     trajeto_sentido = (
-        _rota_service.trajeto_medido(db, numero_linha) if tem_localizacao_usuario else None
+        _rota_service.trajeto_medido(db, numero_linha)
+        if tem_localizacao_usuario and not alvos
+        else None
     )
     trajeto = trajeto_sentido[0] if trajeto_sentido else None
     sentido_resolvido = trajeto_sentido[1] if trajeto_sentido else None
-    agora = datetime.now(timezone.utc)
 
-    resposta_veiculos = [
-        PosicaoVeiculoResponse(
-            prefixo=v.prefixo,
-            lat=v.lat,
-            lng=v.lng,
-            sentido=v.sentido,
-            velocidade=v.velocidade,
-            direcao=v.direcao,
-            atualizado_em=v.atualizado_em.isoformat(),
-            operadora=v.operadora,
-            eta_minutos=(
-                eta_minutos_veiculo(
-                    v,
-                    lat_alvo=lat,
-                    lng_alvo=lng,
-                    agora=agora,
-                    trajeto=trajeto,
-                    sentido_alvo=sentido_resolvido,
-                )
-                if tem_localizacao_usuario
-                else None
+    def eta_e_parada(v):
+        if not tem_localizacao_usuario:
+            return None, None
+
+        if alvos:
+            sentido_do_veiculo = (v.sentido or "").strip().upper()
+            # Linha circular: o veículo nunca reporta "CIRCULAR" (ver
+            # `_eta_por_trajeto`), então vale a única parada que existe.
+            chave = (
+                sentido_do_veiculo
+                if sentido_do_veiculo in alvos
+                else ("CIRCULAR" if "CIRCULAR" in alvos else None)
+            )
+            if chave is None:
+                return None, None
+            parada, vinculo = alvos[chave]
+            medido = _rota_service.trajeto_medido(db, numero_linha, chave)
+            if medido is None:
+                return None, None
+            eta = eta_ate_indice(v, medido[0], vinculo.indice_trajeto, chave, agora)
+            return eta, (parada if eta is not None else None)
+
+        return (
+            eta_minutos_veiculo(
+                v,
+                lat_alvo=lat,
+                lng_alvo=lng,
+                agora=agora,
+                trajeto=trajeto,
+                sentido_alvo=sentido_resolvido,
+                permitir_linha_reta=False,
             ),
+            None,
         )
-        for v in veiculos
-    ]
+
+    resposta_veiculos = []
+    for v in veiculos:
+        eta, parada_do_eta = eta_e_parada(v)
+        resposta_veiculos.append(
+            PosicaoVeiculoResponse(
+                prefixo=v.prefixo,
+                lat=v.lat,
+                lng=v.lng,
+                sentido=v.sentido,
+                velocidade=v.velocidade,
+                direcao=v.direcao,
+                atualizado_em=v.atualizado_em.isoformat(),
+                operadora=v.operadora,
+                eta_minutos=eta,
+                parada_codigo=parada_do_eta.codigo if parada_do_eta else None,
+                parada_nome=(parada_do_eta.nome or None) if parada_do_eta else None,
+            )
+        )
 
     horario_previsto = None
     if tem_localizacao_usuario and not resposta_veiculos:

@@ -31,6 +31,10 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 
 const DEBOUNCE_SUGESTOES_MS = 250;
 
+/** Rótulo de um ponto escolhido no mapa/por link cujo nome ainda não existe
+ *  (ou nunca vai existir, se a geocodificação reversa falhar). */
+const ROTULO_PONTO_NO_MAPA = "Ponto no mapa";
+
 /** Converte um query param em coordenada; `null` se não for número finito. */
 function lerCoordenada(valor: string | null): number | null {
   if (valor === null || valor.trim() === "") return null;
@@ -80,7 +84,6 @@ function MapaConteudo() {
   const [escolhendoNoMapa, setEscolhendoNoMapa] = useState<Extremo | null>(null);
   const [localizacao, setLocalizacao] = useState<Coordenadas | null>(null);
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
-  const [focarBusca, setFocarBusca] = useState(0);
 
   // US #25 — favoritas do usuário: alimentam a estrela do planejador e o
   // bloco "Minhas rotas" da tela principal.
@@ -92,9 +95,10 @@ function MapaConteudo() {
   // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
   const [rotaPendente, setRotaPendente] = useState(false);
 
-  // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
-  // página, só que com o painel certo já aberto — as duas
-  // funcionalidades vivem no mapa, não em páginas separadas.
+  // `?painel=rotas` abre o planejador. Não há mais item de menu para isso
+  // (o planejador abre pelo botão "Para onde você vai?"), mas o endereço
+  // continua sendo o contrato dos Favoritos: "Ir" numa rota salva leva pra
+  // cá com origem/destino já preenchidos.
   const searchParams = useSearchParams();
   const painel = searchParams.get("painel");
   // US #25 — query params injetados pelo clique em favorito.
@@ -108,11 +112,6 @@ function MapaConteudo() {
   useEffect(() => {
     if (painel === "rotas") {
       setPlanejadorAberto(true);
-    } else if (painel === "linhas") {
-      setPlanejadorAberto(false);
-      // Nonce em vez de booleano: clicar em "Linhas de Ônibus" duas
-      // vezes seguidas tem que focar o campo nas duas.
-      setFocarBusca((n) => n + 1);
     }
   }, [painel]);
 
@@ -133,12 +132,12 @@ function MapaConteudo() {
       return;
     }
     setOrigem({
-      nome: origemNomeParam ?? `${origemLat.toFixed(4)}, ${origemLng.toFixed(4)}`,
+      nome: origemNomeParam ?? ROTULO_PONTO_NO_MAPA,
       lat: origemLat,
       lng: origemLng,
     });
     setDestino({
-      nome: destinoNomeParam ?? `${destinoLat.toFixed(4)}, ${destinoLng.toFixed(4)}`,
+      nome: destinoNomeParam ?? ROTULO_PONTO_NO_MAPA,
       lat: destinoLat,
       lng: destinoLng,
     });
@@ -275,11 +274,9 @@ function MapaConteudo() {
       if (!extremo) return;
 
       setEscolhendoNoMapa(null);
-      definirPonto(extremo, {
-        nome: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-        lat,
-        lng,
-      });
+      // Nome provisório humano, e não "-15.8131, -48.0123": se o Nominatim
+      // não responder, é isso que fica no campo.
+      definirPonto(extremo, { nome: ROTULO_PONTO_NO_MAPA, lat, lng });
 
       const lugar = await nomearLugar(lat, lng);
       if (lugar) {
@@ -385,7 +382,6 @@ function MapaConteudo() {
       onDigitarBuscaLinha={handleDigitarBuscaLinha}
       sugestoesLinha={sugestoesLinha}
       onSelecionarSugestaoLinha={handleSelecionarSugestaoLinha}
-      focarBusca={focarBusca}
     >
       <MapaInterativo
         linha={linha}

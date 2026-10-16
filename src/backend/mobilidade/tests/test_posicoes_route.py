@@ -60,8 +60,12 @@ def test_sem_lat_lng_nao_calcula_eta():
     assert data["proximo_horario_previsto"] is None
 
 
-def test_com_lat_lng_calcula_eta_do_veiculo_em_movimento():
-    # Cenário 1/4 da US #19.
+def test_sem_rota_ingerida_nao_ha_eta_em_linha_reta():
+    # Card #179, D4: antes, sem rota ingerida a pílula caía numa distância
+    # em linha reta ÷ velocidade. Ela ignora direção e não sabe se o ônibus
+    # já passou — um número que parecia firme e não era. Sem trajeto, a
+    # pílula fica só com o número da linha, em vez de um tempo inventado.
+    # (Com rota ingerida o ETA existe: ver os testes de rota_ingerida abaixo.)
     with _mockar_posicoes([_veiculo(30.0)]):
         response = client.get(
             f"/mobilidade/linhas/{NUMERO_LINHA}/posicoes",
@@ -69,8 +73,7 @@ def test_com_lat_lng_calcula_eta_do_veiculo_em_movimento():
         )
 
     assert response.status_code == 200
-    eta = response.json()["veiculos"][0]["eta_minutos"]
-    assert eta is not None and eta > 0
+    assert response.json()["veiculos"][0]["eta_minutos"] is None
 
 
 def test_veiculo_parado_fica_sem_eta():

@@ -147,6 +147,30 @@ def _horario_valido(horario: str) -> bool:
         return False
 
 
+def velocidade_para_eta(veiculo: PosicaoVeiculo) -> float | None:
+    """
+    Velocidade (km/h) que o ETA deve usar para este veículo, ou `None` se
+    ele não está andando.
+
+    Prefere a velocidade MÉDIA percorrida nos últimos minutos (card #179,
+    D3b): ela já embute parada em ponto e semáforo, e não faz o ETA piscar
+    entre 60 e 5 km/h a cada leitura. Sem histórico suficiente (processo
+    recém-iniciado), usa a velocidade do instante, como sempre.
+
+    Média abaixo de VELOCIDADE_MINIMA_KMH = ônibus que ficou parado na
+    janela inteira (preso, em garagem, em fim de linha): sem ETA, em vez
+    de um número de quem não está a caminho.
+    """
+    media = veiculo.velocidade_media_kmh
+    if media is not None:
+        return media if media >= VELOCIDADE_MINIMA_KMH else None
+
+    instantanea = veiculo.velocidade
+    if instantanea is None or instantanea < VELOCIDADE_MINIMA_KMH:
+        return None
+    return instantanea
+
+
 def eta_minutos_veiculo(
     veiculo: PosicaoVeiculo,
     *,
@@ -155,6 +179,7 @@ def eta_minutos_veiculo(
     agora: datetime,
     trajeto: TrajetoMedido | None = None,
     sentido_alvo: str | None = None,
+    permitir_linha_reta: bool = True,
 ) -> float | None:
     """
     Ponto de entrada único do motor de ETA (US #19), usado tanto pela
@@ -167,11 +192,20 @@ def eta_minutos_veiculo(
     — só acontece se a linha ainda não tiver rota ingerida — cai para a
     estimativa em linha reta original, que é o que a US #19 já tinha
     antes desta entrega.
+
+    `permitir_linha_reta=False` (card #179, D4) corta esse fallback: a
+    linha reta ignora direção e não sabe se o ônibus já passou, então ela
+    não é um número que se mostre como ETA a quem espera. Quem é voltado
+    ao usuário passa False; os alertas (#27/#172), que ainda dependem do
+    comportamento antigo, seguem com o padrão.
     """
     if trajeto is not None:
         indice_alvo = trajeto.indice_mais_proximo((lat_alvo, lng_alvo), TOLERANCIA_TRAJETO_M)
         if indice_alvo is not None:
             return _eta_por_trajeto(veiculo, trajeto, indice_alvo, sentido_alvo, agora)
+
+    if not permitir_linha_reta:
+        return None
 
     return calcular_eta_minutos(
         lat_veiculo=veiculo.lat,
@@ -182,6 +216,23 @@ def eta_minutos_veiculo(
     )
 
 
+def eta_ate_indice(
+    veiculo: PosicaoVeiculo,
+    trajeto: TrajetoMedido,
+    indice_alvo: int,
+    sentido_alvo: str | None,
+    agora: datetime,
+) -> float | None:
+    """
+    ETA até um ponto JÁ localizado no trajeto (`indice_alvo`) — é o que se
+    tem quando o alvo é uma parada física, cujo `indice_trajeto` foi
+    calculado na ingestão (`RotaParada`). Evita reprojetar uma coordenada
+    a cada requisição e dispensa a tolerância de 150 m, que existe pra
+    alvos "soltos" como o GPS do usuário.
+    """
+    return _eta_por_trajeto(veiculo, trajeto, indice_alvo, sentido_alvo, agora)
+
+
 def _eta_por_trajeto(
     veiculo: PosicaoVeiculo,
     trajeto: TrajetoMedido,
@@ -189,7 +240,8 @@ def _eta_por_trajeto(
     sentido_alvo: str | None,
     agora: datetime,
 ) -> float | None:
-    if veiculo.velocidade is None or veiculo.velocidade < VELOCIDADE_MINIMA_KMH:
+    velocidade = velocidade_para_eta(veiculo)
+    if velocidade is None:
         return None
 
     # Confirmado contra o feed real do SEMOB: veículo de linha circular
@@ -227,7 +279,7 @@ def _eta_por_trajeto(
             return None
 
     metros = max(0.0, metros)
-    minutos_de_viagem = metros / (veiculo.velocidade * 1000 / 60)
+    minutos_de_viagem = metros / (velocidade * 1000 / 60)
     minutos_restantes = max(0.0, minutos_de_viagem - idade_min)
     if minutos_restantes > ETA_MAXIMO_MIN:
         return None
