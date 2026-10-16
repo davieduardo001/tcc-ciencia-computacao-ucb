@@ -831,3 +831,84 @@ describe("PlanejadorViagem — campo de lugar acessível por teclado (card #179)
     expect(screen.getByRole("button", { name: "Limpar para onde" })).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Card #179 (⑤a) — todo tempo diz de onde veio
+// ---------------------------------------------------------------------------
+
+describe("PlanejadorViagem — origem do dado em cada espera (card #179)", () => {
+  it("espera medida pelo GPS leva o selo 'ao vivo'", () => {
+    const { container } = renderizar();
+
+    const chegada = container.querySelector(".plan-chegada.ao-vivo") as HTMLElement;
+    expect(chegada.querySelector(".selo-fonte")).toHaveTextContent("ao vivo");
+  });
+
+  it("intervalo médio leva o selo 'média' — não é um horário", () => {
+    const { container } = renderizar({
+      opcoes: [
+        {
+          ...opcaoViva,
+          pernas: [
+            pernaViva("875A", {
+              fonte_espera: "intervalo_medio",
+              intervalo_medio_min: 16,
+              espera_min: 8,
+              prefixo_veiculo: null,
+            }),
+          ],
+        },
+      ],
+    });
+
+    expect(container.querySelector(".plan-chegada .selo-fonte")).toHaveTextContent("média");
+    expect(container.querySelector(".plan-chegada.ao-vivo")).toBeNull();
+  });
+
+  it("espera fixa da baldeação aparece como estimada (antes o total a incluía e a tela calava)", () => {
+    const { container } = renderizar({
+      opcoes: [
+        {
+          ...opcaoComBaldeacao,
+          pernas: [
+            pernaMockCompleta("0.110"),
+            { ...pernaMockCompleta("106.2"), fonte_espera: "teorica" as const, espera_min: 9 },
+          ],
+        },
+      ],
+    });
+
+    const esperas = [...container.querySelectorAll(".plan-chegada")].map((e) => e.textContent);
+    expect(esperas.some((t) => /Espera estimada ~9 min/.test(t ?? ""))).toBe(true);
+    expect(container.querySelector(".plan-chegada .selo-fonte.estimado")).toHaveTextContent("estimado");
+  });
+
+  it("contagem de ônibus rodando agora também é 'ao vivo'", () => {
+    const { container } = renderizar({
+      opcoes: [{ ...opcaoViva, pernas: [pernaMockCompleta("875A")] }],
+      veiculosPorLinha: { "875A": 3 },
+    });
+
+    expect(container.querySelector(".plan-chegada .selo-fonte")).toHaveTextContent("ao vivo");
+  });
+
+  it("sem dado nenhum, não mostra selo (não há número a rotular)", () => {
+    const { container } = renderizar({
+      opcoes: [{ ...opcaoViva, pernas: [pernaMockCompleta("875A")] }],
+      veiculosPorLinha: {},
+    });
+
+    expect(container.querySelector(".plan-chegada.sem-onibus")).not.toBeNull();
+    expect(container.querySelector(".plan-chegada .selo-fonte")).toBeNull();
+  });
+
+  it("a ressalva explica o que o 'ao vivo' cobre, sem contradizer o selo", () => {
+    const { container } = renderizar();
+
+    const ressalva = container.querySelector(".plan-ressalva") as HTMLElement;
+    expect(ressalva).toHaveTextContent(/Ao vivo vale só para a espera pelo primeiro ônibus/);
+    expect(ressalva).toHaveTextContent(/tempo dentro do ônibus e as baldeações são estimados/);
+    // o texto antigo afirmava "estimado" para tudo, logo abaixo de opções "ao vivo"
+    expect(ressalva).not.toHaveTextContent(/^Tempo estimado por velocidade média/);
+  });
+});

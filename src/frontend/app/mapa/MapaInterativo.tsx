@@ -12,6 +12,7 @@ import {
 import L from "leaflet";
 import Link from "next/link";
 import { corDaLinha } from "./corDaLinha";
+import { legendaDaFonte } from "./SeloFonte";
 import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
@@ -815,15 +816,22 @@ export default function MapaInterativo({
                   ))}
                 </div>
 
+                {/* Card #179 (RN-10): estes horários são de SAÍDA DO
+                    TERMINAL (a origem da linha), não de passagem nesta
+                    parada. Com o título "Próximos horários", parecia que o
+                    ônibus passava aqui naquela hora. */}
                 <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
-                  Próximos horários
+                  Próximas saídas do terminal
                 </div>
+                <p className="mapa-painel-dica">
+                  {legendaDaFonte("saida_terminal")}.
+                </p>
                 {/* Cenário 2 da US #18: parada sem horário disponível */}
                 {detalheParada.detalhes.proximosHorarios.length > 0 ? (
                   <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
                 ) : (
                   <p className="mapa-painel-sem-veiculo">
-                    Nenhum horário previsto disponível para esta parada no
+                    Nenhuma saída prevista disponível para esta parada no
                     momento.
                   </p>
                 )}
@@ -869,7 +877,7 @@ export default function MapaInterativo({
                 <span className="mapa-painel-sem-veiculo">
                   {buscouPosicoes
                     ? proximoHorarioPrevisto
-                      ? `Nenhum ônibus em operação no momento. Próximo horário previsto: ${proximoHorarioPrevisto}.`
+                      ? `Nenhum ônibus em operação no momento. Próxima saída prevista do terminal: ${proximoHorarioPrevisto}.`
                       : "Nenhum ônibus desta linha em operação no momento."
                     : "Procurando ônibus em operação..."}
                 </span>

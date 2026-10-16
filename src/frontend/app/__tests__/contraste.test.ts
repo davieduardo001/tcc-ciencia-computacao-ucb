@@ -50,6 +50,8 @@ const PARES: [string, string, number, string][] = [
   ["--mc-alerta-texto", "--mc-alerta-fundo", 4.5, "botão de favorito salvo / selo pendente"],
   ["--mc-erro-texto", "--mc-erro-fundo", 4.5, "mensagens de erro — eram âmbar, 2,6:1"],
   ["--mc-texto-2", "--mc-areia-clara", 4.5, "texto secundário no cartão selecionado"],
+  ["--mc-texto-2", BRANCO, 4.5, "selo de origem do dado (.selo-fonte) — fundo branco sólido"],
+  ["--mc-sucesso-texto", BRANCO, 4.5, "selo 'ao vivo' (.selo-fonte.ao-vivo)"],
   [BRANCO, "--mc-embarque", 4.5, "número do passo de embarque (marcador azul)"],
   ["--mc-embarque", BRANCO, 4.5, "ícone/borda do passo de baldeação"],
   // componentes de interface e contornos: 3:1 (WCAG 1.4.11)
