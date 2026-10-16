@@ -7,6 +7,7 @@ import { Navigation } from "lucide-react";
 import AppShell from "./AppShell";
 import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
+import { useChegadasDaRota } from "./useChegadasDaRota";
 import {
   buscarLinha,
   BuscarLinhaError,
@@ -364,6 +365,11 @@ function MapaConteudo() {
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
+  // Issue #190 — quando o ônibus de cada trecho da opção escolhida chega às
+  // paradas de subir e de descer. Vive aqui porque o card do planejador e os
+  // marcadores do mapa mostram o mesmo número.
+  const { chegadas: chegadasDaRota } = useChegadasDaRota(viagem?.pernas ?? null);
+
   // US #16 no painel da US #20: quantos ônibus estão rodando cada linha
   // do itinerário escolhido.
   const veiculosPorLinha = (veiculos ?? []).reduce<Record<string, number>>(
@@ -388,6 +394,7 @@ function MapaConteudo() {
         erroBusca={erroBusca}
         onFecharLinha={handleFecharLinha}
         viagem={viagem}
+        chegadasDaRota={chegadasDaRota}
         origemViagem={origem}
         destinoViagem={destino}
         escolhendoNoMapa={escolhendoNoMapa !== null}
@@ -417,6 +424,8 @@ function MapaConteudo() {
           rastreando={veiculos !== null}
           favoritosIds={favoritosChaves}
           onFavoritoSalvo={handleFavoritoSalvo}
+          chegadasDaRota={chegadasDaRota}
+          localizacao={localizacao}
         />
       ) : (
         <button

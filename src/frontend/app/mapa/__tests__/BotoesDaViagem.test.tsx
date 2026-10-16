@@ -6,7 +6,7 @@ import {
   ViagemAtiva,
   ViagemError,
 } from "@/lib/api";
-import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "../BotoesDaViagem";
+import { BotaoDescerNestaParada, BotaoPegueiNaRota, BotaoPegueiOnibus } from "../BotoesDaViagem";
 import { ViagemProvider } from "../ViagemContext";
 
 jest.mock("@/lib/api", () => ({
@@ -234,5 +234,110 @@ describe("BotaoDescerNestaParada", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Descer nesta parada" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("não faz parte desta linha");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #190 — "Peguei este ônibus" a partir de um trecho da rota
+// ---------------------------------------------------------------------------
+
+describe("BotaoPegueiNaRota", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("aguardando e com localização: oferece 'Peguei este ônibus'", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />);
+
+    expect(await screen.findByRole("button", { name: "Peguei este ônibus" })).toBeEnabled();
+  });
+
+  it("tocar manda a linha do trecho, a posição e a parada de DESEMBARQUE como destino", async () => {
+    buscarMock.mockResolvedValueOnce(AGUARDANDO).mockResolvedValue({ falhou: false, viagem: viagem() });
+    embarcarMock.mockResolvedValue(undefined);
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
+
+    await waitFor(() =>
+      expect(embarcarMock).toHaveBeenCalledWith({
+        numeroLinha: "0.110",
+        lat: -15.8,
+        lng: -48.05,
+        paradaDestinoCodigo: "PR-D",
+      })
+    );
+    expect(await screen.findByText("Você está nesta linha.")).toBeInTheDocument();
+  });
+
+  it("trecho sem código de parada: embarca sem destino (a pessoa escolhe depois, no mapa)", async () => {
+    buscarMock.mockResolvedValueOnce(AGUARDANDO).mockResolvedValue({ falhou: false, viagem: viagem() });
+    embarcarMock.mockResolvedValue(undefined);
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo={null} posicaoDoUsuario={POSICAO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
+
+    await waitFor(() => expect(embarcarMock).toHaveBeenCalledTimes(1));
+    const enviado = embarcarMock.mock.calls[0][0];
+    expect(enviado).toEqual({ numeroLinha: "0.110", lat: -15.8, lng: -48.05 });
+    expect("paradaDestinoCodigo" in enviado).toBe(false);
+  });
+
+  it("sem localização, explica em vez de oferecer um botão que nunca funciona", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={null} />);
+
+    expect(await screen.findByText(/Ative a localização/)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("sem ônibus perto: mostra a frase do servidor num alerta e o botão volta a funcionar", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+    embarcarMock.mockRejectedValue(new ViagemError("Não conseguimos confirmar seu embarque.", 422));
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />);
+    const botao = await screen.findByRole("button", { name: "Peguei este ônibus" });
+    fireEvent.click(botao);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não conseguimos confirmar seu embarque.");
+    expect(botao).toBeEnabled();
+  });
+
+  it("já em viagem NESTA linha: diz isso e não oferece o botão", async () => {
+    buscarMock.mockResolvedValue({ falhou: false, viagem: viagem({ numeroLinha: "0.110" }) });
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />);
+
+    expect(await screen.findByText("Você está nesta linha.")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("em viagem em OUTRA linha (ex.: o 2º trecho de uma baldeação): não mostra nada", async () => {
+    buscarMock.mockResolvedValue({ falhou: false, viagem: viagem({ numeroLinha: "0.186" }) });
+
+    const { container } = comProvider(
+      <BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />
+    );
+
+    await waitFor(() => expect(buscarMock).toHaveBeenCalled());
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it("enquanto a ação está em andamento, o botão fica desabilitado (sem toque duplo)", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+    let concluir!: () => void;
+    embarcarMock.mockReturnValue(new Promise<void>((resolve) => (concluir = resolve)));
+
+    comProvider(<BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />);
+    const botao = await screen.findByRole("button", { name: "Peguei este ônibus" });
+    fireEvent.click(botao);
+
+    await waitFor(() => expect(botao).toBeDisabled());
+    await act(async () => {
+      concluir();
+    });
   });
 });
