@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaPage from "../page";
 import {
+  buscarChegadasDaRota,
   buscarLinha,
   buscarLugares,
   calcularRotas,
@@ -48,6 +49,8 @@ jest.mock("@/lib/api", () => ({
   buscarLugares: jest.fn().mockResolvedValue([]),
   nomearLugar: jest.fn().mockResolvedValue(null),
   calcularRotas: jest.fn().mockResolvedValue([]),
+  // Issue #190 — tempo do ônibus nas paradas da rota escolhida.
+  buscarChegadasDaRota: jest.fn().mockResolvedValue(null),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
   // O AppShell consulta a viagem em andamento (US #171): sem viagem.
@@ -64,6 +67,7 @@ jest.mock("@/lib/api", () => ({
 const sugerirLinhasMock = sugerirLinhas as jest.Mock;
 const buscarLugaresMock = buscarLugares as jest.Mock;
 const calcularRotasMock = calcularRotas as jest.Mock;
+const buscarChegadasDaRotaMock = buscarChegadasDaRota as jest.Mock;
 const nomearLugarMock = nomearLugar as jest.Mock;
 const PLACEHOLDER = "Buscar linha ou destino (ex: 0.110 ou Ceilândia)";
 
@@ -274,6 +278,60 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
 
     await escolherLugar("Para onde", LUGAR_DESTINO);
     expect(botao).toBeEnabled();
+  });
+
+  async function calcularComVia(viagem: unknown) {
+    calcularRotasMock.mockResolvedValue([viagem]);
+    await abrirPlanejador();
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /ver opções de ônibus/i }));
+    });
+  }
+
+  it("issue #190: a opção escolhida pede o tempo do ônibus nas paradas e o card mostra", async () => {
+    buscarChegadasDaRotaMock.mockReset().mockResolvedValue({
+      calculadoEm: "2026-10-14T15:00:00+00:00",
+      pernas: [
+        {
+          numero: "0.382",
+          sentido: "IDA",
+          embarque: { paradaCodigo: "PR-E", etaMinutos: 5, fonte: "ao_vivo", prefixo: "440001", horarioPrevisto: null },
+          desembarque: { paradaCodigo: "PR-D", etaMinutos: 31, fonte: "ao_vivo", prefixo: "440001", horarioPrevisto: null },
+        },
+      ],
+    });
+    const perna = VIAGEM_DIRETA.pernas[0];
+
+    await calcularComVia({
+      ...VIAGEM_DIRETA,
+      pernas: [
+        {
+          ...perna,
+          embarque: { ...perna.embarque, parada_codigo: "PR-E" },
+          desembarque: { ...perna.desembarque, parada_codigo: "PR-D" },
+        },
+      ],
+    });
+    await act(async () => {});
+
+    expect(buscarChegadasDaRotaMock).toHaveBeenCalledWith([
+      { numero: "0.382", sentido: "IDA", embarqueCodigo: "PR-E", desembarqueCodigo: "PR-D" },
+    ]);
+    expect(screen.getByLabelText("Tempo até o embarque")).toHaveTextContent("Chega em 5 min");
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Chega em 31 min");
+  });
+
+  it("issue #190: rota sem códigos de parada não pergunta nada ao servidor", async () => {
+    buscarChegadasDaRotaMock.mockReset().mockResolvedValue(null);
+
+    await calcularComVia(VIAGEM_DIRETA);
+    await act(async () => {});
+
+    expect(buscarChegadasDaRotaMock).not.toHaveBeenCalled();
+    // sem código: o desembarque diz que não há previsão (Cenário 7)
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Sem previsão no momento");
   });
 
   it("calcula a rota com as coordenadas dos dois pontos escolhidos", async () => {

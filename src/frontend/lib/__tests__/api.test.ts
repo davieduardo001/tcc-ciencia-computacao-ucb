@@ -10,6 +10,7 @@ import {
   nomearLugar,
   buscarPosicoesDaLinha,
   buscarChegadasParada,
+  buscarChegadasDaRota,
   buscarViagemAtiva,
   definirDestinoDaViagem,
   embarcarNoOnibus,
@@ -1169,5 +1170,132 @@ describe("api.ts — pegar o ônibus (US #171)", () => {
       global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch")) as jest.Mock;
       await expect(encerrarViagem("v-1")).rejects.toBeInstanceOf(ViagemError);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #190 — tempo do ônibus nas paradas de subir e descer de uma rota
+// ---------------------------------------------------------------------------
+
+describe("buscarChegadasDaRota (issue #190)", () => {
+  const PEDIDO = [
+    { numero: "0.110", sentido: "IDA", embarqueCodigo: "PR-E", desembarqueCodigo: "PR-D" },
+    { numero: "0.186", sentido: "CIRCULAR", embarqueCodigo: null, desembarqueCodigo: "PR-D2" },
+  ];
+
+  const PAYLOAD = {
+    calculado_em: "2026-10-14T15:00:00+00:00",
+    pernas: [
+      {
+        numero: "0.110",
+        sentido: "IDA",
+        embarque: { parada_codigo: "PR-E", eta_minutos: 4.3, fonte: "ao_vivo", prefixo: "440001", horario_previsto: null },
+        desembarque: { parada_codigo: "PR-D", eta_minutos: 18, fonte: "previsto", prefixo: null, horario_previsto: "15:18" },
+      },
+      {
+        numero: "0.186",
+        sentido: "CIRCULAR",
+        embarque: { parada_codigo: null, eta_minutos: null, fonte: null },
+        desembarque: { parada_codigo: "PR-D2" },
+      },
+    ],
+  };
+
+  function respondendo(payload: unknown, ok = true, status = 200) {
+    global.fetch = jest.fn().mockResolvedValue({ ok, status, json: async () => payload }) as jest.Mock;
+  }
+
+  it("faz POST em lote no endpoint da rota, com sessão e sem cache", async () => {
+    respondendo(PAYLOAD);
+
+    await buscarChegadasDaRota(PEDIDO);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/api\/mobilidade\/rotas\/chegadas$/);
+    expect(opcoes).toMatchObject({
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  it("manda os códigos em snake_case, na ordem dos trechos, e null onde não há código", async () => {
+    respondendo(PAYLOAD);
+
+    await buscarChegadasDaRota(PEDIDO);
+
+    const corpo = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(corpo).toEqual({
+      pernas: [
+        { numero: "0.110", sentido: "IDA", embarque_codigo: "PR-E", desembarque_codigo: "PR-D" },
+        { numero: "0.186", sentido: "CIRCULAR", embarque_codigo: null, desembarque_codigo: "PR-D2" },
+      ],
+    });
+  });
+
+  it("converte o payload para camelCase, preservando a fonte de cada número", async () => {
+    respondendo(PAYLOAD);
+
+    const resultado = await buscarChegadasDaRota(PEDIDO);
+
+    expect(resultado?.calculadoEm).toBe("2026-10-14T15:00:00+00:00");
+    expect(resultado?.pernas).toHaveLength(2);
+    expect(resultado?.pernas[0].embarque).toEqual({
+      paradaCodigo: "PR-E",
+      etaMinutos: 4.3,
+      fonte: "ao_vivo",
+      prefixo: "440001",
+      horarioPrevisto: null,
+    });
+    expect(resultado?.pernas[0].desembarque).toEqual({
+      paradaCodigo: "PR-D",
+      etaMinutos: 18,
+      fonte: "previsto",
+      prefixo: null,
+      horarioPrevisto: "15:18",
+    });
+  });
+
+  it("campos ausentes viram null — sem dado continua sem dado", async () => {
+    respondendo(PAYLOAD);
+
+    const resultado = await buscarChegadasDaRota(PEDIDO);
+
+    expect(resultado?.pernas[1].embarque).toEqual({
+      paradaCodigo: null,
+      etaMinutos: null,
+      fonte: null,
+      prefixo: null,
+      horarioPrevisto: null,
+    });
+    expect(resultado?.pernas[1].desembarque).toMatchObject({ paradaCodigo: "PR-D2", etaMinutos: null, fonte: null });
+  });
+
+  it("resposta sem a lista de trechos vira lista vazia, não quebra", async () => {
+    respondendo({ calculado_em: "x" });
+    expect((await buscarChegadasDaRota(PEDIDO))?.pernas).toEqual([]);
+  });
+
+  it.each([[500], [422], [401], [404]])("HTTP %s devolve null (é um extra: não quebra a tela)", async (status) => {
+    respondendo({ detail: "x" }, false, status);
+    expect(await buscarChegadasDaRota(PEDIDO)).toBeNull();
+  });
+
+  it("rede fora do ar devolve null", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch")) as jest.Mock;
+    expect(await buscarChegadasDaRota(PEDIDO)).toBeNull();
+  });
+
+  it("JSON inválido devolve null", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token");
+      },
+    }) as jest.Mock;
+    expect(await buscarChegadasDaRota(PEDIDO)).toBeNull();
   });
 });

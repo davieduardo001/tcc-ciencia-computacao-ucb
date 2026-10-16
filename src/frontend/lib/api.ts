@@ -440,6 +440,10 @@ export interface PontoEmbarque {
   /** Vazio quando não há parada cadastrada perto — a UI mostra o ponto no mapa. */
   parada_nome: string;
   caminhada_metros: number;
+  /** Issue #190 — `codigo` da parada física deste ponto na rota do trecho.
+   * `null`/ausente quando não há parada ingerida a até 40 m (ou num backend
+   * antigo): sem código não dá para pedir o tempo do ônibus. */
+  parada_codigo?: string | null;
 }
 
 export interface PernaViagem {
@@ -722,6 +726,107 @@ export async function buscarChegadasParada(
           prefixo: c.prefixo ?? null,
           veiculosACaminho: c.veiculos_a_caminho ?? 0,
           horarioPrevisto: c.horario_previsto ?? null,
+        })
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Issue #190 — tempo do ônibus nas paradas de subir e descer de uma rota
+// ---------------------------------------------------------------------------
+
+export interface ChegadaNoPonto {
+  paradaCodigo: string | null;
+  /** `null` quando não há dado (nem ônibus a caminho, nem horário). */
+  etaMinutos: number | null;
+  fonte: FonteChegada | null;
+  /** Só `ao_vivo`: o ônibus que o passageiro pegaria. */
+  prefixo: string | null;
+  /** Só `previsto`: "HH:MM" da passagem prevista. */
+  horarioPrevisto: string | null;
+}
+
+export interface ChegadasDaPerna {
+  numero: string;
+  sentido: string;
+  embarque: ChegadaNoPonto;
+  desembarque: ChegadaNoPonto;
+}
+
+export interface ChegadasDaRota {
+  calculadoEm: string;
+  /** Na mesma ordem das pernas pedidas. */
+  pernas: ChegadasDaPerna[];
+}
+
+export interface PernaParaChegadas {
+  numero: string;
+  sentido: string;
+  embarqueCodigo: string | null;
+  desembarqueCodigo: string | null;
+}
+
+function lerChegadaNoPonto(p: {
+  parada_codigo?: string | null;
+  eta_minutos?: number | null;
+  fonte?: FonteChegada | null;
+  prefixo?: string | null;
+  horario_previsto?: string | null;
+}): ChegadaNoPonto {
+  return {
+    paradaCodigo: p.parada_codigo ?? null,
+    etaMinutos: p.eta_minutos ?? null,
+    fonte: p.fonte ?? null,
+    prefixo: p.prefixo ?? null,
+    horarioPrevisto: p.horario_previsto ?? null,
+  };
+}
+
+/**
+ * Quando o ônibus de cada trecho da rota escolhida chega à parada de subir e
+ * à de descer — em lote, uma chamada para a rota inteira.
+ *
+ * Devolve `null` em qualquer falha: é um extra sobre o resultado da rota, que
+ * não deve quebrar nem mostrar erro por causa dele (mesma postura de
+ * `buscarChegadasParada`). Quem chama mantém o último valor bom.
+ */
+export async function buscarChegadasDaRota(
+  pernas: PernaParaChegadas[]
+): Promise<ChegadasDaRota | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/mobilidade/rotas/chegadas`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pernas: pernas.map((p) => ({
+          numero: p.numero,
+          sentido: p.sentido,
+          embarque_codigo: p.embarqueCodigo,
+          desembarque_codigo: p.desembarqueCodigo,
+        })),
+      }),
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return {
+      calculadoEm: data.calculado_em,
+      pernas: (data.pernas ?? []).map(
+        (p: {
+          numero: string;
+          sentido: string;
+          embarque: Parameters<typeof lerChegadaNoPonto>[0];
+          desembarque: Parameters<typeof lerChegadaNoPonto>[0];
+        }) => ({
+          numero: p.numero,
+          sentido: p.sentido,
+          embarque: lerChegadaNoPonto(p.embarque ?? {}),
+          desembarque: lerChegadaNoPonto(p.desembarque ?? {}),
         })
       ),
     };

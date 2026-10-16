@@ -16,6 +16,23 @@ jest.mock("@/lib/api", () => ({
   },
 }));
 
+// Issue #190 — o planejador lê o estado de viagem (Aguardando × Em viagem) do
+// ViagemContext. O dublê deixa cada teste escolher o estado e capturar o
+// toque em "Peguei este ônibus", sem montar o Provider (que consulta a API).
+const mockEmbarcar = jest.fn();
+let mockViagem: { numeroLinha: string } | null = null;
+jest.mock("../ViagemContext", () => ({
+  useViagem: () => ({
+    viagem: mockViagem,
+    ocupado: false,
+    carregando: false,
+    embarcar: mockEmbarcar,
+    definirDestino: jest.fn(),
+    encerrar: jest.fn(),
+    atualizar: jest.fn(),
+  }),
+}));
+
 // No jest com ts-jest, o import estático é hoisted ANTES do jest.mock(),
 // então `salvarFavorito` importado via ES import seria undefined.
 // O padrão seguro é acessar via require() após o mock ser registrado.
@@ -910,5 +927,227 @@ describe("PlanejadorViagem — origem do dado em cada espera (card #179)", () =>
     expect(ressalva).toHaveTextContent(/tempo dentro do ônibus e as baldeações são estimados/);
     // o texto antigo afirmava "estimado" para tudo, logo abaixo de opções "ao vivo"
     expect(ressalva).not.toHaveTextContent(/^Tempo estimado por velocidade média/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #190 — tempo do ônibus nas paradas de subir e descer, e embarque pela rota
+// ---------------------------------------------------------------------------
+
+describe("PlanejadorViagem — paradas de subir e descer da rota (issue #190)", () => {
+  type Ponto = {
+    paradaCodigo: string | null;
+    etaMinutos: number | null;
+    fonte: "ao_vivo" | "previsto" | null;
+    prefixo: string | null;
+    horarioPrevisto: string | null;
+  };
+
+  const ponto = (sobre: Partial<Ponto> = {}): Ponto => ({
+    paradaCodigo: null,
+    etaMinutos: null,
+    fonte: null,
+    prefixo: null,
+    horarioPrevisto: null,
+    ...sobre,
+  });
+
+  function pernaComCodigos(numero: string, embarque: string | null, desembarque: string | null, extra = {}) {
+    const base = pernaViva(numero, extra);
+    return {
+      ...base,
+      embarque: { ...base.embarque, parada_codigo: embarque },
+      desembarque: { ...base.desembarque, parada_codigo: desembarque },
+    };
+  }
+
+  const opcaoComCodigos = { ...opcaoViva, pernas: [pernaComCodigos("875A", "PR-E", "PR-D")] };
+
+  const chegadasAoVivo = [
+    {
+      numero: "875A",
+      sentido: "IDA",
+      embarque: ponto({ paradaCodigo: "PR-E", etaMinutos: 3.2, fonte: "ao_vivo", prefixo: "440001" }),
+      desembarque: ponto({ paradaCodigo: "PR-D", etaMinutos: 17.6, fonte: "ao_vivo", prefixo: "440001" }),
+    },
+  ];
+
+  const LOCALIZACAO = { lat: -15.83, lng: -48.04 };
+
+  beforeEach(() => {
+    mockEmbarcar.mockReset().mockResolvedValue({ ok: true });
+    mockViagem = null;
+  });
+
+  afterEach(() => {
+    mockViagem = null;
+  });
+
+  it("embarque: o tempo ao vivo da parada substitui a espera calculada com a rota", () => {
+    renderizar({ opcoes: [opcaoComCodigos], chegadasDaRota: chegadasAoVivo });
+
+    const tempo = screen.getByLabelText("Tempo até o embarque");
+    expect(tempo).toHaveTextContent("Chega em 3 min (carro 440001)");
+    expect(tempo.querySelector(".selo-fonte")).toHaveTextContent("ao vivo");
+    expect(screen.queryByText(/Chega em 6 min/)).not.toBeInTheDocument();
+  });
+
+  it("sem chegadas (carregando ou consulta falhou), mantém a espera que veio com a rota", () => {
+    renderizar({ opcoes: [opcaoComCodigos], chegadasDaRota: null });
+
+    expect(screen.queryByLabelText("Tempo até o embarque")).not.toBeInTheDocument();
+    expect(screen.getByText(/Chega em/)).toHaveTextContent("Chega em 6 min");
+  });
+
+  it("chegada sem dado no embarque não apaga a espera que veio com a rota", () => {
+    renderizar({
+      opcoes: [opcaoComCodigos],
+      chegadasDaRota: [{ ...chegadasAoVivo[0], embarque: ponto({ paradaCodigo: "PR-E" }) }],
+    });
+
+    expect(screen.queryByLabelText("Tempo até o embarque")).not.toBeInTheDocument();
+    // O desembarque também diz "Chega em…"; a espera da rota continua lá.
+    const textos = screen.getAllByText(/Chega em/).map((e) => e.textContent);
+    expect(textos.some((t) => t?.includes("Chega em 6 min"))).toBe(true);
+  });
+
+  it("desembarque ao vivo: 'Chega em N min' do mesmo ônibus, com selo", () => {
+    renderizar({ opcoes: [opcaoComCodigos], chegadasDaRota: chegadasAoVivo });
+
+    const tempo = screen.getByLabelText("Tempo até o desembarque");
+    expect(tempo).toHaveTextContent("Chega em 18 min (carro 440001)");
+    expect(tempo.querySelector(".selo-fonte")).toHaveTextContent("ao vivo");
+  });
+
+  it("desembarque previsto: horário e minutos, com o selo 'previsto'", () => {
+    renderizar({
+      opcoes: [opcaoComCodigos],
+      chegadasDaRota: [
+        {
+          ...chegadasAoVivo[0],
+          desembarque: ponto({ paradaCodigo: "PR-D", etaMinutos: 25, fonte: "previsto", horarioPrevisto: "15:40" }),
+        },
+      ],
+    });
+
+    const tempo = screen.getByLabelText("Tempo até o desembarque");
+    expect(tempo).toHaveTextContent("Previsto às 15:40 (em 25 min)");
+    expect(tempo.querySelector(".selo-fonte")).toHaveTextContent("previsto");
+  });
+
+  it("desembarque com resposta mas sem dado: 'Sem previsão no momento'", () => {
+    renderizar({
+      opcoes: [opcaoComCodigos],
+      chegadasDaRota: [{ ...chegadasAoVivo[0], desembarque: ponto({ paradaCodigo: "PR-D" }) }],
+    });
+
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Sem previsão no momento");
+  });
+
+  it("desembarque com código, mas sem resposta ainda: não afirma 'sem previsão'", () => {
+    renderizar({ opcoes: [opcaoComCodigos], chegadasDaRota: null });
+
+    expect(screen.queryByLabelText("Tempo até o desembarque")).not.toBeInTheDocument();
+  });
+
+  it("Cenário 7 — desembarque sem código de parada: 'Sem previsão no momento', mesmo sem resposta", () => {
+    renderizar({ opcoes: [{ ...opcaoViva, pernas: [pernaComCodigos("875A", "PR-E", null)] }], chegadasDaRota: null });
+
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Sem previsão no momento");
+  });
+
+  it("backend antigo (sem o campo parada_codigo): trata como sem código, sem quebrar", () => {
+    renderizar({ opcoes: [opcaoViva], chegadasDaRota: null });
+
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Sem previsão no momento");
+  });
+
+  it("Cenário 5 — baldeação: cada trecho mostra os seus tempos, na ordem da viagem", () => {
+    const opcao = {
+      ...opcaoViva,
+      pernas: [pernaComCodigos("0.110", "PR-E1", "PR-D1"), pernaComCodigos("106.2", "PR-E2", "PR-D2")],
+    };
+    renderizar({
+      opcoes: [opcao],
+      chegadasDaRota: [
+        {
+          numero: "0.110",
+          sentido: "IDA",
+          embarque: ponto({ paradaCodigo: "PR-E1", etaMinutos: 2, fonte: "ao_vivo" }),
+          desembarque: ponto({ paradaCodigo: "PR-D1", etaMinutos: 14, fonte: "ao_vivo" }),
+        },
+        {
+          numero: "106.2",
+          sentido: "IDA",
+          embarque: ponto({ paradaCodigo: "PR-E2", etaMinutos: 20, fonte: "previsto", horarioPrevisto: "16:00" }),
+          desembarque: ponto({ paradaCodigo: "PR-D2", etaMinutos: 35, fonte: "previsto", horarioPrevisto: "16:15" }),
+        },
+      ],
+    });
+
+    const embarques = screen.getAllByLabelText("Tempo até o embarque");
+    const desembarques = screen.getAllByLabelText("Tempo até o desembarque");
+    expect(embarques[0]).toHaveTextContent("Chega em 2 min");
+    expect(embarques[1]).toHaveTextContent("Previsto às 16:00");
+    expect(desembarques[0]).toHaveTextContent("Chega em 14 min");
+    expect(desembarques[1]).toHaveTextContent("Previsto às 16:15");
+  });
+
+  it("em viagem, o tempo 'do ônibus que a pessoa pegaria' não aparece (ela já está a bordo)", () => {
+    mockViagem = { numeroLinha: "875A" };
+    renderizar({ opcoes: [opcaoComCodigos], chegadasDaRota: chegadasAoVivo });
+
+    expect(screen.queryByLabelText("Tempo até o embarque")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tempo até o desembarque")).not.toBeInTheDocument();
+    expect(screen.getByText("Você está nesta linha.")).toBeInTheDocument();
+  });
+
+  describe("Peguei este ônibus a partir da rota (Cenário 6)", () => {
+    it("toca: manda a linha do trecho, a posição e a parada de desembarque como destino", async () => {
+      renderizar({ opcoes: [opcaoComCodigos], localizacao: LOCALIZACAO });
+
+      fireEvent.click(screen.getByRole("button", { name: "Peguei este ônibus" }));
+
+      await waitFor(() =>
+        expect(mockEmbarcar).toHaveBeenCalledWith({
+          numeroLinha: "875A",
+          lat: LOCALIZACAO.lat,
+          lng: LOCALIZACAO.lng,
+          paradaDestinoCodigo: "PR-D",
+        })
+      );
+    });
+
+    it("sem localização: explica em vez de oferecer o botão", () => {
+      renderizar({ opcoes: [opcaoComCodigos], localizacao: null });
+
+      expect(screen.queryByRole("button", { name: "Peguei este ônibus" })).not.toBeInTheDocument();
+      expect(screen.getByText(/Ative a localização/)).toBeInTheDocument();
+    });
+
+    it("baldeação: cada trecho tem o seu botão, com o destino do seu próprio desembarque", async () => {
+      const opcao = {
+        ...opcaoViva,
+        pernas: [pernaComCodigos("0.110", "PR-E1", "PR-D1"), pernaComCodigos("106.2", "PR-E2", "PR-D2")],
+      };
+      renderizar({ opcoes: [opcao], localizacao: LOCALIZACAO });
+
+      const botoes = screen.getAllByRole("button", { name: "Peguei este ônibus" });
+      expect(botoes).toHaveLength(2);
+
+      fireEvent.click(botoes[1]);
+      await waitFor(() =>
+        expect(mockEmbarcar).toHaveBeenCalledWith(
+          expect.objectContaining({ numeroLinha: "106.2", paradaDestinoCodigo: "PR-D2" })
+        )
+      );
+    });
+
+    it("em viagem em OUTRA linha, o botão do trecho não aparece", () => {
+      mockViagem = { numeroLinha: "999" };
+      renderizar({ opcoes: [opcaoComCodigos], localizacao: LOCALIZACAO });
+
+      expect(screen.queryByRole("button", { name: "Peguei este ônibus" })).not.toBeInTheDocument();
+    });
   });
 });
