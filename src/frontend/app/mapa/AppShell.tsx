@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  Bus,
   HelpCircle,
   LogOut,
   Map as MapIcon,
