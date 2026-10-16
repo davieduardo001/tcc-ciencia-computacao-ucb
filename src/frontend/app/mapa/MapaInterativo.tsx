@@ -16,7 +16,9 @@ import BadgeLinha from "./BadgeLinha";
 import SeloFonte, { legendaDaFonte } from "./SeloFonte";
 import { formatarMinutos, minutosInteiros } from "./tempo";
 import { useChegadasDaParada } from "./useChegadasDaParada";
+import SaidasDoTerminal from "./SaidasDoTerminal";
 import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
+import TempoNaParada, { SEM_DADO } from "./TempoNaParada";
 import FaixaDaViagem from "./FaixaDaViagem";
 import { useViagem } from "./ViagemContext";
 import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
@@ -24,6 +26,8 @@ import {
   buscarDetalhesParada,
   buscarPosicoesDaLinha,
   BuscarParadaError,
+  ChegadaNoPonto,
+  ChegadasDaPerna,
   DetalhesParada,
   LinhaDetalhada,
   OpcaoViagem,
@@ -266,6 +270,37 @@ function iconeViagem(rotulo: string, classe: string) {
   });
 }
 
+/** Distância aproximada em metros — basta para decidir se dois pontos se sobrepõem. */
+function metrosEntre(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const metrosPorGrau = 111_000;
+  const dLat = (a.lat - b.lat) * metrosPorGrau;
+  const dLng = (a.lng - b.lng) * metrosPorGrau * Math.cos((a.lat * Math.PI) / 180);
+  return Math.hypot(dLat, dLng);
+}
+
+// Abaixo disto, o desembarque de um trecho e o embarque do seguinte são, no
+// mapa, o mesmo lugar: desenhar os dois sobreporia os marcadores.
+const SOBREPOSICAO_MARCADORES_M = 25;
+
+/**
+ * Tempo do ônibus numa parada de subir/descer, dentro do popup do marcador
+ * (issue #190). Sem código de parada: "Sem previsão no momento". Com código
+ * e sem resposta ainda (carregando, ou a consulta falhou): não afirma nada.
+ */
+function TempoDoMarcador({
+  codigo,
+  ponto,
+  qual,
+}: {
+  codigo: string | null | undefined;
+  ponto: ChegadaNoPonto | undefined;
+  qual: "embarque" | "desembarque";
+}) {
+  if (!codigo) return <TempoNaParada ponto={SEM_DADO} qual={qual} />;
+  if (!ponto) return null;
+  return <TempoNaParada ponto={ponto} qual={qual} />;
+}
+
 const iconeOrigem = iconeViagem("A", "origem");
 const iconeDestino = iconeViagem("B", "destino");
 
@@ -315,6 +350,9 @@ interface MapaInterativoProps {
   onFecharLinha?: () => void;
   /** US #20 — itinerário escolhido no planejador, pra desenhar no mapa. */
   viagem?: OpcaoViagem | null;
+  /** Issue #190 — quando o ônibus de cada trecho de `viagem` chega às
+   * paradas de subir e de descer, alinhado por índice com as pernas. */
+  chegadasDaRota?: ChegadasDaPerna[] | null;
   origemViagem?: PontoEscolhido | null;
   destinoViagem?: PontoEscolhido | null;
   /** Modo "escolher no mapa": qualquer clique vira coordenada. */
@@ -332,6 +370,7 @@ export default function MapaInterativo({
   erroBusca,
   onFecharLinha,
   viagem,
+  chegadasDaRota = null,
   origemViagem,
   destinoViagem,
   escolhendoNoMapa = false,
@@ -356,6 +395,11 @@ export default function MapaInterativo({
   // frequência bem maior que o polling de posições dos ônibus).
   const coordenadasRef = useRef<Coordenadas | null>(null);
   coordenadasRef.current = coordenadas;
+
+  // Issue #174 — número da última consulta de detalhes. Tocar na parada A e
+  // logo na B (ou fechar o painel) não pode deixar a resposta atrasada de A
+  // sobrescrever o painel: só vale a resposta da consulta mais recente.
+  const consultaDetalheRef = useRef(0);
 
   // US #18 — detalhes da parada selecionada no mapa.
   const [detalheParada, setDetalheParada] = useState<{
@@ -523,10 +567,12 @@ export default function MapaInterativo({
   // US #18 — Cenário 1: ao tocar numa parada, busca e exibe o painel de
   // detalhes (linhas que passam por ela e próximos horários).
   async function abrirDetalheParada(parada: ParadaLinha) {
+    const consulta = ++consultaDetalheRef.current;
     setDetalheParada({ parada, detalhes: null, carregando: true, erro: null });
 
     try {
       const detalhes = await buscarDetalhesParada(parada.lat, parada.lng);
+      if (consulta !== consultaDetalheRef.current) return;
       setDetalheParada({
         parada,
         detalhes,
@@ -536,6 +582,7 @@ export default function MapaInterativo({
           : "Não encontramos detalhes para esta parada no momento.",
       });
     } catch (err) {
+      if (consulta !== consultaDetalheRef.current) return;
       setDetalheParada({
         parada,
         detalhes: null,
@@ -550,6 +597,7 @@ export default function MapaInterativo({
 
   // US #18 — Cenário 3: fechar o painel e retornar ao mapa.
   function fecharDetalheParada() {
+    consultaDetalheRef.current++;
     setDetalheParada(null);
   }
 
@@ -654,9 +702,46 @@ export default function MapaInterativo({
                   <br />
                   {indice === 0 ? "Embarque" : "Baldeação"} em{" "}
                   {perna.embarque.parada_nome || "ponto no mapa"}
+                  {!emViagem && (
+                    <TempoDoMarcador
+                      codigo={perna.embarque.parada_codigo}
+                      ponto={chegadasDaRota?.[indice]?.embarque}
+                      qual="embarque"
+                    />
+                  )}
                 </Popup>
               </Marker>
             ))}
+
+            {/* Desembarque das baldeações: o do último trecho é o destino
+                (marcador abaixo); os intermediários só ganham marcador
+                próprio quando não caem em cima do embarque seguinte. */}
+            {viagem.pernas.slice(0, -1).map((perna, indice) => {
+              const proxima = viagem.pernas[indice + 1];
+              if (metrosEntre(perna.desembarque, proxima.embarque) < SOBREPOSICAO_MARCADORES_M) {
+                return null;
+              }
+              return (
+                <Marker
+                  key={`desembarque-${indice}`}
+                  position={[perna.desembarque.lat, perna.desembarque.lng]}
+                  icon={iconeViagem("↓", "desembarque")}
+                >
+                  <Popup>
+                    <strong>{perna.numero}</strong>
+                    <br />
+                    Desça em {perna.desembarque.parada_nome || "ponto no mapa"}
+                    {!emViagem && (
+                      <TempoDoMarcador
+                        codigo={perna.desembarque.parada_codigo}
+                        ponto={chegadasDaRota?.[indice]?.desembarque}
+                        qual="desembarque"
+                      />
+                    )}
+                  </Popup>
+                </Marker>
+              );
+            })}
 
             {(() => {
               const ultima = viagem.pernas[viagem.pernas.length - 1];
@@ -668,6 +753,13 @@ export default function MapaInterativo({
                   <Popup>
                     Desça em{" "}
                     {ultima.desembarque.parada_nome || "ponto no mapa"}
+                    {!emViagem && (
+                      <TempoDoMarcador
+                        codigo={ultima.desembarque.parada_codigo}
+                        ponto={chegadasDaRota?.[viagem.pernas.length - 1]?.desembarque}
+                        qual="desembarque"
+                      />
+                    )}
                   </Popup>
                 </Marker>
               );
@@ -756,11 +848,28 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
-                {!emViagem && veiculo.etaMinutos != null && veiculo.paradaNome && (
+                {!emViagem &&
+                  veiculo.etaMinutos != null &&
+                  (veiculo.paradaNome || veiculo.paradaCodigo) && (
+                    <>
+                      <br />
+                      {veiculo.paradaNome ? (
+                        <>
+                          Chega na parada <strong>{veiculo.paradaNome}</strong>
+                        </>
+                      ) : (
+                        "Chega na sua parada"
+                      )}{" "}
+                      em {formatarMinutos(veiculo.etaMinutos)} <SeloFonte fonte="ao_vivo" />
+                    </>
+                  )}
+                {/* Issue #190 — com a localização conhecida e sem tempo (ônibus
+                    parado, sentido oposto, já passou da parada), diz isso em vez
+                    de calar: nunca inventa um número. */}
+                {!emViagem && coordenadas && veiculo.etaMinutos == null && (
                   <>
                     <br />
-                    Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
-                    {formatarMinutos(veiculo.etaMinutos)}
+                    <span className="mapa-painel-sem-veiculo">Sem previsão no momento</span>
                   </>
                 )}
                 <br />
@@ -903,15 +1012,12 @@ export default function MapaInterativo({
                 <p className="mapa-painel-dica">
                   {legendaDaFonte("saida_terminal")}.
                 </p>
-                {/* Cenário 2 da US #18: parada sem horário disponível */}
-                {detalheParada.detalhes.proximosHorarios.length > 0 ? (
-                  <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
-                ) : (
-                  <p className="mapa-painel-sem-veiculo">
-                    Nenhuma saída prevista disponível para esta parada no
-                    momento.
-                  </p>
-                )}
+                {/* Cenário 2 da US #18: parada sem horário disponível. Issue
+                    #174: os horários vêm por linha. */}
+                <SaidasDoTerminal
+                  linhas={detalheParada.detalhes.linhas}
+                  horariosCombinados={detalheParada.detalhes.proximosHorarios}
+                />
               </>
             )}
           </div>

@@ -6,7 +6,8 @@
 #          nada daqui grava latitude/longitude do passageiro.
 #   RN-15  Uma viagem ativa por usuário (o banco garante, ver models/viagem.py).
 #   RN-16  Confirmar = veículo DA LINHA, com posição recente, a até
-#          RAIO_EMBARQUE_M do usuário; vários → o mais próximo.
+#          RAIO_EMBARQUE_M do usuário; vários → o mais próximo. Ou, na
+#          issue #190, o ônibus que chega à parada do usuário em instantes.
 #   RN-17  Viagem esquecida expira sozinha.
 #
 # O progresso (próxima parada, paradas restantes) é calculado na hora da
@@ -14,6 +15,9 @@
 
 from __future__ import annotations
 
+import logging
+import math
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -21,17 +25,57 @@ from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mobilidade.eta_service import IDADE_MAXIMA_ETA_MIN, TOLERANCIA_NA_PARADA_M, TOLERANCIA_TRAJETO_M
+from mobilidade.chegada_service import RAIO_PARADA_DO_USUARIO_M, paradas_proximas_do_usuario
+from mobilidade.eta_service import (
+    IDADE_MAXIMA_ETA_MIN,
+    TOLERANCIA_NA_PARADA_M,
+    TOLERANCIA_TRAJETO_M,
+    eta_ate_indice,
+)
 from mobilidade.geometria import distancia_metros
 from mobilidade.models.parada import Parada, RotaParada
 from mobilidade.models.viagem import Viagem
 from mobilidade.posicao_service import PosicaoVeiculo
 from mobilidade.rota_service import RotaService
 
+logger = logging.getLogger(__name__)
+
+
+def _limite_do_ambiente(nome: str, padrao: float) -> float:
+    """
+    Lê um limite numérico positivo da variável de ambiente `nome`.
+
+    Ausente, em branco, não numérica, não finita ou <= 0 cai no `padrao`
+    (e as inválidas registram um aviso): um valor errado no Fly não pode
+    transformar o embarque em "sempre recusa" nem em "sempre aceita".
+    """
+    bruto = os.environ.get(nome)
+    if bruto is None or not bruto.strip():
+        return padrao
+    try:
+        valor = float(bruto)
+    except ValueError:
+        valor = float("nan")
+    if not math.isfinite(valor) or valor <= 0:
+        logger.warning("%s=%r é inválido; usando o padrão %s.", nome, bruto, padrao)
+        return padrao
+    return valor
+
+
 # RN-16. 100 m é a proposta do #179 (D2): perto o bastante para ser o
-# ônibus em que a pessoa está, folgado para o erro de GPS do celular. É uma
-# constante porque a medição em campo pode mudá-la.
-RAIO_EMBARQUE_M = 100.0
+# ônibus em que a pessoa está, folgado para o erro de GPS do celular. Lido de
+# `RAIO_EMBARQUE_M` porque a medição em campo pode mudá-lo — e o backend não
+# separa homolog de produção (issue #42): o valor vale para os dois. A
+# posição vem do cliente, então este raio é checagem de bom senso, não
+# barreira de segurança.
+RAIO_EMBARQUE_M = _limite_do_ambiente("RAIO_EMBARQUE_M", 100.0)
+
+# Embarque "com o ônibus chegando" (issue #190) — A VALIDAR EM CAMPO. Vale
+# quando o usuário está a até RAIO_PARADA_EMBARQUE_M de uma parada da linha
+# e o ônibus mais próximo dela, no sentido certo, chega em até
+# ETA_MAXIMO_EMBARQUE_MIN. A regra do raio acima continua valendo primeiro.
+RAIO_PARADA_EMBARQUE_M = _limite_do_ambiente("RAIO_PARADA_EMBARQUE_M", RAIO_PARADA_DO_USUARIO_M)
+ETA_MAXIMO_EMBARQUE_MIN = _limite_do_ambiente("ETA_MAXIMO_EMBARQUE_MIN", 2.0)
 
 # Posição mais velha que isso não confirma embarque: o ônibus já andou.
 IDADE_MAXIMA_EMBARQUE_MIN = IDADE_MAXIMA_ETA_MIN
@@ -102,6 +146,51 @@ def veiculo_mais_proximo(
     return min(candidatos, key=lambda c: c[0])[1]
 
 
+def veiculo_chegando_na_parada_do_usuario(
+    db: Session,
+    rota_service: RotaService,
+    numero_linha: str,
+    veiculos: list[PosicaoVeiculo],
+    lat: float,
+    lng: float,
+    agora: datetime,
+) -> PosicaoVeiculo | None:
+    """
+    Embarque "com o ônibus chegando" (issue #190, a validar em campo): o
+    usuário espera numa parada da linha e o ônibus ainda não está ao lado
+    dele, mas chega em instantes.
+
+    Vale quando existe parada da linha a até RAIO_PARADA_EMBARQUE_M do
+    usuário (por sentido, a mais próxima — `paradas_proximas_do_usuario`) e
+    algum ônibus, no sentido dessa parada, tem ETA ao longo do trajeto de no
+    máximo ETA_MAXIMO_EMBARQUE_MIN. Vários → o de menor ETA.
+
+    Nunca inventa: sem parada ingerida por perto, sem trajeto, ônibus parado,
+    de sentido oposto, que já passou ou com posição velha → `None`, e quem
+    chama segue para a recusa de sempre. Não há fallback em linha reta.
+
+    `agora` com fuso (as posições da SEMOB vêm com fuso).
+    """
+    alvos = paradas_proximas_do_usuario(db, numero_linha, lat, lng, RAIO_PARADA_EMBARQUE_M)
+    if not alvos:
+        return None
+
+    candidatos: list[tuple[float, PosicaoVeiculo]] = []
+    for sentido, (_parada, vinculo) in alvos.items():
+        medido = rota_service.trajeto_medido(db, numero_linha, sentido)
+        if medido is None:
+            continue
+        trajeto = medido[0]
+        for veiculo in veiculos:
+            eta = eta_ate_indice(veiculo, trajeto, vinculo.indice_trajeto, sentido, agora)
+            if eta is not None and eta <= ETA_MAXIMO_EMBARQUE_MIN:
+                candidatos.append((eta, veiculo))
+
+    if not candidatos:
+        return None
+    return min(candidatos, key=lambda c: c[0])[1]
+
+
 def expirar_vencidas(db: Session, agora: datetime, usuario_id=None) -> int:
     """
     RN-17: encerra as viagens abertas há mais de DURACAO_MAXIMA_VIAGEM.
@@ -160,6 +249,7 @@ def embarcar(
     parada_destino_codigo: str | None,
     veiculos: list[PosicaoVeiculo],
     agora: datetime,
+    rota_service: RotaService | None = None,
 ) -> Viagem:
     """
     Registra o embarque. `lat`/`lng` entram só na validação (RN-06).
@@ -167,6 +257,11 @@ def embarcar(
     A ordem das checagens importa para a mensagem: primeiro "você já está
     em viagem", depois o destino, por último o veículo — o de mais custo
     (depende do feed) fica por último.
+
+    O veículo se confirma de dois jeitos, nesta ordem: a até RAIO_EMBARQUE_M
+    do usuário (RN-16) ou, com `rota_service`, chegando à parada dele
+    (`veiculo_chegando_na_parada_do_usuario`). Sem `rota_service` só vale o
+    primeiro, que é o comportamento de antes.
     """
     if viagem_ativa(db, usuario_id, agora) is not None:
         raise JaEmViagem()
@@ -174,9 +269,12 @@ def embarcar(
     if parada_destino_codigo is not None:
         _validar_destino(db, numero_linha, parada_destino_codigo)
 
-    veiculo = veiculo_mais_proximo(
-        veiculos, lat, lng, agora=agora.replace(tzinfo=timezone.utc)
-    )
+    agora_com_fuso = agora.replace(tzinfo=timezone.utc)
+    veiculo = veiculo_mais_proximo(veiculos, lat, lng, agora=agora_com_fuso)
+    if veiculo is None and rota_service is not None:
+        veiculo = veiculo_chegando_na_parada_do_usuario(
+            db, rota_service, numero_linha, veiculos, lat, lng, agora_com_fuso
+        )
     if veiculo is None:
         raise SemVeiculoProximo()
 

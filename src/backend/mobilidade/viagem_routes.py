@@ -80,6 +80,7 @@ async def pegar_onibus(
             parada_destino_codigo=corpo.parada_destino_codigo,
             veiculos=veiculos,
             agora=servico.agora_utc(),
+            rota_service=_base._rota_service,
         )
     except servico.JaEmViagem:
         raise HTTPException(status_code=409, detail="Você já está em uma viagem.")

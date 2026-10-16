@@ -7,10 +7,15 @@ asserção poder ser conferida na mão: onde o ônibus está, onde estão as
 paradas, o que sobra pela frente.
 """
 
+import logging
+import os
+import subprocess
+import sys
 import uuid
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +23,7 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 from mobilidade import viagem_service as servico
+from mobilidade.eta_service import eta_ate_indice
 from mobilidade.geometria import TrajetoMedido, distancia_metros
 from mobilidade.main import app
 from mobilidade.models.parada import Parada, RotaParada
@@ -252,8 +258,9 @@ class TestEmbarque:
         assert r.status_code == 201
 
     def test_cenario_4_veiculo_longe_nao_registra(self, db):
-        # ~133 m do usuário: fora do raio.
-        r = _embarcar([_veiculo(deslocar_lat=0.0012)])
+        # ~133 m do usuário (fora do raio) e a ~3 km da parada dele (ETA de
+        # vários minutos): nem o raio nem o "ônibus chegando" confirmam.
+        r = _embarcar([_veiculo(70, deslocar_lat=0.0012)])
 
         assert r.status_code == 422
         assert "não conseguimos confirmar" in r.json()["detail"].lower()
@@ -822,6 +829,243 @@ class TestVeiculoMaisProximo:
 
     def test_lista_vazia(self):
         assert servico.veiculo_mais_proximo([], 0.0, 0.0, datetime.now(timezone.utc)) is None
+
+
+# ==========================================================================
+# Raio de embarque configurável (issue #190)
+# ==========================================================================
+
+
+class TestRaioConfiguravel:
+    def test_sem_variavel_usa_o_padrao(self, monkeypatch):
+        monkeypatch.delenv("RAIO_EMBARQUE_M", raising=False)
+        assert servico._limite_do_ambiente("RAIO_EMBARQUE_M", 100.0) == 100.0
+
+    @pytest.mark.parametrize("bruto", ["", "   "])
+    def test_em_branco_usa_o_padrao_sem_aviso(self, monkeypatch, caplog, bruto):
+        monkeypatch.setenv("RAIO_EMBARQUE_M", bruto)
+        with caplog.at_level(logging.WARNING, logger=servico.logger.name):
+            assert servico._limite_do_ambiente("RAIO_EMBARQUE_M", 100.0) == 100.0
+        assert caplog.records == []
+
+    @pytest.mark.parametrize("bruto, esperado", [("250", 250.0), ("250.5", 250.5), (" 80 ", 80.0)])
+    def test_valor_valido_e_usado(self, monkeypatch, bruto, esperado):
+        monkeypatch.setenv("RAIO_EMBARQUE_M", bruto)
+        assert servico._limite_do_ambiente("RAIO_EMBARQUE_M", 100.0) == esperado
+
+    @pytest.mark.parametrize("bruto", ["abc", "0", "-5", "-0.1", "nan", "inf", "-inf", "12m"])
+    def test_valor_invalido_cai_no_padrao_e_avisa(self, monkeypatch, caplog, bruto):
+        monkeypatch.setenv("RAIO_EMBARQUE_M", bruto)
+        with caplog.at_level(logging.WARNING, logger=servico.logger.name):
+            assert servico._limite_do_ambiente("RAIO_EMBARQUE_M", 100.0) == 100.0
+        assert any("RAIO_EMBARQUE_M" in r.getMessage() for r in caplog.records)
+
+    def test_a_variavel_e_lida_quando_o_modulo_carrega(self):
+        """Ponta a ponta: um processo novo com a variável vê o valor novo."""
+        backend = Path(__file__).resolve().parents[2]
+        codigo = "import mobilidade.viagem_service as s; print(s.RAIO_EMBARQUE_M)"
+        for valor, esperado in (("250", "250.0"), ("lixo", "100.0"), (None, "100.0")):
+            ambiente = {k: v for k, v in os.environ.items() if k != "RAIO_EMBARQUE_M"}
+            if valor is not None:
+                ambiente["RAIO_EMBARQUE_M"] = valor
+            saida = subprocess.run(
+                [sys.executable, "-c", codigo],
+                cwd=backend,
+                env=ambiente,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            assert saida.returncode == 0, saida.stderr
+            assert saida.stdout.strip().splitlines()[-1] == esperado
+
+    def test_raio_maior_aceita_o_embarque_na_linha_sem_paradas(self, db, monkeypatch):
+        """
+        Linha sem paradas ingeridas: só o raio decide (o "ônibus chegando"
+        não se aplica). ~167 m recusa com 100 m e aceita com 200 m.
+        """
+        longe = _veiculo(deslocar_lat=0.0015)
+        assert _embarcar([longe], linha=LINHA_SEM_PARADAS).status_code == 422
+
+        monkeypatch.setattr(servico, "RAIO_EMBARQUE_M", 200.0)
+        assert _embarcar([longe], linha=LINHA_SEM_PARADAS).status_code == 201
+
+    def test_raio_menor_recusa_o_que_antes_aceitava(self, db, monkeypatch):
+        monkeypatch.setattr(servico, "RAIO_EMBARQUE_M", 50.0)
+        # ~78 m: dentro de 100 m, fora de 50 m.
+        r = _embarcar([_veiculo(deslocar_lat=0.0007)], linha=LINHA_SEM_PARADAS)
+        assert r.status_code == 422
+
+
+# ==========================================================================
+# Embarque com o ônibus chegando na parada do usuário (issue #190)
+# A VALIDAR EM CAMPO: os limites de 400 m e 2 min são propostas.
+# ==========================================================================
+
+
+def _onibus(indice, *, velocidade=30.0, **kw):
+    return replace(_veiculo(indice, **kw), velocidade=velocidade)
+
+
+def _eta_para_b(veiculo):
+    """ETA do veículo até a parada B (onde o passageiro está), no momento."""
+    return eta_ate_indice(veiculo, MEDIDO, IDX["B"], "IDA", datetime.now(timezone.utc))
+
+
+class TestEmbarqueComOnibusChegando:
+    def test_aceita_quando_chega_dentro_do_limite_mesmo_fora_do_raio(self, db):
+        # 8 vértices (~860 m) antes da parada B, a 30 km/h: ~1,7 min.
+        chegando = _onibus(92, prefixo="CHEGANDO")
+        lat, lng = TRAJETO[IDX["B"]]
+        assert distancia_metros(lat, lng, chegando.lat, chegando.lng) > servico.RAIO_EMBARQUE_M
+        assert _eta_para_b(chegando) <= servico.ETA_MAXIMO_EMBARQUE_MIN
+
+        r = _embarcar([chegando])
+
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "CHEGANDO"
+        assert r.json()["sentido"] == "IDA"
+        assert db.query(Viagem).one().origem_embarque == "manual"
+
+    def test_recusa_quando_o_eta_passa_do_limite(self, db):
+        # 20 vértices (~2,1 km) antes: ~4 min.
+        devagar = _onibus(80)
+        assert _eta_para_b(devagar) > servico.ETA_MAXIMO_EMBARQUE_MIN
+
+        r = _embarcar([devagar])
+
+        assert r.status_code == 422
+        assert "não conseguimos confirmar" in r.json()["detail"].lower()
+        assert db.query(Viagem).count() == 0
+
+    def test_o_limite_de_tempo_e_inclusivo_e_configuravel(self, db, monkeypatch):
+        onibus = _onibus(92)
+        eta = _eta_para_b(onibus)
+
+        monkeypatch.setattr(servico, "ETA_MAXIMO_EMBARQUE_MIN", eta + 0.3)
+        assert _embarcar([onibus]).status_code == 201
+        db.query(Viagem).delete()
+        db.commit()
+
+        monkeypatch.setattr(servico, "ETA_MAXIMO_EMBARQUE_MIN", eta - 0.3)
+        assert _embarcar([onibus]).status_code == 422
+
+    def test_sentido_oposto_nao_conta(self, db):
+        r = _embarcar([_onibus(92, sentido="VOLTA")])
+        assert r.status_code == 422
+
+    def test_onibus_que_ja_passou_da_parada_nao_conta(self, db):
+        # 8 vértices depois da parada B: já passou, não volta.
+        passou = _onibus(108)
+        assert _eta_para_b(passou) is None
+        assert _embarcar([passou]).status_code == 422
+
+    def test_onibus_parado_nao_tem_eta_e_nao_confirma(self, db):
+        assert _embarcar([_onibus(92, velocidade=0.0)]).status_code == 422
+
+    def test_posicao_velha_nao_confirma(self, db):
+        assert _embarcar([_onibus(92, idade_s=10 * 60)]).status_code == 422
+
+    def test_sem_paradas_ingeridas_so_vale_o_raio(self, db):
+        r = _embarcar([_onibus(92)], linha=LINHA_SEM_PARADAS)
+        assert r.status_code == 422
+
+    def test_sem_parada_da_linha_perto_do_usuario_nao_vale(self, db):
+        # O passageiro está ~1 km depois da parada B (nenhuma parada a 400 m)
+        # e o ônibus está 8 vértices antes DELE — que seria ~1,7 min.
+        lat, lng = TRAJETO[IDX["B"] + 10]
+        r = _embarcar([_onibus(IDX["B"] + 2)], lat=lat, lng=lng)
+        assert r.status_code == 422
+
+    def test_com_varios_vale_o_de_menor_eta(self, db):
+        lento = _onibus(85, prefixo="LENTO")  # ~3 min: fora do limite
+        medio = _onibus(92, prefixo="MEDIO")  # ~1,7 min
+        rapido = _onibus(95, prefixo="RAPIDO")  # ~1,2 min
+        r = _embarcar([lento, medio, rapido])
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "RAPIDO"
+
+    def test_linha_circular_aceita_veiculo_que_reporta_ida(self, db):
+        """O veículo de linha circular nunca reporta 'CIRCULAR' (feed real)."""
+        r = _embarcar([_onibus(92, prefixo="CIRC")], linha=LINHA_CIRCULAR)
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "CIRC"
+
+    def test_destino_invalido_continua_recusando_antes_do_veiculo(self, db):
+        r = _embarcar([_onibus(92)], destino="PR-NAOEXISTE")
+        assert r.status_code == 422
+        assert "parada de destino" in r.json()["detail"].lower()
+        assert db.query(Viagem).count() == 0
+
+    def test_destino_valido_e_gravado_no_embarque_chegando(self, db):
+        r = _embarcar([_onibus(92)], destino=COD["C"])
+        assert r.status_code == 201
+        assert r.json()["parada_destino_codigo"] == COD["C"]
+
+
+class TestEmbarqueChegandoNoServico:
+    def test_a_regra_do_raio_vem_primeiro_e_nao_consulta_a_rota(self, db):
+        rota = MagicMock()
+        viagem = servico.embarcar(
+            db,
+            usuario_id=PASSAGEIRO,
+            numero_linha=LINHA,
+            lat=LAT_USUARIO,
+            lng=LNG_USUARIO,
+            parada_destino_codigo=None,
+            veiculos=[_veiculo()],
+            agora=servico.agora_utc(),
+            rota_service=rota,
+        )
+        assert viagem.veiculo_prefixo == "440001"
+        rota.trajeto_medido.assert_not_called()
+
+    def test_sem_rota_service_o_comportamento_e_o_de_antes(self, db):
+        with pytest.raises(servico.SemVeiculoProximo):
+            servico.embarcar(
+                db,
+                usuario_id=PASSAGEIRO,
+                numero_linha=LINHA,
+                lat=LAT_USUARIO,
+                lng=LNG_USUARIO,
+                parada_destino_codigo=None,
+                veiculos=[_onibus(92)],
+                agora=servico.agora_utc(),
+            )
+        assert db.query(Viagem).count() == 0
+
+    def test_sem_trajeto_nao_inventa(self, db):
+        rota = MagicMock()
+        rota.trajeto_medido.return_value = None
+        achado = servico.veiculo_chegando_na_parada_do_usuario(
+            db, rota, LINHA, [_onibus(92)], LAT_USUARIO, LNG_USUARIO, datetime.now(timezone.utc)
+        )
+        assert achado is None
+        rota.trajeto_medido.assert_called_once_with(db, LINHA, "IDA")
+
+    def test_sem_veiculos_devolve_none(self, db):
+        achado = servico.veiculo_chegando_na_parada_do_usuario(
+            db, MagicMock(), LINHA, [], LAT_USUARIO, LNG_USUARIO, datetime.now(timezone.utc)
+        )
+        assert achado is None
+
+    def test_o_raio_da_parada_e_configuravel(self, db, monkeypatch):
+        """Com o raio da parada em 1 m, o usuário (em cima da parada) ainda vale;
+        deslocado ~110 m, deixa de valer."""
+        monkeypatch.setattr(servico, "RAIO_PARADA_EMBARQUE_M", 50.0)
+        rota = MagicMock()
+        rota.trajeto_medido.return_value = (MEDIDO, "IDA")
+        agora = datetime.now(timezone.utc)
+
+        em_cima = servico.veiculo_chegando_na_parada_do_usuario(
+            db, rota, LINHA, [_onibus(92)], LAT_USUARIO, LNG_USUARIO, agora
+        )
+        assert em_cima is not None
+
+        deslocado = servico.veiculo_chegando_na_parada_do_usuario(
+            db, rota, LINHA, [_onibus(92)], LAT_USUARIO + 0.001, LNG_USUARIO, agora
+        )
+        assert deslocado is None
 
 
 # ==========================================================================

@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
@@ -57,6 +57,9 @@ class LinhaNaParada:
     # rota ("IDA"/"VOLTA"/"CIRCULAR") e posição da parada nela.
     rota_sentido: str | None = None
     ordem: int | None = None
+    # Issue #174 (2): próximos horários DESTA linha (o PRD pede 3 por linha,
+    # e não 3 no total misturando as linhas).
+    proximos_horarios: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,34 @@ def _proximos_horarios(todos: list[str], agora: str) -> list[str]:
     depois = [h for h in ordenados if h >= agora]
     antes = [h for h in ordenados if h < agora]
     return (depois + antes)[:QTD_PROXIMOS_HORARIOS]
+
+
+def vinculos_por_linha(db: Session, parada_id: int) -> dict[str, tuple[RotaParada, Rota]]:
+    """
+    Um vínculo (parada↔rota) por linha. ~21% das paradas casam IDA e VOLTA
+    dentro do raio de vínculo (vias estreitas, lados opostos da rua); vale
+    a rota de menor distância ao traçado, que é o lado onde a parada
+    realmente está.
+
+    Regra única: o painel da parada (`ParadaService`) e as chegadas
+    (`chegada_service`) usam esta função, para nunca divergirem sobre qual
+    sentido é o da parada.
+    """
+    vinculos = (
+        db.query(RotaParada, Rota)
+        .join(
+            Rota,
+            and_(Rota.numero == RotaParada.numero, Rota.sentido == RotaParada.sentido),
+        )
+        .filter(RotaParada.parada_id == parada_id)
+        .all()
+    )
+    por_numero: dict[str, tuple[RotaParada, Rota]] = {}
+    for vinculo, rota in vinculos:
+        atual = por_numero.get(vinculo.numero)
+        if atual is None or vinculo.distancia_ao_trajeto_m < atual[0].distancia_ao_trajeto_m:
+            por_numero[vinculo.numero] = (vinculo, rota)
+    return por_numero
 
 
 class ParadaService:
@@ -116,30 +147,18 @@ class ParadaService:
             return None
         parada = min(dentro_do_raio, key=lambda c: c[0])[1]
 
-        vinculos = (
-            db.query(RotaParada, Rota)
-            .join(
-                Rota,
-                and_(Rota.numero == RotaParada.numero, Rota.sentido == RotaParada.sentido),
-            )
-            .filter(RotaParada.parada_id == parada.id)
-            .all()
-        )
-        if not vinculos:
+        por_numero = vinculos_por_linha(db, parada.id)
+        if not por_numero:
             return None
 
-        # Uma entrada por linha. ~21% das paradas casam IDA e VOLTA
-        # dentro do raio de vínculo (vias estreitas); vale a rota de
-        # menor distância ao traçado, que é o lado onde a parada está.
-        por_numero: dict[str, tuple[RotaParada, Rota]] = {}
-        for vinculo, rota in vinculos:
-            atual = por_numero.get(vinculo.numero)
-            if atual is None or vinculo.distancia_ao_trajeto_m < atual[0].distancia_ao_trajeto_m:
-                por_numero[vinculo.numero] = (vinculo, rota)
+        horarios_antigos = _horarios_da_lista_antiga(
+            db, [r.numero for _, r in por_numero.values() if r.horarios_por_dia is None]
+        )
 
         linhas: list[LinhaNaParada] = []
         todos_horarios: list[str] = []
         for numero, (vinculo, rota) in sorted(por_numero.items()):
+            horarios = _horarios_de_hoje(rota, agora, horarios_antigos)
             linhas.append(
                 LinhaNaParada(
                     numero=numero,
@@ -147,9 +166,10 @@ class ParadaService:
                     sentido=_rotulo_da_rota(rota),
                     rota_sentido=rota.sentido,
                     ordem=vinculo.ordem,
+                    proximos_horarios=_proximos_horarios(horarios, agora.strftime("%H:%M")),
                 )
             )
-            todos_horarios.extend(_horarios_de_hoje(db, rota, agora))
+            todos_horarios.extend(horarios)
 
         return ParadaEncontrada(
             nome=parada.nome or "Parada sem nome cadastrado",
@@ -163,30 +183,47 @@ class ParadaService:
     def _por_linhas_cacheadas(
         self, db: Session, lat: float, lng: float, agora: datetime
     ) -> ParadaEncontrada | None:
-        colunas = (
-            Linha.numero,
-            Linha.nome,
-            Linha.sentido,
-            Linha.paradas,
-            Linha.horarios_previstos,
-        )
+        # Só o necessário para achar a parada: os horários (lista longa por
+        # linha) são lidos depois, apenas das linhas que realmente passam aqui.
+        colunas = (Linha.numero, Linha.nome, Linha.sentido, Linha.paradas)
+
+        delta_lat = RAIO_MESMA_PARADA_METROS / _METROS_POR_GRAU
+        delta_lng = delta_lat / max(cos(radians(lat)), 0.01)
 
         nome_da_parada: str | None = None
-        linhas: list[LinhaNaParada] = []
-        todos_horarios: list[str] = []
+        achadas: list[tuple[str, str, str]] = []
 
-        for numero, nome, sentido, paradas, horarios_previstos in db.query(*colunas):
+        for numero, nome, sentido, paradas in db.query(*colunas):
             for p in paradas or []:
+                # Caixa antes do haversine: a esmagadora maioria dos pontos do
+                # catálogo está longe e é descartada com duas subtrações.
+                if abs(p["lat"] - lat) > delta_lat or abs(p["lng"] - lng) > delta_lng:
+                    continue
                 if _distancia_metros(lat, lng, p["lat"], p["lng"]) > RAIO_MESMA_PARADA_METROS:
                     continue
                 if nome_da_parada is None and p.get("nome"):
                     nome_da_parada = p["nome"]
-                linhas.append(LinhaNaParada(numero=numero, nome=nome, sentido=sentido))
-                todos_horarios.extend(horarios_previstos or [])
+                achadas.append((numero, nome, sentido))
                 break  # uma parada por linha já basta: não conta a mesma linha duas vezes
 
-        if not linhas:
+        if not achadas:
             return None
+
+        horarios_por_numero = _horarios_da_lista_antiga(db, [n for n, _, _ in achadas])
+        linhas: list[LinhaNaParada] = []
+        todos_horarios: list[str] = []
+        agora_hhmm = agora.strftime("%H:%M")
+        for numero, nome, sentido in achadas:
+            horarios = horarios_por_numero.get(numero, [])
+            linhas.append(
+                LinhaNaParada(
+                    numero=numero,
+                    nome=nome,
+                    sentido=sentido,
+                    proximos_horarios=_proximos_horarios(horarios, agora_hhmm),
+                )
+            )
+            todos_horarios.extend(horarios)
 
         return ParadaEncontrada(
             nome=nome_da_parada or "Parada sem nome cadastrado",
@@ -194,7 +231,7 @@ class ParadaService:
             lat=lat,
             lng=lng,
             linhas=linhas,
-            proximos_horarios=_proximos_horarios(todos_horarios, agora.strftime("%H:%M")),
+            proximos_horarios=_proximos_horarios(todos_horarios, agora_hhmm),
         )
 
 
@@ -208,14 +245,29 @@ def _rotulo_da_rota(rota: Rota) -> str:
     return rotulo_do_sentido(rota.sentido, pontas)
 
 
-def _horarios_de_hoje(db: Session, rota: Rota, agora: datetime) -> list[str]:
+def _horarios_da_lista_antiga(db: Session, numeros: list[str]) -> dict[str, list[str]]:
     """
-    Saídas do dia corrente. Rota ainda sem `horarios_por_dia` (ingestão
-    anterior a esta coluna) usa a lista antiga da linha — sem recorte de
-    dia, que é o comportamento de antes e não some enquanto a reingestão
-    não roda.
+    `Linha.horarios_previstos` (lista plana, sem recorte de dia) das linhas
+    pedidas, numa única consulta. Antes era uma consulta por rota: com 25
+    linhas na parada, eram 25 idas ao banco só para isto.
+    """
+    if not numeros:
+        return {}
+    linhas = db.query(Linha.numero, Linha.horarios_previstos).filter(
+        Linha.numero.in_(set(numeros))
+    )
+    return {numero: list(horarios or []) for numero, horarios in linhas}
+
+
+def _horarios_de_hoje(
+    rota: Rota, agora: datetime, horarios_antigos: dict[str, list[str]]
+) -> list[str]:
+    """
+    Saídas do dia corrente (RN-08: nunca mistura dia útil, sábado e
+    domingo). Rota ainda sem `horarios_por_dia` (ingestão anterior a esta
+    coluna) usa a lista antiga da linha — sem recorte de dia, que é o
+    comportamento de antes e não some enquanto a reingestão não roda.
     """
     if rota.horarios_por_dia is not None:
         return horarios_do_dia(rota.horarios_por_dia, agora.weekday())
-    linha = db.query(Linha.horarios_previstos).filter(Linha.numero == rota.numero).first()
-    return list(linha[0]) if linha and linha[0] else []
+    return horarios_antigos.get(rota.numero, [])

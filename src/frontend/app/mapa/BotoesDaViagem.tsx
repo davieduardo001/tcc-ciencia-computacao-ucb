@@ -69,6 +69,79 @@ export function BotaoPegueiOnibus({ numeroLinha, prefixo, posicaoDoUsuario }: Bo
   );
 }
 
+interface BotaoPegueiNaRotaProps {
+  numeroLinha: string;
+  /** `parada.codigo` do desembarque do trecho; vira o destino da viagem. */
+  paradaDestinoCodigo: string | null;
+  /** Posição do usuário; só confirma que ele está perto do ônibus (RN-06). */
+  posicaoDoUsuario: { lat: number; lng: number } | null;
+}
+
+/**
+ * "Peguei este ônibus" a partir de um trecho da rota montada (issue #190).
+ *
+ * Diferente do botão do popup, aqui não se escolhe um ônibus: o servidor
+ * decide qual da linha confirma o embarque (a até o raio do usuário, ou
+ * chegando à parada dele). Com sucesso, a parada de desembarque do trecho já
+ * fica como destino da viagem — sem escolher de novo no mapa. Sem código de
+ * parada, a viagem começa sem destino e o usuário pode escolhê-lo depois.
+ */
+export function BotaoPegueiNaRota({
+  numeroLinha,
+  paradaDestinoCodigo,
+  posicaoDoUsuario,
+}: BotaoPegueiNaRotaProps) {
+  const { viagem, ocupado, embarcar } = useViagem();
+  const [mensagem, setMensagem] = useState<string | null>(null);
+
+  if (viagem) {
+    return viagem.numeroLinha === numeroLinha ? (
+      <p className="mapa-pegar-onibus-aviso" role="status">
+        Você está nesta linha.
+      </p>
+    ) : null;
+  }
+
+  if (!posicaoDoUsuario) {
+    return (
+      <p className="mapa-pegar-onibus-aviso">
+        Ative a localização para indicar que pegou o ônibus.
+      </p>
+    );
+  }
+
+  async function aoTocar() {
+    setMensagem(null);
+    const resultado = await embarcar({
+      numeroLinha,
+      lat: posicaoDoUsuario!.lat,
+      lng: posicaoDoUsuario!.lng,
+      ...(paradaDestinoCodigo ? { paradaDestinoCodigo } : {}),
+    });
+    if (!resultado.ok) {
+      setMensagem(resultado.mensagem ?? "Não foi possível registrar o embarque.");
+    }
+  }
+
+  return (
+    <div className="mapa-pegar-onibus">
+      <button
+        type="button"
+        className="mapa-pegar-onibus-btn"
+        onClick={aoTocar}
+        disabled={ocupado}
+      >
+        Peguei este ônibus
+      </button>
+      {mensagem && (
+        <p className="mapa-pegar-onibus-erro" role="alert">
+          {mensagem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface BotaoDescerProps {
   codigoDaParada: string;
   /** Linhas que passam por esta parada. */

@@ -1661,6 +1661,22 @@
   color: var(--text-2);
 }
 
+/* Issue #174 — saídas do terminal, uma linha por ônibus. */
+.mapa-saidas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mapa-saida {
+  font-size: 14px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
 .plan-ressalva {
   margin: 12px 0 0;
   font-size: 12.5px;

@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
-import { ChegadasDaParada, DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
+import { ChegadaNoPonto, ChegadasDaParada, ChegadasDaPerna, DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
 import { buscarChegadasParada, buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
 import { buscarViagemAtiva, embarcarNoOnibus, ViagemAtiva } from "@/lib/api";
 import { ViagemProvider } from "../ViagemContext";
@@ -525,6 +525,133 @@ describe("MapaInterativo", () => {
       );
     });
   });
+
+  // -------------------------------------------------------------------
+  // Issue #174 — resposta atrasada não sobrescreve o painel
+  // -------------------------------------------------------------------
+
+  const DETALHE_A: DetalhesParada = { ...DETALHE_PARADA_TESTE, codigo: "PR-AAAAA", nome: "Parada A" };
+  const DETALHE_B: DetalhesParada = { ...DETALHE_PARADA_TESTE, codigo: "PR-BBBBB", nome: "Parada B" };
+
+  function adiada<T>() {
+    let resolver!: (valor: T) => void;
+    let rejeitar!: (erro: unknown) => void;
+    const promessa = new Promise<T>((resolve, reject) => {
+      resolver = resolve;
+      rejeitar = reject;
+    });
+    return { promessa, resolver, rejeitar };
+  }
+
+  it("clicar na parada A e logo na B: a resposta atrasada de A não sobrescreve a B", async () => {
+    const a = adiada<DetalhesParada | null>();
+    buscarDetalhesParadaMock
+      .mockReturnValueOnce(a.promessa)
+      .mockResolvedValueOnce(DETALHE_B);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    const marcadores = screen.getAllByTestId("marcador-mapa-icone-parada");
+    fireEvent.click(marcadores[0]);
+    fireEvent.click(marcadores[1]);
+
+    await screen.findByText("Parada PR-BBBBB");
+
+    await act(async () => {
+      a.resolver(DETALHE_A);
+      await a.promessa;
+    });
+
+    expect(screen.getByText("Parada PR-BBBBB")).toBeInTheDocument();
+    expect(screen.queryByText("Parada PR-AAAAA")).not.toBeInTheDocument();
+  });
+
+  it("o erro atrasado de A também não derruba o painel da B", async () => {
+    const a = adiada<DetalhesParada | null>();
+    buscarDetalhesParadaMock
+      .mockReturnValueOnce(a.promessa)
+      .mockResolvedValueOnce(DETALHE_B);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    const marcadores = screen.getAllByTestId("marcador-mapa-icone-parada");
+    fireEvent.click(marcadores[0]);
+    fireEvent.click(marcadores[1]);
+    await screen.findByText("Parada PR-BBBBB");
+
+    await act(async () => {
+      a.rejeitar(new BuscarParadaError("Falha antiga de A"));
+      await a.promessa.catch(() => undefined);
+    });
+
+    expect(screen.getByText("Parada PR-BBBBB")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("fechar o painel antes da resposta chegar: ela não reabre o painel", async () => {
+    const a = adiada<DetalhesParada | null>();
+    buscarDetalhesParadaMock.mockReturnValueOnce(a.promessa);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+    fireEvent.click(screen.getByTitle("Fechar"));
+
+    await act(async () => {
+      a.resolver(DETALHE_A);
+      await a.promessa;
+    });
+
+    expect(screen.queryByText("Parada PR-AAAAA")).not.toBeInTheDocument();
+    expect(screen.getByText(LINHA_TESTE.nome)).toBeInTheDocument();
+  });
+
+  it("clicar de novo depois de fechar continua funcionando", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_B);
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    const marcadores = screen.getAllByTestId("marcador-mapa-icone-parada");
+    fireEvent.click(marcadores[0]);
+    await screen.findByText("Parada PR-BBBBB");
+    fireEvent.click(screen.getByTitle("Fechar"));
+    fireEvent.click(marcadores[1]);
+
+    expect(await screen.findByText("Parada PR-BBBBB")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------
+  // Issue #174 — horários por linha
+  // -------------------------------------------------------------------
+
+  it("mostra as próximas saídas de cada linha, e não três no total", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue({
+      ...DETALHE_PARADA_TESTE,
+      linhas: [
+        { numero: "0.110", nome: "Taguatinga", sentido: "ida", proximosHorarios: ["06:20", "06:40", "07:00"] },
+        { numero: "0.220", nome: "Ceilândia", sentido: "ida", proximosHorarios: ["06:30"] },
+        { numero: "0.330", nome: "Samambaia", sentido: "ida", proximosHorarios: [] },
+      ],
+    });
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    expect(await screen.findByText("06:20 · 06:40 · 07:00")).toBeInTheDocument();
+    expect(screen.getByText("06:30")).toBeInTheDocument();
+    expect(screen.getByText("sem saída prevista hoje")).toBeInTheDocument();
+  });
+
+  it("nenhuma linha com saída hoje: mostra o aviso de sem saída prevista", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue({
+      ...DETALHE_PARADA_TESTE,
+      linhas: [{ numero: "0.110", nome: "Taguatinga", sentido: "ida", proximosHorarios: [] }],
+      proximosHorarios: [],
+    });
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    expect(
+      await screen.findByText("Nenhuma saída prevista disponível para esta parada no momento.")
+    ).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -612,9 +739,26 @@ describe("MapaInterativo — itinerário da viagem (US #20)", () => {
     expect(
       screen.getByTestId("marcador-mapa-icone-viagem baldeacao")
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("marcador-mapa-icone-viagem desembarque")
-    ).toBeInTheDocument();
+    // Issue #190: um desembarque por trecho — o do 1º ônibus (~150 m do
+    // embarque do 2º, então não se sobrepõem) e o do destino.
+    expect(screen.getAllByTestId("marcador-mapa-icone-viagem desembarque")).toHaveLength(2);
+  });
+
+  it("desembarque da baldeação que cai em cima do embarque seguinte não ganha marcador próprio", () => {
+    const [primeira, segunda] = VIAGEM_COM_BALDEACAO.pernas;
+    const colada: OpcaoViagem = {
+      ...VIAGEM_COM_BALDEACAO,
+      pernas: [
+        { ...primeira, desembarque: { ...primeira.desembarque, lat: segunda.embarque.lat, lng: segunda.embarque.lng } },
+        segunda,
+      ],
+    };
+
+    render(<MapaInterativo viagem={colada} />);
+
+    // Só o do destino; o ponto da troca já tem o marcador de "baldeação".
+    expect(screen.getAllByTestId("marcador-mapa-icone-viagem desembarque")).toHaveLength(1);
+    expect(screen.getByTestId("marcador-mapa-icone-viagem baldeacao")).toBeInTheDocument();
   });
 
   it("marca origem e destino informados pelo usuário", () => {
@@ -631,6 +775,110 @@ describe("MapaInterativo — itinerário da viagem (US #20)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Aeroporto JK")).toBeInTheDocument();
     expect(screen.getByText("UnB")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------
+  // Issue #190 — tempo do ônibus nas paradas de subir e descer
+  // -------------------------------------------------------------------
+
+  const ponto = (sobre: Partial<ChegadaNoPonto> = {}): ChegadaNoPonto => ({
+    paradaCodigo: null,
+    etaMinutos: null,
+    fonte: null,
+    prefixo: null,
+    horarioPrevisto: null,
+    ...sobre,
+  });
+
+  const [PERNA_1, PERNA_2] = VIAGEM_COM_BALDEACAO.pernas;
+  const VIAGEM_COM_CODIGOS: OpcaoViagem = {
+    ...VIAGEM_COM_BALDEACAO,
+    pernas: [
+      {
+        ...PERNA_1,
+        embarque: { ...PERNA_1.embarque, parada_codigo: "PR-E1" },
+        desembarque: { ...PERNA_1.desembarque, parada_codigo: "PR-D1" },
+      },
+      {
+        ...PERNA_2,
+        embarque: { ...PERNA_2.embarque, parada_codigo: "PR-E2" },
+        desembarque: { ...PERNA_2.desembarque, parada_codigo: "PR-D2" },
+      },
+    ],
+  };
+
+  const CHEGADAS: ChegadasDaPerna[] = [
+    {
+      numero: "0.186",
+      sentido: "IDA",
+      embarque: ponto({ paradaCodigo: "PR-E1", etaMinutos: 4.3, fonte: "ao_vivo", prefixo: "440001" }),
+      desembarque: ponto({ paradaCodigo: "PR-D1", etaMinutos: 18, fonte: "previsto", horarioPrevisto: "15:18" }),
+    },
+    {
+      numero: "0.110",
+      sentido: "CIRCULAR",
+      embarque: ponto({ paradaCodigo: "PR-E2", etaMinutos: 7, fonte: "previsto", horarioPrevisto: "15:07" }),
+      desembarque: ponto({ paradaCodigo: "PR-D2", etaMinutos: 12, fonte: "ao_vivo", prefixo: "440002" }),
+    },
+  ];
+
+  it("popup do embarque mostra o tempo ao vivo, com o selo de origem", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} chegadasDaRota={CHEGADAS} />);
+
+    const popup = within(screen.getByTestId("marcador-mapa-icone-viagem embarque"));
+    const tempo = popup.getByLabelText("Tempo até o embarque");
+    expect(tempo).toHaveTextContent("Chega em 4 min (carro 440001)");
+    expect(popup.getByText("ao vivo")).toBeInTheDocument();
+  });
+
+  it("popup da baldeação mostra o horário previsto, com o selo 'previsto'", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} chegadasDaRota={CHEGADAS} />);
+
+    const popup = within(screen.getByTestId("marcador-mapa-icone-viagem baldeacao"));
+    expect(popup.getByText("15:07")).toBeInTheDocument();
+    expect(popup.getByText("previsto")).toBeInTheDocument();
+  });
+
+  it("popups do desembarque (da baldeação e do destino) mostram o tempo de cada trecho", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} chegadasDaRota={CHEGADAS} />);
+
+    const [intermediario, destino] = screen.getAllByTestId("marcador-mapa-icone-viagem desembarque");
+    expect(within(intermediario).getByText("15:18")).toBeInTheDocument();
+    expect(within(destino).getByLabelText("Tempo até o desembarque")).toHaveTextContent(
+      "Chega em 12 min (carro 440002)"
+    );
+  });
+
+  it("ponto sem dado diz 'Sem previsão no momento' (não inventa)", () => {
+    const semDado: ChegadasDaPerna[] = [
+      { ...CHEGADAS[0], embarque: ponto({ paradaCodigo: "PR-E1" }) },
+      CHEGADAS[1],
+    ];
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} chegadasDaRota={semDado} />);
+
+    const popup = within(screen.getByTestId("marcador-mapa-icone-viagem embarque"));
+    expect(popup.getByText("Sem previsão no momento")).toBeInTheDocument();
+  });
+
+  it("ponto sem código de parada diz 'Sem previsão no momento', mesmo sem resposta do servidor", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_BALDEACAO} chegadasDaRota={null} />);
+
+    const popup = within(screen.getByTestId("marcador-mapa-icone-viagem embarque"));
+    expect(popup.getByText("Sem previsão no momento")).toBeInTheDocument();
+  });
+
+  it("com código mas sem resposta ainda (carregando ou falhou), o popup não afirma nada", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} chegadasDaRota={null} />);
+
+    const embarque = screen.getByTestId("marcador-mapa-icone-viagem embarque");
+    expect(within(embarque).queryByText(/Sem previsão/)).not.toBeInTheDocument();
+    expect(within(embarque).queryByText(/Chega em/)).not.toBeInTheDocument();
+  });
+
+  it("sem a prop de chegadas o mapa se comporta como antes", () => {
+    render(<MapaInterativo viagem={VIAGEM_COM_CODIGOS} />);
+    expect(screen.getByTestId("marcador-mapa-icone-viagem embarque")).toBeInTheDocument();
+    expect(screen.queryByText(/Chega em/)).not.toBeInTheDocument();
   });
 
   it("no modo escolher ponto, o clique no mapa devolve a coordenada", () => {
@@ -1107,6 +1355,96 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
     expect(popup).not.toHaveTextContent(/Chega na parada/);
   });
 
+  // ---------------------------------------------------------------------
+  // Issue #190 — "quanto falta para ESTE ônibus chegar até mim"
+  // ---------------------------------------------------------------------
+
+  function comLocalizacao() {
+    mockGeolocation({
+      getCurrentPosition: jest.fn((sucesso) =>
+        sucesso({
+          coords: { latitude: -15.83, longitude: -48.04 },
+        } as GeolocationPosition)
+      ) as unknown as Geolocation["getCurrentPosition"],
+    });
+  }
+
+  it("o tempo do popup declara a origem: 'ao vivo'", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na parada W3 Sul — 502 em 4 min");
+    expect(popup).toHaveTextContent("ao vivo");
+  });
+
+  it("parada sem nome cadastrado: diz 'sua parada' em vez de calar", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: null },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na sua parada em 4 min");
+    expect(popup).toHaveTextContent("ao vivo");
+  });
+
+  it("com localização e sem tempo, o popup diz 'Sem previsão no momento'", async () => {
+    comLocalizacao();
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: null }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    await waitFor(() => expect(popup).toHaveTextContent("Sem previsão no momento"));
+    expect(popup).not.toHaveTextContent(/Chega na/);
+    expect(popup).not.toHaveTextContent("ao vivo");
+  });
+
+  it("sem localização, o popup não afirma 'Sem previsão' (não sabemos onde o usuário está)", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: null }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).not.toHaveTextContent("Sem previsão no momento");
+  });
+
+  it("o tempo do popup atualiza sozinho a cada 20 s", async () => {
+    jest.useFakeTimers();
+    comLocalizacao();
+    buscarPosicoesMock
+      .mockResolvedValueOnce(
+        resultadoPosicoes([
+          { ...VEICULO, etaMinutos: 6, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+        ])
+      )
+      .mockResolvedValue(
+        resultadoPosicoes([
+          { ...VEICULO, etaMinutos: 4, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+        ])
+      );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await act(async () => {});
+    expect(screen.getByTestId("popup")).toHaveTextContent("em 6 min");
+
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    expect(screen.getByTestId("popup")).toHaveTextContent("em 4 min");
+    expect(screen.getByTestId("popup")).not.toHaveTextContent("em 6 min");
+  });
+
 });
 
 // ---------------------------------------------------------------------------
@@ -1235,6 +1573,45 @@ describe("MapaInterativo — viagem em andamento (US #171)", () => {
       const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
       expect(marcador.getAttribute("data-html")).not.toContain("4 min");
       expect(marcador.getAttribute("data-html")).toContain("0.110");
+    });
+
+    it("os popups da rota não mostram o tempo do ônibus que o passageiro pegaria (issue #190)", async () => {
+      // Já está a bordo: "daqui a quanto o ônibus chega" deixa de valer, e
+      // calcular pelo "ônibus que ele pegaria" apontaria o próximo da fila.
+      const [p1, p2] = VIAGEM_COM_BALDEACAO.pernas;
+      const comCodigos: OpcaoViagem = {
+        ...VIAGEM_COM_BALDEACAO,
+        pernas: [
+          {
+            ...p1,
+            embarque: { ...p1.embarque, parada_codigo: "PR-E1" },
+            desembarque: { ...p1.desembarque, parada_codigo: "PR-D1" },
+          },
+          {
+            ...p2,
+            embarque: { ...p2.embarque, parada_codigo: "PR-E2" },
+            desembarque: { ...p2.desembarque, parada_codigo: "PR-D2" },
+          },
+        ],
+      };
+      const aoVivo = (codigo: string) => ({
+        paradaCodigo: codigo,
+        etaMinutos: 4,
+        fonte: "ao_vivo" as const,
+        prefixo: "440001",
+        horarioPrevisto: null,
+      });
+      const chegadas: ChegadasDaPerna[] = [
+        { numero: "0.186", sentido: "IDA", embarque: aoVivo("PR-E1"), desembarque: aoVivo("PR-D1") },
+        { numero: "0.110", sentido: "CIRCULAR", embarque: aoVivo("PR-E2"), desembarque: aoVivo("PR-D2") },
+      ];
+
+      comProvider({ viagem: comCodigos, chegadasDaRota: chegadas });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+
+      expect(screen.getByTestId("marcador-mapa-icone-viagem embarque")).toBeInTheDocument();
+      expect(screen.queryByText(/Chega em/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sem previsão/)).not.toBeInTheDocument();
     });
 
     it("o popup deixa de dizer quando o ônibus chega na parada", async () => {

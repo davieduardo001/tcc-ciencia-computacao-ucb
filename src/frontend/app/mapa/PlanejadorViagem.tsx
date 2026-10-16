@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import {
   buscarLugares,
+  ChegadasDaPerna,
   Lugar,
   OpcaoViagem,
   PernaViagem,
@@ -35,7 +36,10 @@ import {
   salvarFavorito,
 } from "@/lib/api";
 import BadgeLinha from "./BadgeLinha";
+import { BotaoPegueiNaRota } from "./BotoesDaViagem";
 import SeloFonte from "./SeloFonte";
+import TempoNaParada, { SEM_DADO, temTempo } from "./TempoNaParada";
+import { useViagem } from "./ViagemContext";
 import {
   Destaque,
   destaquesDasOpcoes,
@@ -85,6 +89,12 @@ interface PlanejadorViagemProps {
   favoritosIds?: Set<string>;
   /** US #25 — callback ao salvar favorito com sucesso. */
   onFavoritoSalvo?: (favorito: RotaFavorita) => void;
+  /** Issue #190 — quando o ônibus de cada trecho da opção SELECIONADA chega
+   * à parada de subir e à de descer, alinhado por índice com as pernas.
+   * `null` enquanto carrega ou se a consulta falhou. */
+  chegadasDaRota?: ChegadasDaPerna[] | null;
+  /** Issue #190 — posição do usuário, para "Peguei este ônibus" no trecho. */
+  localizacao?: { lat: number; lng: number } | null;
 }
 
 function CampoLugar({
@@ -454,6 +464,27 @@ function Metros({ metros }: { metros: number }) {
 }
 
 /**
+ * Tempo até a parada de descer (issue #190). Sem código de parada não há o
+ * que perguntar: diz "sem previsão" (Cenário 7). Com código, mas sem resposta
+ * ainda (carregando, ou a consulta falhou), não afirma nada.
+ */
+function TempoNaDescida({
+  perna,
+  chegada,
+  carregou,
+}: {
+  perna: PernaViagem;
+  chegada: ChegadasDaPerna | null;
+  carregou: boolean;
+}) {
+  if (!perna.desembarque.parada_codigo) {
+    return <TempoNaParada ponto={SEM_DADO} qual="desembarque" />;
+  }
+  if (!carregou || !chegada) return null;
+  return <TempoNaParada ponto={chegada.desembarque} qual="desembarque" />;
+}
+
+/**
  * Detalhe da opção como linha do tempo — era texto corrido de três linhas
  * iguais. Cada passo tem marcador próprio: o número do marcador do mapa no
  * embarque (a tela e o mapa dizem o mesmo), seta no desembarque, pegadas na
@@ -461,13 +492,27 @@ function Metros({ metros }: { metros: number }) {
  */
 function LinhaDoTempo({
   passos,
+  pernas,
   veiculosPorLinha,
   rastreando,
+  chegadas = null,
+  localizacao = null,
 }: {
   passos: Passo[];
+  /** As pernas da opção, na ordem: o índice casa com `chegadas`. */
+  pernas: PernaViagem[];
   veiculosPorLinha: Record<string, number>;
   rastreando: boolean;
+  chegadas?: ChegadasDaPerna[] | null;
+  localizacao?: { lat: number; lng: number } | null;
 }) {
+  // Em viagem o passageiro já está a bordo: o tempo "do ônibus que ele
+  // pegaria" (embarque e desembarque) deixa de valer, e quem acompanha é a
+  // faixa de viagem do mapa.
+  const { viagem } = useViagem();
+  const emViagem = viagem !== null;
+  const chegadaDaPerna = (perna: PernaViagem) => chegadas?.[pernas.indexOf(perna)] ?? null;
+
   return (
     <ol className="plan-tempo">
       {passos.map((passo, posicao) => (
@@ -506,10 +551,19 @@ function LinhaDoTempo({
                   <BadgeLinha numero={passo.perna.numero} />
                   <span className="plan-tempo-nome">{passo.perna.nome}</span>
                 </p>
-                <Chegada
-                  perna={passo.perna}
-                  veiculosPorLinha={veiculosPorLinha}
-                  rastreando={rastreando}
+                {!emViagem && temTempo(chegadaDaPerna(passo.perna)?.embarque) ? (
+                  <TempoNaParada ponto={chegadaDaPerna(passo.perna)?.embarque} qual="embarque" />
+                ) : (
+                  <Chegada
+                    perna={passo.perna}
+                    veiculosPorLinha={veiculosPorLinha}
+                    rastreando={rastreando}
+                  />
+                )}
+                <BotaoPegueiNaRota
+                  numeroLinha={passo.perna.numero}
+                  paradaDestinoCodigo={passo.perna.desembarque.parada_codigo ?? null}
+                  posicaoDoUsuario={localizacao}
                 />
               </>
             )}
@@ -536,6 +590,14 @@ function LinhaDoTempo({
                   {rotuloDoPonto(passo.perna.desembarque.parada_nome)}
                 </strong>
               </p>
+            )}
+
+            {passo.tipo === "descer" && !emViagem && (
+              <TempoNaDescida
+                perna={passo.perna}
+                chegada={chegadaDaPerna(passo.perna)}
+                carregou={chegadas !== null}
+              />
             )}
 
             {passo.tipo === "baldear" && (
@@ -664,6 +726,8 @@ export default function PlanejadorViagem({
   rastreando,
   favoritosIds = new Set(),
   onFavoritoSalvo,
+  chegadasDaRota = null,
+  localizacao = null,
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
   const folha = useFolhaArrastavel();
@@ -939,8 +1003,11 @@ export default function PlanejadorViagem({
                     >
                       <LinhaDoTempo
                         passos={passosDaOpcao(opcao)}
+                        pernas={opcao.pernas}
                         veiculosPorLinha={veiculosPorLinha}
                         rastreando={rastreando}
+                        chegadas={chegadasDaRota}
+                        localizacao={localizacao}
                       />
                     </div>
                   )}
