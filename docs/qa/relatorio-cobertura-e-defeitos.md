@@ -1,0 +1,133 @@
+# Relatório de Cobertura, Defeitos e Histórico de CI — Movecity
+
+
+> 📎 Ver este arquivo no GitHub: <https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/blob/main/docs/qa/relatorio-cobertura-e-defeitos.md>
+
+Cobertura medida, defeitos encontrados e corrigidos nas Sprints 2 e 3 (e como cada um foi detectado), histórico do CI e dívida de testes. Medições em 16/10/2026, `homolog` @ `07c9edc`. Contexto: [`README.md`](README.md).
+
+## 1. Cobertura
+
+### 1.1 Backend (`pytest --cov`)
+
+Comando: `pytest -q --cov=auth --cov=colaboracao --cov=gateway --cov=mobilidade --cov=shared --cov-report=term` (Postgres 16, 671 testes).
+
+| Serviço | Instruções do código de produção | Não cobertas | Cobertura |
+|---|---|---|---|
+| mobilidade | 2.700 | 146 | 94,6% |
+| colaboracao | 535 | 35 | 93,5% |
+| auth | 372 | 29 | 92,2% |
+| gateway | 180 | 31 | 82,8% |
+| shared | 41 | 0 | 100,0% |
+| **Código de produção** | **3.828** | **241** | **93,7%** |
+
+> O relatório do pytest mostra `TOTAL 9361 / 254 / 97%`. Esse total **inclui os próprios arquivos de teste** (que se cobrem a si mesmos) e por isso é mais alto. Os números acima separam o código de produção pelo caminho (`*/tests/*` e `test_*.py` ficam de fora).
+
+Arquivos de produção com menos de 85% de cobertura (20 ou mais instruções):
+
+| Arquivo | Cobertura | Não cobertas | Observação |
+|---|---|---|---|
+| `mobilidade/providers/linha_google_maps.py` | 30% | 32 de 46 | Provider real do Google (chamada externa) |
+| `mobilidade/workers/monitoramento.py` | 62% | 15 de 39 | Worker de alertas |
+| `mobilidade/main.py` | 73% | 11 de 41 | Montagem da aplicação e do worker |
+| `gateway/routes.py` | 81% | 16 de 86 | Rotas de proxy |
+| `gateway/proxy.py` | 83% | 4 de 23 | Proxy (testado com `httpx` mockado) |
+
+### 1.2 Frontend (`jest --coverage`)
+
+| Medida | Cobertura | Cobertas / total |
+|---|---|---|
+| Instruções | **89,07%** | 1.622 / 1.821 |
+| Ramos | 84,65% | 855 / 1.010 |
+| Funções | 86,09% | 353 / 410 |
+| Linhas | 90,86% | 1.532 / 1.686 |
+
+Menos cobertos (linhas): `app/ocorrencias/reportar/page.tsx` 73,8%, `app/tutorial/page.tsx` 81,1%, `app/AvisoEmBreve.tsx` 81,8%, `app/redefinir-senha/page.tsx` 82,6%, `lib/api.ts` 84,5%.
+
+> **Limitação importante.** O Jest do projeto não define `collectCoverageFrom`, então só entram na conta os arquivos **importados por algum teste**. Dos 43 arquivos `.ts`/`.tsx` em `app/` e `lib/` (fora dos testes), 40 foram medidos. Os 3 que ficaram de fora são `app/layout.tsx`, `app/manifest.ts` e `app/RegistrarServiceWorker.tsx`. Os 89,07% são, portanto, um piso otimista; incluir esses arquivos (por exemplo, com `collectCoverageFrom`) derrubaria o número.
+
+## 2. Defeitos encontrados e corrigidos
+
+Selecionados nas issues e PRs das Sprints 1 a 3, com a forma de detecção **registrada na própria issue ou PR**. Quando o registro não diz como foi detectado, a tabela diz isso.
+
+| # | Defeito | Issue / PR | Causa | Detectado por | Quando |
+|---|---|---|---|---|---|
+| 1 | Contêiner dos serviços morria no boot | PR #102; #127/#128; corrigido pelo CI da #145 e do PR #148 | `requirements.txt` do serviço sem pacote que o código importa; o CI instalava só o requirements combinado | **Produção** (queda) | Sprint 1 |
+| 2 | Front chamava caminho que o Gateway não serve | PR #81 (citado na #151) | Sem teste de contrato front ↔ Gateway | **Produção**, segundo a #151 | Sprint 1 |
+| 3 | Ordem do CORS quebrava toda rota protegida | PR #107 (citado na #151) | Ordem dos middlewares | **Produção**, segundo a #151 | Sprint 1 |
+| 4 | `/docs` do Gateway respondia 401 | #149 → PR #150 | Entrada `"/doc"` (sem "s") em `ROTAS_PUBLICAS`; 6 das 18 entradas não correspondiam a rota alguma | **Produção**; depois **auditoria** da lista contra a aplicação rodando | 24/09 |
+| 5 | CI vermelho: `No module named 'psycopg'` nas migrations e no boot dos serviços | Runs de 27 e 28/09; commit `cf3289d` ("travar sqlalchemy em 2.0.x pra nao puxar o driver psycopg v3"), mergeado pelo PR #154 | SQLAlchemy sem versão travada puxava outro driver | **CI** (antes do merge) | 27–28/09 |
+| 6 | Tutorial voltava a aparecer sempre (`first_access` nunca persistia) | PR #165 (fechado), consolidado no #166 | Gateway não tinha proxy para `PUT /auth/me/first-access`; o 404 era engolido pelo `catch` do front | **Mapeamento de UI** da issue #143 (auditoria) | ~01/10 |
+| 7 | Nenhuma linha circular mostrava ETA | PR #161 | O motor exigia `sentido: "CIRCULAR"` do veículo, que o feed real nunca reporta | **Validação manual** com o feed real do SEMOB | 30/09–01/10 |
+| 8 | Achados de uso: botão de fechar do painel, legibilidade, direção do ônibus, atalho de reportar | PR #168 | Vários | **Teste manual contra dados reais** (descrito no PR) | 01/10 |
+| 9 | ETA errado: sentido ambíguo e horários misturando dias | #173 → PRs #177 e #185 | 21,4% dos pares (parada, linha) casam IDA e VOLTA; 809 de 1.394 linha×sentido têm mais de um tipo de dia | **Medição** sobre o feed real do SEMOB (06/10), registrada na #173 | 06/10 |
+| 10 | Número da linha com contraste 1,78:1; botão de favorito sem estilo; ETA medido até o GPS do usuário; saída do terminal apresentada como passagem | #179 → PRs #181 a #185 | Tokens de cor; CSS no escopo errado (`favoritos.css`); alvo do ETA | **Auditoria** do card, com contraste calculado e leitura do código | 14/10 |
+| 11 | Gateway repassava o `X-User-Id` do cliente | #188 → PR #189 | Dois cabeçalhos `X-User-Id` chegavam ao serviço (o `dict` distingue maiúsculas) e o serviço lia o primeiro | **Não registrado** na issue | 14/10 |
+| 12 | Import de ícone perdido num merge quebrava o chip de viagem | PR #187 (commit `a3d03e5`) | Merge sem conflito do Git removeu o import usado por outro PR | **CI** (Jest), antes de chegar ao usuário | 16/10 |
+| 13 | Embarque recusado a mais de 100 m do ônibus | PR #191 (issue #190) | Raio fixo | **Teste real** da equipe (de longe do ônibus) | 16/10 |
+
+### Resumo da detecção (13 defeitos)
+
+| Detectado por | Quantidade | Defeitos |
+|---|---|---|
+| Produção, antes do usuário final reportar | 4 | 1, 2, 3, 4 |
+| CI, antes do merge | 2 | 5, 12 |
+| Teste manual ou uso com dados reais | 3 | 7, 8, 13 |
+| Auditoria ou medição | 3 | 6, 9, 10 |
+| Não registrado | 1 | 11 |
+
+> **Leitura.** Dos 13 defeitos, **8 são de conexão entre as peças** (1, 2, 3, 4, 5, 6, 11, 12: dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge), e 5 são de regra, dado ou interface (7, 8, 9, 10, 13). Isso reforça a prioridade dos testes de integração do [relatório de integração](relatorio-testes-integracao.md). Os defeitos 1 a 4 foram relatados como ocorridos em produção. Os demais foram achados por outros meios, mas como `homolog` publica direto no ambiente visível (ver o [plano de testes](plano-de-testes.md)), os defeitos 6, 7, 10 e 11 também estiveram no código publicado até a correção; os registros consultados não dizem se algum usuário foi afetado.
+
+## 3. Histórico do CI
+
+Fonte: `gh run list --limit 1000 --json databaseId,workflowName,conclusion,createdAt,updatedAt,headBranch` (327 execuções, de 18/06 a 16/10/2026) e `gh run view` para o passo que falhou.
+
+### 3.1 CI de PR ("CI — Testes no PR")
+
+| Janela | Execuções concluídas | Verdes | Vermelhas | % verde | Duração mediana |
+|---|---|---|---|---|---|
+| Desde 18/06 (todas) | 199 | 148 | 51 | 74% | — |
+| Desde 22/09 (Sprint 2 em diante) | 76 | 60 | 16 | 79% | 1,1 min |
+| Desde 05/10 (Sprint 3) | 35 | 33 | 2 | 94% | 1,1 min |
+
+(Há ainda 1 execução cancelada no total.) A duração máxima desde 22/09 aparece como 275,6 min; é um valor atípico (execução presa ou reexecutada) cuja causa **não foi investigada**. Desde 05/10, o máximo foi de 4,3 min.
+
+### 3.2 As 16 execuções vermelhas desde 22/09
+
+| Branch | Execuções | Passos que falharam |
+|---|---|---|
+| `feat/issue-27-alerta-atraso-linha` | 6 (26 e 28/09) | verificação de imports; migrations; testes |
+| `feat/issue-30-tutorial-primeiro-acesso` | 6 (30/09) | migrations; importar a aplicação; Conventional Commits |
+| `feat/issue-133-recuperacao-de-senha-no-aplicativo` | 1 (27/09) | migrations; importar a aplicação (3 serviços) |
+| `feat/issue-19-eta-onibus` | 1 (28/09) | migrations; importar a aplicação (3 serviços) |
+| `fix/issue-173-mapeamento-paradas` | 1 (08/10) | migrations |
+| `feat/issue-171-pegar-onibus-frontend` | 1 (16/10) | Jest (`Bus is not defined`, ver defeito 12) |
+
+Só duas causas estão confirmadas em log: `ModuleNotFoundError: No module named 'psycopg'` (27/09) e o import perdido de 16/10. A causa dos demais vermelhos em "Rodar migrations" não foi investigada.
+
+### 3.3 Deploys
+
+| Workflow | Sucesso | Falha | Cancelado | Desde 22/09 |
+|---|---|---|---|---|
+| Deploy Backend (Fly.io) | 62 | 6 | 3 | nenhuma falha |
+| Deploy Frontend (Vercel) | 48 | 1 | 0 | nenhuma falha |
+| Ingestão de linhas do SEMOB | 4 | 1 | 0 | — |
+| Deploy Protótipo (GitHub Pages) | 1 | 1 | 0 | — |
+
+Os deploys de `homolog` do commit `07c9edc` (backend e frontend) terminaram com sucesso.
+
+## 4. Dívida de testes
+
+| Área | O que falta | Evidência |
+|---|---|---|
+| Casos manuais | Os 49 casos de [`casos-de-teste.md`](casos-de-teste.md) ainda não foram executados | 0 execuções registradas |
+| Contrato front ↔ Gateway | Nenhum teste compara `lib/api.ts` com o Gateway | `fetch` mockado em todo o frontend; defeitos 2 e 6 |
+| Gateway ↔ serviços | Proxy testado com `httpx` mockado | `gateway/tests/test_proxy.py`; defeito 11 |
+| Cobertura no CI | A cobertura não é medida nem exibida no PR | `ci.yml` roda `pytest -v` e `npm test` sem `--cov`/`--coverage` |
+| Jest sem `collectCoverageFrom` | 3 arquivos fora da medição | seção 1.2 |
+| Lint do frontend | `next lint` não está configurado | PR #187, "Notas e limites" |
+| Postgres × SQLite | 2 arquivos de teste usam SQLite em memória; o PR #192 mediu o custo da consulta em SQLite | seção 2.2 do relatório de integração; PR #192 |
+| Validação visual e no celular | O toque em "Cheguei", o estado de erro e a posição do botão no passo do card não foram conferidos no navegador | PR #187 e PR #193, "O que NÃO foi verificado" |
+| ETA em campo | Tolerância proposta de 2 min para ETA até 10 min não foi medida; raio de 100 m e regra do embarque com o ônibus chegando (400 m, 2 min) também não | issue #173; PR #191 |
+| Web Push / tela bloqueada | Não existe ainda; sem teste em dispositivo real nem no iOS | issue #195 |
+| Avisos do pytest | 173 avisos não analisados | execução de 16/10 |
+| APIs externas | SEMOB, OSRM, Nominatim e Google só em mocks | relatório de integração |
