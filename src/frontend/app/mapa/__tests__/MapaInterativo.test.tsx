@@ -1234,6 +1234,96 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
     expect(popup).not.toHaveTextContent(/Chega na parada/);
   });
 
+  // ---------------------------------------------------------------------
+  // Issue #190 — "quanto falta para ESTE ônibus chegar até mim"
+  // ---------------------------------------------------------------------
+
+  function comLocalizacao() {
+    mockGeolocation({
+      getCurrentPosition: jest.fn((sucesso) =>
+        sucesso({
+          coords: { latitude: -15.83, longitude: -48.04 },
+        } as GeolocationPosition)
+      ) as unknown as Geolocation["getCurrentPosition"],
+    });
+  }
+
+  it("o tempo do popup declara a origem: 'ao vivo'", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na parada W3 Sul — 502 em 4 min");
+    expect(popup).toHaveTextContent("ao vivo");
+  });
+
+  it("parada sem nome cadastrado: diz 'sua parada' em vez de calar", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: null },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na sua parada em 4 min");
+    expect(popup).toHaveTextContent("ao vivo");
+  });
+
+  it("com localização e sem tempo, o popup diz 'Sem previsão no momento'", async () => {
+    comLocalizacao();
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: null }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    await waitFor(() => expect(popup).toHaveTextContent("Sem previsão no momento"));
+    expect(popup).not.toHaveTextContent(/Chega na/);
+    expect(popup).not.toHaveTextContent("ao vivo");
+  });
+
+  it("sem localização, o popup não afirma 'Sem previsão' (não sabemos onde o usuário está)", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: null }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).not.toHaveTextContent("Sem previsão no momento");
+  });
+
+  it("o tempo do popup atualiza sozinho a cada 20 s", async () => {
+    jest.useFakeTimers();
+    comLocalizacao();
+    buscarPosicoesMock
+      .mockResolvedValueOnce(
+        resultadoPosicoes([
+          { ...VEICULO, etaMinutos: 6, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+        ])
+      )
+      .mockResolvedValue(
+        resultadoPosicoes([
+          { ...VEICULO, etaMinutos: 4, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+        ])
+      );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await act(async () => {});
+    expect(screen.getByTestId("popup")).toHaveTextContent("em 6 min");
+
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    expect(screen.getByTestId("popup")).toHaveTextContent("em 4 min");
+    expect(screen.getByTestId("popup")).not.toHaveTextContent("em 6 min");
+  });
+
 });
 
 // ---------------------------------------------------------------------------

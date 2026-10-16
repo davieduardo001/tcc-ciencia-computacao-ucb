@@ -766,11 +766,28 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
-                {!emViagem && veiculo.etaMinutos != null && veiculo.paradaNome && (
+                {!emViagem &&
+                  veiculo.etaMinutos != null &&
+                  (veiculo.paradaNome || veiculo.paradaCodigo) && (
+                    <>
+                      <br />
+                      {veiculo.paradaNome ? (
+                        <>
+                          Chega na parada <strong>{veiculo.paradaNome}</strong>
+                        </>
+                      ) : (
+                        "Chega na sua parada"
+                      )}{" "}
+                      em {formatarMinutos(veiculo.etaMinutos)} <SeloFonte fonte="ao_vivo" />
+                    </>
+                  )}
+                {/* Issue #190 — com a localização conhecida e sem tempo (ônibus
+                    parado, sentido oposto, já passou da parada), diz isso em vez
+                    de calar: nunca inventa um número. */}
+                {!emViagem && coordenadas && veiculo.etaMinutos == null && (
                   <>
                     <br />
-                    Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
-                    {formatarMinutos(veiculo.etaMinutos)}
+                    <span className="mapa-painel-sem-veiculo">Sem previsão no momento</span>
                   </>
                 )}
                 <br />
