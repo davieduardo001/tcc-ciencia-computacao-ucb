@@ -1178,6 +1178,21 @@ export interface ParadaDaViagem {
   lng: number;
 }
 
+/**
+ * US #172 — "o ônibus está chegando na sua parada", ainda não visto. O
+ * servidor só devolve um aviso recente (alguns minutos) e que a pessoa ainda
+ * não dispensou.
+ */
+export interface AvisoDeProximidade {
+  id: string;
+  paradaCodigo: string;
+  /** `null` quando a parada não tem nome cadastrado. */
+  paradaNome: string | null;
+  /** ETA no instante do disparo; envelhece, por isso a tela não o exibe. */
+  etaMinutos: number | null;
+  disparadoEm: string;
+}
+
 export interface ViagemAtiva {
   id: string;
   numeroLinha: string;
@@ -1198,6 +1213,8 @@ export interface ViagemAtiva {
   destino: (ParadaDaViagem & { ultrapassado: boolean }) | null;
   proximaParada: ParadaDaViagem | null;
   paradasRestantes: ParadaDaViagem[];
+  /** US #172. Opcional: respostas de um backend antigo não trazem o campo. */
+  avisoProximidade?: AvisoDeProximidade | null;
 }
 
 /** `falhou` separa "o servidor disse que não há viagem" de "não consegui
@@ -1267,6 +1284,15 @@ export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
           : null,
         proximaParada: data.proxima_parada ? paradaDaViagem(data.proxima_parada) : null,
         paradasRestantes: (data.paradas_restantes ?? []).map(paradaDaViagem),
+        avisoProximidade: data.alerta_proximidade
+          ? {
+              id: data.alerta_proximidade.id,
+              paradaCodigo: data.alerta_proximidade.parada_codigo,
+              paradaNome: data.alerta_proximidade.parada_nome ?? null,
+              etaMinutos: data.alerta_proximidade.eta_minutos ?? null,
+              disparadoEm: data.alerta_proximidade.disparado_em,
+            }
+          : null,
       },
     };
   } catch {
@@ -1367,5 +1393,22 @@ export async function encerrarViagem(viagemId: string): Promise<void> {
   // está cumprido, então não é erro.
   if (!response.ok && response.status !== 404) {
     throw await erroDaViagem(response, "Não foi possível encerrar a viagem. Tente novamente.");
+  }
+}
+
+/**
+ * US #172 — avisa o servidor que a pessoa viu o aviso de proximidade, para
+ * ele não voltar nas próximas consultas. Nunca lança: o aviso já saiu da tela
+ * e, se a confirmação se perder, o pior caso é ele reaparecer depois de
+ * recarregar a página (a tela também o esconde localmente).
+ */
+export async function confirmarAvisoDeProximidade(viagemId: string): Promise<void> {
+  try {
+    await fetch(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/alerta-proximidade/visto`,
+      { method: "POST", credentials: "include" }
+    );
+  } catch {
+    // sem rede: ver o comentário acima
   }
 }

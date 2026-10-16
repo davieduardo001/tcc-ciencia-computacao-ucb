@@ -11,7 +11,9 @@ import {
   useState,
 } from "react";
 import {
+  AvisoDeProximidade,
   buscarViagemAtiva,
+  confirmarAvisoDeProximidade,
   definirDestinoDaViagem,
   EmbarquePayload,
   embarcarNoOnibus,
@@ -44,12 +46,18 @@ interface EstadoViagem {
   encerrar: () => Promise<ResultadoAcao>;
   /** `true` quando o servidor respondeu (com ou sem viagem). */
   atualizar: () => Promise<boolean>;
+  /** US #172 — o aviso "seu ônibus está chegando", se houver um por ver. */
+  avisoProximidade: AvisoDeProximidade | null;
+  /** Esconde o aviso na hora e avisa o servidor que foi visto. */
+  dispensarAviso: () => void;
 }
 
 const SEM_PROVEDOR: EstadoViagem = {
   viagem: null,
   carregando: false,
   ocupado: false,
+  avisoProximidade: null,
+  dispensarAviso: () => {},
   embarcar: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
   definirDestino: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
   encerrar: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
@@ -85,6 +93,10 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
   const [viagem, setViagem] = useState<ViagemAtiva | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
+  // Avisos de proximidade que a pessoa já dispensou. Guardados aqui (e não só
+  // no servidor) para o aviso não piscar de volta numa consulta que ainda
+  // traga o mesmo, ou se a confirmação ao servidor falhar.
+  const [avisosDispensados, setAvisosDispensados] = useState<string[]>([]);
   const ordemRef = useRef(0);
   const montadoRef = useRef(true);
 
@@ -176,9 +188,39 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
     );
   }, [executar, idDaViagem]);
 
+  const aviso = viagem?.avisoProximidade ?? null;
+  const avisoProximidade = aviso && !avisosDispensados.includes(aviso.id) ? aviso : null;
+
+  const dispensarAviso = useCallback(() => {
+    if (!viagem || !viagem.avisoProximidade) return;
+    const idDoAviso = viagem.avisoProximidade.id;
+    setAvisosDispensados((ids) => (ids.includes(idDoAviso) ? ids : [...ids, idDoAviso]));
+    void confirmarAvisoDeProximidade(viagem.id);
+  }, [viagem]);
+
   const valor = useMemo<EstadoViagem>(
-    () => ({ viagem, carregando, ocupado, embarcar, definirDestino, encerrar, atualizar }),
-    [viagem, carregando, ocupado, embarcar, definirDestino, encerrar, atualizar]
+    () => ({
+      viagem,
+      carregando,
+      ocupado,
+      embarcar,
+      definirDestino,
+      encerrar,
+      atualizar,
+      avisoProximidade,
+      dispensarAviso,
+    }),
+    [
+      viagem,
+      carregando,
+      ocupado,
+      embarcar,
+      definirDestino,
+      encerrar,
+      atualizar,
+      avisoProximidade,
+      dispensarAviso,
+    ]
   );
 
   return <ViagemContext.Provider value={valor}>{children}</ViagemContext.Provider>;
