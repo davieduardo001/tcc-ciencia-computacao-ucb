@@ -10,6 +10,7 @@ import {
   nomearLugar,
   buscarPosicoesDaLinha,
   buscarChegadasParada,
+  buscarDetalhesParada,
   buscarViagemAtiva,
   definirDestinoDaViagem,
   embarcarNoOnibus,
@@ -1169,5 +1170,56 @@ describe("api.ts — pegar o ônibus (US #171)", () => {
       global.fetch = jest.fn().mockRejectedValue(new TypeError("Failed to fetch")) as jest.Mock;
       await expect(encerrarViagem("v-1")).rejects.toBeInstanceOf(ViagemError);
     });
+  });
+});
+
+describe("api.ts — buscarDetalhesParada (US #18 / issue #174)", () => {
+  const corpo = (linhas: Record<string, unknown>[]) => ({
+    nome: "W3 Sul — 502",
+    codigo: "PR-12345",
+    lat: -15.8,
+    lng: -47.9,
+    linhas,
+    proximos_horarios: ["06:20", "06:30", "06:40"],
+  });
+
+  it("traz os horários de cada linha em proximosHorarios", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () =>
+        corpo([
+          { numero: "0.110", nome: "A", sentido: "ida", rota_sentido: "IDA", ordem: 3, proximos_horarios: ["06:20", "06:40"] },
+          { numero: "0.220", nome: "B", sentido: "ida", rota_sentido: "VOLTA", ordem: 1, proximos_horarios: [] },
+        ]),
+    }) as jest.Mock;
+
+    const detalhes = await buscarDetalhesParada(-15.8, -47.9);
+
+    expect(detalhes?.linhas.map((l) => [l.numero, l.proximosHorarios])).toEqual([
+      ["0.110", ["06:20", "06:40"]],
+      ["0.220", []],
+    ]);
+    // a lista combinada continua disponível
+    expect(detalhes?.proximosHorarios).toEqual(["06:20", "06:30", "06:40"]);
+  });
+
+  it("backend antigo, sem o campo por linha: proximosHorarios fica ausente", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => corpo([{ numero: "0.110", nome: "A", sentido: "ida" }]),
+    }) as jest.Mock;
+
+    const detalhes = await buscarDetalhesParada(-15.8, -47.9);
+
+    expect(detalhes?.linhas[0].proximosHorarios).toBeUndefined();
+    expect(detalhes?.linhas[0].numero).toBe("0.110");
+  });
+
+  it("404 devolve null", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) }) as jest.Mock;
+
+    await expect(buscarDetalhesParada(0, 0)).resolves.toBeNull();
   });
 });
