@@ -45,6 +45,16 @@ postgresql://movecity_owner:SENHA_AQUI@ep-shiny-term-acc2b3yz.sa-east-1.aws.neon
 | `JWT_EXPIRATION_MINUTES` | ✅ Configurado | Fixo: `60` |
 | `ENVIRONMENT` | ✅ Configurado | Fixo: `production` |
 
+**Variáveis opcionais de ajuste do embarque (serviço de mobilidade, issue #190)** — não são secrets e todas têm padrão no código; só configure se precisar mudar o comportamento:
+
+| Variável | Padrão | O que faz |
+|----------|--------|-----------|
+| `RAIO_EMBARQUE_M` | `100` | Distância máxima (m) entre o usuário e o ônibus para confirmar "Peguei este ônibus". |
+| `RAIO_PARADA_EMBARQUE_M` | `400` | Embarque "com o ônibus chegando": distância máxima (m) do usuário a uma parada da linha. **A validar em campo.** |
+| `ETA_MAXIMO_EMBARQUE_MIN` | `2` | Embarque "com o ônibus chegando": tempo máximo (min) até o ônibus chegar à parada. **A validar em campo.** |
+
+Valor ausente, em branco, não numérico ou menor ou igual a zero usa o padrão (os inválidos registram um aviso no log). Como o backend não separa homolog de produção (issue #42), o valor definido no Fly vale para os dois ambientes. O raio é uma checagem de bom senso, não uma barreira de segurança: a posição do usuário vem do cliente.
+
 **URL do backend:** `https://movecity-backend.fly.dev`
 
 **Comandos úteis:**
