@@ -89,3 +89,86 @@ self.addEventListener("fetch", (evento) => {
     ehImutavel(url) ? cachePrimeiro(requisicao) : redePrimeiro(requisicao)
   );
 });
+
+/* ------------------------------------------------------------------ *
+ * Web Push — alerta de proximidade com a tela bloqueada (US #172).   *
+ * ------------------------------------------------------------------ *
+ *
+ * O servidor manda um JSON com `titulo`, `corpo`, `url` e `tag`, sem
+ * coordenadas nem identificadores. Nada disso passa pelo cache acima.
+ *
+ * Duas regras que não dependem de a carga estar bem formada:
+ *  - todo push mostra uma notificação. O Chrome exige (userVisibleOnly) e,
+ *    se o worker não mostrar nada, ele mesmo mostra um aviso genérico.
+ *    Carga vazia ou quebrada cai em textos padrão;
+ *  - o destino do clique é sempre um caminho DESTE site. Uma URL com
+ *    outro domínio (inclusive "//outro.site" e "/\outro.site") vira /mapa.
+ */
+
+const DESTINO_PADRAO = "/mapa";
+
+function destinoSeguro(valor) {
+  if (typeof valor !== "string") return DESTINO_PADRAO;
+  if (!/^\/(?![\/\\])/.test(valor)) return DESTINO_PADRAO;
+  if (/[\u0000-\u001f\\]/.test(valor)) return DESTINO_PADRAO;
+  return valor;
+}
+
+function texto(valor, padrao) {
+  return typeof valor === "string" && valor.trim() ? valor : padrao;
+}
+
+self.addEventListener("push", (evento) => {
+  let dados = {};
+  try {
+    dados = evento.data ? evento.data.json() : {};
+  } catch (erro) {
+    dados = {};
+  }
+  if (dados === null || typeof dados !== "object") dados = {};
+
+  evento.waitUntil(
+    self.registration.showNotification(texto(dados.titulo, "Movecity"), {
+      body: texto(dados.corpo, "Sua parada está chegando."),
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      // Mesma tag: um aviso novo substitui o anterior em vez de empilhar.
+      tag: texto(dados.tag, "proximidade"),
+      renotify: true,
+      data: { url: destinoSeguro(dados.url) },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+
+  const dados = evento.notification.data;
+  const alvo = new URL(destinoSeguro(dados && dados.url), self.location.origin);
+
+  evento.waitUntil(
+    (async () => {
+      const janelas = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      // Já tem o app aberto: foca nele em vez de abrir outra janela.
+      for (const janela of janelas) {
+        if (new URL(janela.url).origin !== self.location.origin) continue;
+        try {
+          await janela.focus();
+          if (new URL(janela.url).pathname !== alvo.pathname && "navigate" in janela) {
+            await janela.navigate(alvo.href);
+          }
+        } catch (erro) {
+          // focar pode falhar (janela fechando); cai para abrir uma nova
+          continue;
+        }
+        return;
+      }
+
+      if (self.clients.openWindow) await self.clients.openWindow(alvo.href);
+    })()
+  );
+});

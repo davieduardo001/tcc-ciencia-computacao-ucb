@@ -18,3 +18,8 @@ httpx>=0.27.0
 # ZoneInfoNotFoundError e o código cai no deslocamento fixo.
 tzdata>=2024.1
 apscheduler>=3.10.0
+# Web Push (VAPID) do alerta de proximidade (US #172). Traz py-vapid,
+# http-ece e cryptography; o import é no topo de mobilidade/web_push.py,
+# então faltar aqui quebra o boot do contêiner e o job "Contêiner do
+# serviço (mobilidade)" do CI acusa na hora.
+pywebpush>=2.0,<3
