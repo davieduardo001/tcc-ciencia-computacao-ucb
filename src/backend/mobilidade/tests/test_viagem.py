@@ -425,6 +425,7 @@ class TestEncerrar:
         assert _ativa([]).json() == {
             "ativa": False, "viagem": None, "sinal": None, "veiculo": None,
             "destino": None, "proxima_parada": None, "paradas_restantes": [],
+            "alerta_proximidade": None,
         }
 
     def test_cenario_7_encerrar_duas_vezes_nao_da_erro_e_nao_muda_o_horario(self, db):
@@ -1086,6 +1087,9 @@ class TestProviderDaProximidade:
         assert a.parada_destino_codigo == COD["C"]
         assert (a.parada_destino_lat, a.parada_destino_lng) == TRAJETO[IDX["C"]]
         assert a.parada_destino_nome == "Parada C"
+        # O alerta da #172 acompanha o ônibus da viagem, não o mais próximo.
+        assert a.veiculo_prefixo == "440001"
+        assert a.sentido == "IDA"
 
     def test_viagem_sem_destino_nao_entra(self, db):
         _inserir_viagem(db, destino=None)
@@ -1134,12 +1138,13 @@ class TestProviderDaProximidade:
         """Viagem criada pela API → worker de proximidade → alerta gravado."""
         from mobilidade.models.alerta_proximidade import AlertaProximidade
         from mobilidade.providers.contratos_proximidade import PreferenciasDeNotificacao
+        from mobilidade.providers.eta_destino_trajeto import EtaDoDestinoPorTrajeto
         from mobilidade.services.servico_notificacoes import NotificadorMock
         from mobilidade.services.servico_proximidade import EVENTO_DISPARADO, ServicoProximidade
 
         class _Veiculos:
             def obter_das_linhas(self, numeros):
-                # Ônibus parado a 100 m do destino: ETA em linha reta ≈ 0.
+                # O ônibus da viagem, ~107 m antes do destino: ETA de segundos.
                 return {n: [_veiculo(indice=IDX["C"] - 1, prefixo="440001")] for n in numeros}
 
         class _Prefs:
@@ -1154,6 +1159,7 @@ class TestProviderDaProximidade:
                 veiculos=_Veiculos(),
                 preferencias=_Prefs(),
                 notificador=NotificadorMock(),
+                eta=EtaDoDestinoPorTrajeto(RotaService()),
             ).verificar_proximidades(db)
 
             assert EVENTO_DISPARADO in eventos

@@ -2551,6 +2551,64 @@
   color: var(--mc-texto-2);
 }
 
+/* Aviso "seu ônibus está chegando" (US #172). Fixo no topo de qualquer tela,
+   acima de tudo (inclusive do botão central), e fora do fluxo: não empurra
+   a faixa de viagem, a barra do topo nem o mapa. */
+.ms-aviso-proximidade {
+  position: fixed;
+  top: calc(var(--safe-top, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-fab) + 10);
+  width: min(520px, calc(100% - 32px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--mc-r-sm);
+  background: var(--mc-petroleo);
+  color: #fff;
+  box-shadow: var(--mc-sombra-sm);
+}
+
+.ms-aviso-proximidade svg {
+  flex: none;
+}
+
+.ms-aviso-proximidade-texto {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ms-aviso-proximidade-texto strong {
+  font-size: 15px;
+}
+
+.ms-aviso-proximidade-ok {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--mc-r-pill);
+  background: #fff;
+  color: var(--mc-petroleo);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ms-aviso-proximidade-ok:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
 /* Chip do topo, nas telas que não são o mapa */
 .ms-viagem-chip {
   display: inline-flex;

@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
+from mobilidade.eta_service import eta_minutos_veiculo
 from mobilidade.models.alerta_proximidade import AlertaProximidade
 from mobilidade.posicao_service import PosicaoVeiculo
 from mobilidade.providers.contratos_proximidade import (
@@ -69,12 +70,46 @@ class _Preferencias:
         return self._pref
 
 
+class _EtaEmLinhaReta:
+    """
+    Dublê do EtaDoDestinoProvider para os testes de REGRA do alerta
+    (limiar, uma vez só, preferências, ônibus certo). A conta por trajeto
+    — sentido, "já passou", velocidade média — é do provider real e está
+    em test_eta_destino_trajeto.py.
+    """
+
+    def __init__(self):
+        self.chamadas: list[tuple] = []
+
+    def eta_minutos(self, viagem, veiculo, agora, db):
+        self.chamadas.append((viagem, veiculo))
+        return eta_minutos_veiculo(
+            veiculo,
+            lat_alvo=viagem.parada_destino_lat,
+            lng_alvo=viagem.parada_destino_lng,
+            agora=agora,
+        )
+
+
+class _EtaScriptado:
+    """Devolve um valor fixo (ou levanta) — para isolar a decisão do serviço."""
+
+    def __init__(self, valor=None, erro=None):
+        self._valor = valor
+        self._erro = erro
+
+    def eta_minutos(self, viagem, veiculo, agora, db):
+        if self._erro:
+            raise self._erro
+        return self._valor
+
+
 # ---------------------------------------------------------------------------
 # Fábricas de dados de teste
 # ---------------------------------------------------------------------------
 
 
-def _viagem(usuario_id=None, codigo="PR-00001", viagem_id=None):
+def _viagem(usuario_id=None, codigo="PR-00001", viagem_id=None, prefixo="TESTE01"):
     return ViagemAtiva(
         viagem_id=viagem_id or str(uuid.uuid4()),
         usuario_id=usuario_id or uuid.uuid4(),
@@ -83,12 +118,13 @@ def _viagem(usuario_id=None, codigo="PR-00001", viagem_id=None):
         parada_destino_lat=LAT_PARADA,
         parada_destino_lng=LNG_PARADA,
         parada_destino_nome="Terminal Central",
+        veiculo_prefixo=prefixo,
     )
 
 
-def _veiculo(deslocamento_graus=DESL_PERTO_GRAUS, velocidade=60.0):
+def _veiculo(deslocamento_graus=DESL_PERTO_GRAUS, velocidade=60.0, prefixo="TESTE01"):
     return PosicaoVeiculo(
-        prefixo="TESTE01",
+        prefixo=prefixo,
         lat=LAT_PARADA - deslocamento_graus,
         lng=LNG_PARADA,
         sentido=None,
@@ -103,12 +139,13 @@ def _preferencias(**kwargs):
     return PreferenciasDeNotificacao(**kwargs)
 
 
-def _servico(viagens, veiculos, preferencias, notificador=None):
+def _servico(viagens, veiculos, preferencias, notificador=None, eta=None):
     return ServicoProximidade(
         viagens=_Viagens(viagens),
         veiculos=_Veiculos(veiculos),
         preferencias=preferencias,
         notificador=notificador or NotificadorMock(),
+        eta=eta or _EtaEmLinhaReta(),
     )
 
 
@@ -348,6 +385,7 @@ def test_cenario4_falha_na_fonte_nao_derruba_o_ciclo(db):
         veiculos=_Veiculos(falhar=True),
         preferencias=_Preferencias(_preferencias()),
         notificador=notificador,
+        eta=_EtaEmLinhaReta(),
     )
 
     eventos = servico.verificar_proximidades(db)
@@ -378,6 +416,7 @@ def test_viagem_ativa_provisoria_nao_tem_nada(db):
         veiculos=_Veiculos({"0.110": [_veiculo()]}),
         preferencias=_Preferencias(_preferencias()),
         notificador=NotificadorMock(),
+        eta=_EtaEmLinhaReta(),
     )
 
     assert servico.verificar_proximidades(db) == []
@@ -433,4 +472,161 @@ def test_erro_inesperado_na_viagem_nao_derruba_o_ciclo():
 
     assert eventos == [EVENTO_ERRO, EVENTO_DISPARADO]
     assert mock_db.rollback.called
+    assert len(notificador.chamadas) == 1
+
+
+# ---------------------------------------------------------------------------
+# O alerta acompanha o ônibus DA VIAGEM, não o mais próximo da linha
+# ---------------------------------------------------------------------------
+
+
+def test_onibus_da_linha_perto_nao_alerta_quem_esta_em_outro_onibus(db):
+    # O passageiro está no TESTE01, ainda longe. O OUTRO02, da mesma linha,
+    # já está a 5 min da parada: antes isso disparava o alerta errado.
+    notificador = NotificadorMock()
+    servico = _servico(
+        [_viagem(prefixo="TESTE01")],
+        {
+            "0.110": [
+                _veiculo(deslocamento_graus=DESL_PERTO_GRAUS, prefixo="OUTRO02"),
+                _veiculo(deslocamento_graus=DESL_LONGE_GRAUS, prefixo="TESTE01"),
+            ]
+        },
+        _Preferencias(_preferencias(antecedencia_minutos=10)),
+        notificador,
+    )
+
+    eventos = servico.verificar_proximidades(db)
+
+    assert eventos == []
+    assert db.query(AlertaProximidade).count() == 0
+    assert notificador.chamadas == []
+
+
+def test_alerta_usa_o_eta_do_onibus_da_viagem_e_nao_o_menor_da_linha(db):
+    # O ônibus da viagem está a ~5 min; o outro, a ~22 min. O ETA gravado é
+    # o do primeiro, mesmo vindo depois na lista.
+    servico = _servico(
+        [_viagem(prefixo="TESTE01")],
+        {
+            "0.110": [
+                _veiculo(deslocamento_graus=DESL_LONGE_GRAUS, prefixo="OUTRO02"),
+                _veiculo(deslocamento_graus=DESL_PERTO_GRAUS, prefixo="TESTE01"),
+            ]
+        },
+        _Preferencias(_preferencias(antecedencia_minutos=10)),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_DISPARADO]
+    assert db.query(AlertaProximidade).one().eta_minutos == pytest.approx(5.0, abs=0.1)
+
+
+def test_eta_e_pedido_para_o_veiculo_da_viagem(db):
+    eta = _EtaEmLinhaReta()
+    viagem = _viagem(prefixo="TESTE01")
+    servico = _servico(
+        [viagem],
+        {"0.110": [_veiculo(prefixo="OUTRO02"), _veiculo(prefixo="TESTE01")]},
+        _Preferencias(_preferencias()),
+        eta=eta,
+    )
+
+    servico.verificar_proximidades(db)
+
+    assert [(v.viagem_id, p.prefixo) for v, p in eta.chamadas] == [(viagem.viagem_id, "TESTE01")]
+
+
+def test_onibus_da_viagem_fora_do_feed_nao_dispara(db):
+    # Há ônibus da linha com GPS, mas o da viagem sumiu do feed.
+    notificador = NotificadorMock()
+    servico = _servico(
+        [_viagem(prefixo="TESTE01")],
+        {"0.110": [_veiculo(prefixo="OUTRO02")]},
+        _Preferencias(_preferencias()),
+        notificador,
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_SEM_POSICAO]
+    assert db.query(AlertaProximidade).count() == 0
+    assert notificador.chamadas == []
+
+
+def test_viagem_sem_prefixo_do_veiculo_nao_dispara(db):
+    # Sem saber qual é o ônibus, qualquer escolha seria um palpite.
+    servico = _servico(
+        [_viagem(prefixo=None)],
+        {"0.110": [_veiculo()]},
+        _Preferencias(_preferencias()),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_SEM_POSICAO]
+    assert db.query(AlertaProximidade).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# ETA indisponível: não alerta e não inventa (RN-09)
+# ---------------------------------------------------------------------------
+
+
+def test_eta_indisponivel_nao_dispara(db):
+    # Parado, sentido oposto, já passou da parada, posição velha, sem rota:
+    # o provider devolve None e o serviço não avisa.
+    notificador = NotificadorMock()
+    servico = _servico(
+        [_viagem()],
+        {"0.110": [_veiculo()]},
+        _Preferencias(_preferencias()),
+        notificador,
+        eta=_EtaScriptado(valor=None),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_SEM_POSICAO]
+    assert db.query(AlertaProximidade).count() == 0
+    assert notificador.chamadas == []
+
+
+def test_eta_do_provider_vira_o_eta_gravado_no_alerta(db):
+    servico = _servico(
+        [_viagem()],
+        {"0.110": [_veiculo()]},
+        _Preferencias(_preferencias(antecedencia_minutos=10)),
+        eta=_EtaScriptado(valor=7.5),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_DISPARADO]
+    assert db.query(AlertaProximidade).one().eta_minutos == 7.5
+
+
+def test_eta_exatamente_na_antecedencia_dispara(db):
+    servico = _servico(
+        [_viagem()],
+        {"0.110": [_veiculo()]},
+        _Preferencias(_preferencias(antecedencia_minutos=10)),
+        eta=_EtaScriptado(valor=10.0),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_DISPARADO]
+
+
+def test_falha_no_calculo_do_eta_nao_derruba_o_ciclo(db):
+    # A viagem A quebra no cálculo; a B segue e dispara.
+    viagem_a = _viagem(prefixo="A")
+    viagem_b = _viagem(prefixo="B")
+
+    class _EtaQuebraNoA:
+        def eta_minutos(self, viagem, veiculo, agora, db):
+            if veiculo.prefixo == "A":
+                raise RuntimeError("trajeto corrompido")
+            return 3.0
+
+    notificador = NotificadorMock()
+    servico = _servico(
+        [viagem_a, viagem_b],
+        {"0.110": [_veiculo(prefixo="A"), _veiculo(prefixo="B")]},
+        _Preferencias(_preferencias()),
+        notificador,
+        eta=_EtaQuebraNoA(),
+    )
+
+    assert servico.verificar_proximidades(db) == [EVENTO_ERRO, EVENTO_DISPARADO]
     assert len(notificador.chamadas) == 1

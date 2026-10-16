@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
 import AvisoEmBreve from "../AvisoEmBreve";
+import AvisoDeProximidade from "./AvisoDeProximidade";
 import { useViagem, ViagemProvider } from "./ViagemContext";
 import "./mapa.css";
 
@@ -213,6 +214,7 @@ function AppShellConteudo({
 
   return (
     <div className="app-shell">
+      <AvisoDeProximidade />
       <aside className="ms-sidebar">
         <div className="ms-brand">
           <div className="ms-brand-mark">

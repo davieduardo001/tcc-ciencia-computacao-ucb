@@ -13,6 +13,8 @@ from mobilidade.providers.viagens_ativas_banco import ViagensAtivasDoBanco
 from mobilidade.viagem_routes import router as viagem_router
 from mobilidade.providers.preferencias_banco import PreferenciasDoBanco
 from mobilidade.providers.veiculos_ao_vivo import VeiculosAoVivo
+from mobilidade.providers.eta_destino_trajeto import EtaDoDestinoPorTrajeto
+from mobilidade.rota_service import RotaService
 
 instalar_redator_de_acesso()
 settings = get_settings()
@@ -41,11 +43,15 @@ def startup():
 
     # US #172 — alerta de proximidade da parada, agora sobre as viagens
     # reais da US #171 (o provider provisório devolvia sempre []).
+    # O ETA é medido ao longo do trajeto até a parada de destino, pelo ônibus
+    # da viagem. O RotaService é só do worker: o cache dos trajetos não é
+    # dividido com as requisições HTTP.
     servico_proximidade = ServicoProximidade(
         viagens=ViagensAtivasDoBanco(),
         veiculos=VeiculosAoVivo(),
         preferencias=PreferenciasDoBanco(),
         notificador=NotificadorNulo(),
+        eta=EtaDoDestinoPorTrajeto(RotaService()),
     )
 
     intervalo = int(getattr(settings, "WORKER_INTERVAL_MINUTES", 5))

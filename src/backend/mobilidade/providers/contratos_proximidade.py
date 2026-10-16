@@ -35,10 +35,13 @@
 #    `parada.codigo` numa migration aditiva — os dados já estarão no
 #    formato certo.
 #
-# 3. ETA — o ServicoProximidade calcula o tempo com
-#    `mobilidade.eta_service.eta_minutos_veiculo` em linha reta (sem
-#    trajeto/sentido), porque o trajeto por parada vem da #173. Com a
-#    identidade de parada pronta, passar a medir ao longo do traçado.
+# 3. ETA — RESOLVIDO. O ServicoProximidade não calcula mais o tempo em
+#    linha reta: delega a um `EtaDoDestinoProvider`, e a implementação real
+#    (providers/eta_destino_trajeto.py) mede ao longo do traçado até a
+#    parada de destino, no sentido do veículo, com a velocidade média
+#    percorrida. Sem dado confiável, devolve `None` e não há alerta.
+#    O alerta acompanha o ônibus DA VIAGEM (`ViagemAtiva.veiculo_prefixo`),
+#    e não o mais próximo da linha.
 #
 # 4. PREFERÊNCIAS (US #29 — PRONTA, tabela em colaboracao/)
 #    lidas via SQL direto em preferencias_notificacao, sem importar o
@@ -48,6 +51,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -87,6 +91,14 @@ class ViagemAtiva:
                                 coordenada, não identidade
         parada_destino_lng    → longitude do destino
         parada_destino_nome   → nome legível compõe a mensagem do alerta
+        veiculo_prefixo       → o ônibus em que o passageiro está (a #171
+                                grava o prefixo no embarque). É ele que o
+                                alerta acompanha, e não o mais próximo da
+                                linha. `None` = veículo desconhecido: sem
+                                ônibus para acompanhar, sem alerta
+        sentido               → sentido do veículo no embarque; reserva
+                                para resolver a rota quando o feed não
+                                informa o sentido agora
     """
 
     viagem_id: str
@@ -96,6 +108,8 @@ class ViagemAtiva:
     parada_destino_lat: float
     parada_destino_lng: float
     parada_destino_nome: str = ""
+    veiculo_prefixo: str | None = None
+    sentido: str | None = None
 
 
 @dataclass(frozen=True)
@@ -183,6 +197,32 @@ class VeiculosProvider(Protocol):
         ou "fonte indisponível" — nas duas situações o alerta simplesmente
         não dispara (Cenário 4: sem posição, sem alerta).
         Nunca lança exceção.
+        """
+        ...
+
+
+@runtime_checkable
+class EtaDoDestinoProvider(Protocol):
+    """
+    Contrato para medir quanto falta até a parada de destino da viagem.
+
+    Implementação real: EtaDoDestinoPorTrajeto (eta_destino_trajeto.py) —
+    distância ao longo do traçado ÷ velocidade média percorrida.
+    """
+
+    def eta_minutos(
+        self,
+        viagem: ViagemAtiva,
+        veiculo: PosicaoVeiculo,
+        agora: datetime,
+        db: Session,
+    ) -> float | None:
+        """
+        Minutos até o veículo da viagem alcançar a parada de destino.
+
+        `None` quando não há como afirmar (RN-09, "não inventar"): veículo
+        parado, posição velha, sentido oposto ao da parada, ônibus que já
+        passou do destino ou linha sem trajeto ingerido. `agora` com fuso.
         """
         ...
 
