@@ -172,12 +172,16 @@ class ParadaLinhaResponse(BaseModel):
     # parada foi resolvida pelo caminho antigo (antes da reingestão).
     rota_sentido: str | None = None
     ordem: int | None = None
+    # Issue #174 — os próximos horários DESTA linha (até 3). Campo novo e
+    # opcional: clientes antigos seguem lendo `proximos_horarios` da parada.
+    proximos_horarios: list[str] = []
 
 
 class ParadaDetalheResponse(BaseModel):
     """
     Cenário 1: `proximos_horarios` traz os horários previstos mais
-    próximos. Cenário 2 (parada sem horário disponível) é a lista vazia —
+    próximos (até 3, combinados entre as linhas — mantido por
+    compatibilidade; o painel usa os de cada linha em `linhas[]`). Cenário 2 (parada sem horário disponível) é a lista vazia —
     o front trata isso como aviso, não erro.
     """
 
