@@ -348,6 +348,18 @@ export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
  * erro de rede.
  */
 export async function logoutUsuario(): Promise<void> {
+  // US #172 — tira a inscrição de Web Push DESTE aparelho antes de a sessão
+  // acabar: a remoção no servidor exige a sessão, e um aparelho que sai da
+  // conta não pode continuar recebendo avisos dela. Este é o único caminho
+  // de saída (Configurações e AppShell passam por aqui). Import dinâmico
+  // porque lib/push.ts importa deste arquivo. Nunca impede o logout.
+  try {
+    const { desativarPushAoSair } = await import("./push");
+    await desativarPushAoSair();
+  } catch {
+    // best-effort
+  }
+
   try {
     await fetch(`${API_URL}/api/auth/logout`, {
       method: "POST",
@@ -1595,5 +1607,93 @@ export async function confirmarAvisoDeProximidade(viagemId: string): Promise<voi
     );
   } catch {
     // sem rede: ver o comentário acima
+  }
+}
+
+// ---------------------------------------------------------------------------
+// US #172 — Web Push: alerta de proximidade com a tela bloqueada
+// ---------------------------------------------------------------------------
+
+export class PushError extends Error {}
+
+export interface ConfiguracaoPush {
+  /** Falso quando o servidor está sem as chaves VAPID: o controle some. */
+  disponivel: boolean;
+  /** `applicationServerKey` em base64url; nulo quando indisponível. */
+  chavePublica: string | null;
+}
+
+/**
+ * Nunca lança: qualquer falha (sem rede, sessão expirada, servidor antigo
+ * sem a rota) significa "não dá para ativar agora", e é assim que a tela
+ * trata. Ativar um recurso opcional não pode virar tela de erro.
+ */
+export async function obterConfiguracaoPush(): Promise<ConfiguracaoPush> {
+  try {
+    const response = await fetch(`${API_URL}/api/mobilidade/push/chave`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) return { disponivel: false, chavePublica: null };
+    const data = await response.json();
+    if (data?.disponivel === true && typeof data.chave_publica === "string") {
+      return { disponivel: true, chavePublica: data.chave_publica };
+    }
+  } catch {
+    // cai no padrão abaixo
+  }
+  return { disponivel: false, chavePublica: null };
+}
+
+/**
+ * Registra a inscrição deste aparelho. `inscricao` é o
+ * `PushSubscription.toJSON()` do navegador, enviado sem adaptação.
+ *
+ * 422/503 trazem uma frase pronta em português; qualquer outra resposta
+ * vira texto genérico, sem vazar detalhe técnico.
+ */
+export async function registrarInscricaoPush(inscricao: unknown): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(inscricao),
+    });
+  } catch {
+    throw new PushError("Não foi possível ativar os avisos. Verifique sua conexão.");
+  }
+  if (response.ok) return;
+
+  if (response.status === 401) {
+    throw new PushError("Faça login para ativar os avisos.");
+  }
+  if (response.status === 422 || response.status === 503) {
+    try {
+      const data = await response.json();
+      if (typeof data.detail === "string") throw new PushError(data.detail);
+    } catch (erro) {
+      if (erro instanceof PushError) throw erro;
+    }
+  }
+  throw new PushError("Não foi possível ativar os avisos. Tente novamente.");
+}
+
+/** Idempotente no servidor (sempre 204), então repetir não dá erro. */
+export async function removerInscricaoPush(endpoint: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    });
+  } catch {
+    throw new PushError("Não foi possível desativar os avisos. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw new PushError("Não foi possível desativar os avisos. Tente novamente.");
   }
 }
