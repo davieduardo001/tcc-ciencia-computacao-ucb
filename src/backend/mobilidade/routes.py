@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from mobilidade.busca_parada_service import BuscaParadaService
 from mobilidade.chegada_service import chegadas_da_parada, paradas_proximas_do_usuario
 from mobilidade.chegadas_da_rota import (
     PedidoDePerna,
@@ -32,6 +33,7 @@ from mobilidade.rota_service import RotaService
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.schemas import (
+    BuscaParadaResponse,
     ChegadaNoPontoResponse,
     ChegadaResponse,
     ChegadasDaPernaResponse,
@@ -74,6 +76,10 @@ _posicao_service = PosicaoService()
 
 # US #18 — sem estado próprio, só lê a tabela `linha` sob demanda.
 _parada_service = ParadaService()
+
+# US #21 — reaproveita o geocodificador da US #20 (mesmo cache e mesmo
+# limite de 1 req/s ao Nominatim para a aplicação inteira).
+_busca_parada_service = BuscaParadaService(_geocode_service)
 
 
 def get_servico() -> ServicoRastreamento:
@@ -312,6 +318,29 @@ def obter_parada(lat: float, lng: float, db: Session = Depends(get_db)):
             for l in resultado.linhas
         ],
         proximos_horarios=resultado.proximos_horarios,
+    )
+
+
+@router.get("/paradas/busca", response_model=BuscaParadaResponse)
+async def buscar_paradas(q: str = "", db: Session = Depends(get_db)):
+    """
+    US #21 — Buscar Parada por Nome ou Endereço.
+
+    Cenário 1: o termo casa com o nome de paradas → `tipo = "nome"`.
+    Cenário 2: sem parada com esse nome, o termo é geocodificado e voltam
+               as paradas num raio de 500 m → `tipo = "endereco"`, com o
+               lugar encontrado em `referencia`.
+    Cenário 3: nada encontrado → `tipo = "nenhum"` e lista vazia. É 200, e
+               não 404: "não achei" é resposta válida de uma busca, e o
+               front exibe a mensagem.
+
+    Termo com menos de 3 caracteres responde como Cenário 3.
+    """
+    resultado = await _busca_parada_service.buscar(db, q)
+    return BuscaParadaResponse(
+        tipo=resultado.tipo,
+        paradas=[asdict(p) for p in resultado.paradas],
+        referencia=asdict(resultado.referencia) if resultado.referencia else None,
     )
 
 
