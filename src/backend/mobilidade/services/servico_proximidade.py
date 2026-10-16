@@ -6,10 +6,12 @@
 #
 # A cada ciclo o serviço varre as viagens ativas e, para cada uma:
 #   1. lê as preferências do usuário (Cenário 3 — US #29);
-#   2. busca a posição dos veículos da linha (Cenário 4 — sem GPS, não
-#      dispara nada; o mesmo vale para veículo parado, sem ETA);
-#   3. calcula o ETA até a parada de destino e compara com a antecedência
-#      configurada (Cenário 1 — "distância/tempo configurado");
+#   2. acha, entre os veículos da linha, o ônibus DA VIAGEM (pelo prefixo
+#      gravado no embarque) — Cenário 4: sem GPS dele, não dispara nada;
+#   3. pede o ETA até a parada de destino, medido ao longo do trajeto, e
+#      compara com a antecedência configurada (Cenário 1 — "distância/tempo
+#      configurado"). Veículo parado, de sentido oposto, que já passou do
+#      destino ou com posição velha não tem ETA, e portanto não alerta;
 #   4. se nunca disparou para esta parada nesta viagem, persiste o alerta
 #      e notifica (Cenário 2 — uma única vez; o índice único
 #      (viagem_id, parada_destino_codigo) fecha a porta para dois ciclos
@@ -23,17 +25,16 @@
 #   (já ligado em main.py). `ViagensAtivasProvisorias` (devolve []) ficou
 #   só como dublê de teste.
 #
-# * Identidade da parada — depende da #173 ("mapeamento entre paradas",
-#   @davieduardo001, PR #177). `parada_destino_codigo` ainda não é chave
-#   estrangeira; o ETA é medido em linha reta (sem trajeto/sentido),
-#   porque o trajeto por parada vem da mesma #173. Com as duas entregas,
-#   adicionar a FK para `parada.codigo` e medir ao longo do traçado —
-#   a regra de negócio (limiar, uma-única-vez, preferências) não muda.
+# * Identidade da parada — `parada_destino_codigo` continua sem chave
+#   estrangeira para `parada.codigo` (a tabela é reconstruída a cada
+#   ingestão). O ETA, porém, já é medido ao longo do traçado até essa
+#   parada (EtaDoDestinoProvider, providers/eta_destino_trajeto.py).
 #
-# * Entrega da notificação — segue o mesmo estado da US #27: o worker
-#   sobe com NotificadorNulo (no-op). O disparo está completo (registro
-#   persistido + notificador chamado); a entrega real (FCM/push) é
-#   integração futura, assim como foi para o alerta de atraso.
+# * Entrega da notificação — o worker sobe com NotificadorNulo (no-op),
+#   como o alerta de atraso (#27). Dentro do app, o alerta persistido
+#   chega à tela pela consulta da viagem ativa (alerta_proximidade_entrega.py);
+#   fora do app (push com a tela bloqueada) é integração futura, que
+#   precisa de credencial e de decisão do time.
 #
 # * Preferências lidas do banco compartilhado (ver preferencias_banco.py)
 #   sem importar o pacote `colaboracao`, por causa do Dockerfile do
@@ -47,9 +48,10 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mobilidade.eta_service import eta_minutos_veiculo
 from mobilidade.models.alerta_proximidade import AlertaProximidade
+from mobilidade.posicao_service import PosicaoVeiculo
 from mobilidade.providers.contratos_proximidade import (
+    EtaDoDestinoProvider,
     PreferenciasProvider,
     VeiculosProvider,
     ViagemAtiva,
@@ -83,11 +85,13 @@ class ServicoProximidade:
         veiculos: VeiculosProvider,
         preferencias: PreferenciasProvider,
         notificador: Notificador,
+        eta: EtaDoDestinoProvider,
     ) -> None:
         self.viagens = viagens
         self.veiculos = veiculos
         self.preferencias = preferencias
         self.notificador = notificador
+        self.eta = eta
 
     def verificar_proximidades(self, db: Session) -> list[str]:
         """
@@ -147,11 +151,14 @@ class ServicoProximidade:
         if not pref.notificacoes_ativas or not pref.alerta_chegada:
             return EVENTO_PREFERENCIAS
 
-        # Cenário 4 — sem posição do veículo não há alerta confiável.
-        if not veiculos:
+        # Cenário 4 — sem a posição do ônibus da viagem não há alerta
+        # confiável. Outro ônibus da mesma linha não serve: ele pode estar
+        # a minutos da parada enquanto o do passageiro ainda vai longe.
+        veiculo = self._veiculo_da_viagem(viagem, veiculos)
+        if veiculo is None:
             return EVENTO_SEM_POSICAO
 
-        eta = self._menor_eta(viagem, veiculos, agora)
+        eta = self.eta.eta_minutos(viagem, veiculo, agora, db)
         if eta is None:
             return EVENTO_SEM_POSICAO
 
@@ -195,25 +202,17 @@ class ServicoProximidade:
         )
         return EVENTO_DISPARADO
 
-    def _menor_eta(self, viagem: ViagemAtiva, veiculos: list, agora: datetime) -> float | None:
+    @staticmethod
+    def _veiculo_da_viagem(viagem: ViagemAtiva, veiculos: list[PosicaoVeiculo]) -> PosicaoVeiculo | None:
         """
-        Menor ETA até o destino entre os veículos em movimento.
+        O ônibus em que o passageiro está, pelo prefixo gravado no embarque.
 
-        `None` quando nenhum veículo tem ETA calculável — parado ou sem
-        velocidade (Cenário 5 da US #19), o que de novo vira "sem
-        posição" em vez de alerta impreciso.
+        `None` quando a viagem não tem prefixo ou o veículo não está no
+        feed agora — o que vira "sem posição" em vez de um palpite.
         """
-        etas = [
-            eta_minutos_veiculo(
-                veiculo,
-                lat_alvo=viagem.parada_destino_lat,
-                lng_alvo=viagem.parada_destino_lng,
-                agora=agora,
-            )
-            for veiculo in veiculos
-        ]
-        validos = [e for e in etas if e is not None]
-        return min(validos) if validos else None
+        if not viagem.veiculo_prefixo:
+            return None
+        return next((v for v in veiculos if v.prefixo == viagem.veiculo_prefixo), None)
 
     def _obter_veiculos(self, numeros_linha: set[str]) -> dict[str, list]:
         try:

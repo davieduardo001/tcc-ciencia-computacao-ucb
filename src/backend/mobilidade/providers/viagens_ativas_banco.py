@@ -78,6 +78,8 @@ class ViagensAtivasDoBanco:
                         parada_destino_lat=parada.lat,
                         parada_destino_lng=parada.lng,
                         parada_destino_nome=parada.nome or "",
+                        veiculo_prefixo=viagem.veiculo_prefixo,
+                        sentido=viagem.sentido,
                     )
                 )
             return ativas
