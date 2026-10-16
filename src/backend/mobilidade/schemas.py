@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ParadaResponse(BaseModel):
@@ -47,6 +47,10 @@ class PontoEmbarqueResponse(BaseModel):
     lng: float
     parada_nome: str
     caminhada_metros: int
+    # Issue #190 — código da parada física (`parada.codigo`) deste ponto na
+    # rota do trecho. `None` quando não há parada ingerida a até 40 m: o
+    # front mostra o ponto no mapa e não consegue pedir o tempo.
+    parada_codigo: str | None = None
 
 
 class PernaResponse(BaseModel):
@@ -139,6 +143,54 @@ class ChegadasParadaResponse(BaseModel):
     parada_nome: str
     calculado_em: str
     chegadas: list[ChegadaResponse]
+
+
+# ---------------------------------------------------------------------------
+# Issue #190 — tempo do ônibus nas paradas de subir e descer de uma rota
+# ---------------------------------------------------------------------------
+
+
+class PernaChegadaRequest(BaseModel):
+    """Um trecho da rota escolhida: a linha, o sentido e as duas paradas."""
+
+    numero: str = Field(min_length=1, max_length=20)
+    sentido: str = Field(min_length=1, max_length=20)
+    embarque_codigo: str | None = Field(default=None, max_length=40)
+    desembarque_codigo: str | None = Field(default=None, max_length=40)
+
+
+class ChegadasDaRotaRequest(BaseModel):
+    # Uma rota tem 1 ou 2 trechos hoje; o teto protege o custo do cálculo.
+    pernas: list[PernaChegadaRequest] = Field(min_length=1, max_length=6)
+
+
+class ChegadaNoPontoResponse(BaseModel):
+    """
+    Quando o ônibus daquele trecho chega a uma parada de subir ou descer.
+
+    `fonte` (RN-10): `ao_vivo` é a posição real do ônibus; `previsto` é
+    horário de saída + tempo de percurso; `None` é "sem dado" (RN-09).
+    """
+
+    parada_codigo: str | None = None
+    eta_minutos: float | None = None
+    fonte: Literal["ao_vivo", "previsto"] | None = None
+    # só `ao_vivo`: o ônibus que o passageiro pegaria
+    prefixo: str | None = None
+    # só `previsto`: "HH:MM" da passagem prevista
+    horario_previsto: str | None = None
+
+
+class ChegadasDaPernaResponse(BaseModel):
+    numero: str
+    sentido: str
+    embarque: ChegadaNoPontoResponse
+    desembarque: ChegadaNoPontoResponse
+
+
+class ChegadasDaRotaResponse(BaseModel):
+    calculado_em: str
+    pernas: list[ChegadasDaPernaResponse]
 
 
 class PosicoesLinhaResponse(BaseModel):

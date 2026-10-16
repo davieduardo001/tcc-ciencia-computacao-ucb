@@ -7,6 +7,12 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from mobilidade.chegada_service import chegadas_da_parada, paradas_proximas_do_usuario
+from mobilidade.chegadas_da_rota import (
+    PedidoDePerna,
+    chegadas_das_pernas,
+    codigo_da_parada,
+    vinculos_da_rota,
+)
 from mobilidade.eta_service import (
     eta_ate_indice,
     eta_minutos_veiculo,
@@ -26,7 +32,11 @@ from mobilidade.rota_service import RotaService
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.schemas import (
+    ChegadaNoPontoResponse,
     ChegadaResponse,
+    ChegadasDaPernaResponse,
+    ChegadasDaRotaRequest,
+    ChegadasDaRotaResponse,
     ChegadasParadaResponse,
     LinhaResponse,
     LinhaResumoResponse,
@@ -177,6 +187,16 @@ async def calcular_rotas(
             if resolvido is not None:
                 trajetos_por_perna[chave] = resolvido[0]
 
+    # Issue #190 — código da parada física de cada ponto de subir/descer, para
+    # o front pedir o tempo do ônibus naquela parada. Uma consulta por rota.
+    vinculos_por_perna: dict[tuple[str, str], list] = {}
+
+    def codigo_do_ponto(perna, ponto) -> str | None:
+        chave = (perna.numero, perna.sentido)
+        if chave not in vinculos_por_perna:
+            vinculos_por_perna[chave] = vinculos_da_rota(db, perna.numero, perna.sentido)
+        return codigo_da_parada(vinculos_por_perna[chave], ponto.lat, ponto.lng)
+
     respostas = []
     for opcao in opcoes:
         estimativa = estimar_viagem(opcao, posicoes_por_linha, trajetos_por_perna, agora)
@@ -187,8 +207,14 @@ async def calcular_rotas(
                         "numero": perna.numero,
                         "sentido": perna.sentido,
                         "nome": perna.nome,
-                        "embarque": perna.embarque.__dict__,
-                        "desembarque": perna.desembarque.__dict__,
+                        "embarque": {
+                            **perna.embarque.__dict__,
+                            "parada_codigo": codigo_do_ponto(perna, perna.embarque),
+                        },
+                        "desembarque": {
+                            **perna.desembarque.__dict__,
+                            "parada_codigo": codigo_do_ponto(perna, perna.desembarque),
+                        },
                         "distancia_km": perna.distancia_km,
                         "paradas_no_trecho": perna.paradas_no_trecho,
                         "trajeto": perna.trajeto,
@@ -209,6 +235,44 @@ async def calcular_rotas(
             )
         )
     return respostas
+
+
+@router.post("/rotas/chegadas", response_model=ChegadasDaRotaResponse)
+async def chegadas_da_rota(corpo: ChegadasDaRotaRequest, db: Session = Depends(get_db)):
+    """
+    Issue #190 — Quando o ônibus de cada trecho da rota escolhida chega à
+    parada de subir e à de descer.
+
+    Em lote (uma leitura do feed para a rota toda): o front repete só esta
+    chamada a cada 20 s, sem recalcular a rota. Cada ponto traz `fonte`
+    (`ao_vivo` | `previsto` | `None`, RN-10) e `eta_minutos: null` quando não
+    há dado — não inventa (RN-09). O tempo de descer é o do MESMO ônibus que
+    o passageiro pegaria.
+    """
+    agora = datetime.now(timezone.utc)
+    pedidos = [
+        PedidoDePerna(
+            numero=p.numero,
+            sentido=p.sentido,
+            embarque_codigo=p.embarque_codigo,
+            desembarque_codigo=p.desembarque_codigo,
+        )
+        for p in corpo.pernas
+    ]
+    resultado = await chegadas_das_pernas(db, pedidos, _posicao_service, _rota_service, agora)
+
+    return ChegadasDaRotaResponse(
+        calculado_em=agora.isoformat(),
+        pernas=[
+            ChegadasDaPernaResponse(
+                numero=c.numero,
+                sentido=c.sentido,
+                embarque=ChegadaNoPontoResponse(**asdict(c.embarque)),
+                desembarque=ChegadaNoPontoResponse(**asdict(c.desembarque)),
+            )
+            for c in resultado
+        ],
+    )
 
 
 @router.get("/paradas", response_model=ParadaDetalheResponse)
