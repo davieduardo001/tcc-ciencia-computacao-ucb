@@ -307,6 +307,7 @@ def obter_parada(lat: float, lng: float, db: Session = Depends(get_db)):
                 "sentido": l.sentido,
                 "rota_sentido": l.rota_sentido,
                 "ordem": l.ordem,
+                "proximos_horarios": l.proximos_horarios,
             }
             for l in resultado.linhas
         ],

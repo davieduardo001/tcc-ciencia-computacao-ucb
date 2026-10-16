@@ -27,13 +27,13 @@ from datetime import date, datetime, timedelta, timezone
 from math import cos, radians
 from typing import Literal
 
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from mobilidade.eta_service import eta_ate_indice
 from mobilidade.geometria import distancia_metros
 from mobilidade.models.parada import Parada, RotaParada
 from mobilidade.models.rota import Rota
+from mobilidade.parada_service import vinculos_por_linha
 from mobilidade.posicao_service import FUSO_SEMOB, PosicaoService
 from mobilidade.rota_service import RotaService
 from mobilidade.semob_source import horarios_do_dia
@@ -70,31 +70,6 @@ class ChegadaNaParada:
 class ChegadasDaParada:
     parada: Parada
     chegadas: list[ChegadaNaParada]
-
-
-def vinculos_por_linha(db: Session, parada_id: int) -> dict[str, tuple[RotaParada, Rota]]:
-    """
-    Um vínculo por linha. ~21% das paradas casam IDA e VOLTA dentro do raio
-    de vínculo (vias estreitas, lados opostos da rua); vale a rota de menor
-    distância ao traçado, que é o lado onde a parada realmente está. Mesma
-    regra de `ParadaService._por_parada_fisica` (duplicada aqui para não
-    mexer num arquivo que a #174 também está alterando).
-    """
-    vinculos = (
-        db.query(RotaParada, Rota)
-        .join(
-            Rota,
-            and_(Rota.numero == RotaParada.numero, Rota.sentido == RotaParada.sentido),
-        )
-        .filter(RotaParada.parada_id == parada_id)
-        .all()
-    )
-    por_numero: dict[str, tuple[RotaParada, Rota]] = {}
-    for vinculo, rota in vinculos:
-        atual = por_numero.get(vinculo.numero)
-        if atual is None or vinculo.distancia_ao_trajeto_m < atual[0].distancia_ao_trajeto_m:
-            por_numero[vinculo.numero] = (vinculo, rota)
-    return por_numero
 
 
 def _hora_do_dia(dia: date, hhmm: str) -> datetime | None:

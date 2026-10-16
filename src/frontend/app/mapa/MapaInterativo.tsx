@@ -16,6 +16,7 @@ import BadgeLinha from "./BadgeLinha";
 import SeloFonte, { legendaDaFonte } from "./SeloFonte";
 import { formatarMinutos, minutosInteiros } from "./tempo";
 import { useChegadasDaParada } from "./useChegadasDaParada";
+import SaidasDoTerminal from "./SaidasDoTerminal";
 import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
 import TempoNaParada, { SEM_DADO } from "./TempoNaParada";
 import FaixaDaViagem from "./FaixaDaViagem";
@@ -395,6 +396,11 @@ export default function MapaInterativo({
   const coordenadasRef = useRef<Coordenadas | null>(null);
   coordenadasRef.current = coordenadas;
 
+  // Issue #174 — número da última consulta de detalhes. Tocar na parada A e
+  // logo na B (ou fechar o painel) não pode deixar a resposta atrasada de A
+  // sobrescrever o painel: só vale a resposta da consulta mais recente.
+  const consultaDetalheRef = useRef(0);
+
   // US #18 — detalhes da parada selecionada no mapa.
   const [detalheParada, setDetalheParada] = useState<{
     parada: ParadaLinha;
@@ -561,10 +567,12 @@ export default function MapaInterativo({
   // US #18 — Cenário 1: ao tocar numa parada, busca e exibe o painel de
   // detalhes (linhas que passam por ela e próximos horários).
   async function abrirDetalheParada(parada: ParadaLinha) {
+    const consulta = ++consultaDetalheRef.current;
     setDetalheParada({ parada, detalhes: null, carregando: true, erro: null });
 
     try {
       const detalhes = await buscarDetalhesParada(parada.lat, parada.lng);
+      if (consulta !== consultaDetalheRef.current) return;
       setDetalheParada({
         parada,
         detalhes,
@@ -574,6 +582,7 @@ export default function MapaInterativo({
           : "Não encontramos detalhes para esta parada no momento.",
       });
     } catch (err) {
+      if (consulta !== consultaDetalheRef.current) return;
       setDetalheParada({
         parada,
         detalhes: null,
@@ -588,6 +597,7 @@ export default function MapaInterativo({
 
   // US #18 — Cenário 3: fechar o painel e retornar ao mapa.
   function fecharDetalheParada() {
+    consultaDetalheRef.current++;
     setDetalheParada(null);
   }
 
@@ -838,11 +848,28 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
-                {!emViagem && veiculo.etaMinutos != null && veiculo.paradaNome && (
+                {!emViagem &&
+                  veiculo.etaMinutos != null &&
+                  (veiculo.paradaNome || veiculo.paradaCodigo) && (
+                    <>
+                      <br />
+                      {veiculo.paradaNome ? (
+                        <>
+                          Chega na parada <strong>{veiculo.paradaNome}</strong>
+                        </>
+                      ) : (
+                        "Chega na sua parada"
+                      )}{" "}
+                      em {formatarMinutos(veiculo.etaMinutos)} <SeloFonte fonte="ao_vivo" />
+                    </>
+                  )}
+                {/* Issue #190 — com a localização conhecida e sem tempo (ônibus
+                    parado, sentido oposto, já passou da parada), diz isso em vez
+                    de calar: nunca inventa um número. */}
+                {!emViagem && coordenadas && veiculo.etaMinutos == null && (
                   <>
                     <br />
-                    Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
-                    {formatarMinutos(veiculo.etaMinutos)}
+                    <span className="mapa-painel-sem-veiculo">Sem previsão no momento</span>
                   </>
                 )}
                 <br />
@@ -985,15 +1012,12 @@ export default function MapaInterativo({
                 <p className="mapa-painel-dica">
                   {legendaDaFonte("saida_terminal")}.
                 </p>
-                {/* Cenário 2 da US #18: parada sem horário disponível */}
-                {detalheParada.detalhes.proximosHorarios.length > 0 ? (
-                  <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
-                ) : (
-                  <p className="mapa-painel-sem-veiculo">
-                    Nenhuma saída prevista disponível para esta parada no
-                    momento.
-                  </p>
-                )}
+                {/* Cenário 2 da US #18: parada sem horário disponível. Issue
+                    #174: os horários vêm por linha. */}
+                <SaidasDoTerminal
+                  linhas={detalheParada.detalhes.linhas}
+                  horariosCombinados={detalheParada.detalhes.proximosHorarios}
+                />
               </>
             )}
           </div>
