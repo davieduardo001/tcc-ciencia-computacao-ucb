@@ -6,6 +6,7 @@ from .linha_acompanhada import LinhaAcompanhada
 from .alerta import AlertaAtraso
 from .alerta_proximidade import AlertaProximidade
 from .viagem import Viagem
+from .inscricao_push import InscricaoPush
 
 __all__ = [
     "TestLinha",
@@ -18,4 +19,5 @@ __all__ = [
     "AlertaAtraso",
     "AlertaProximidade",
     "Viagem",
+    "InscricaoPush",
 ]
