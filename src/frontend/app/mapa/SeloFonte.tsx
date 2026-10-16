@@ -4,7 +4,7 @@
  * lido como "quando o ônibus passa aqui" — são coisas diferentes, e a
  * diferença pode ser de dezenas de minutos.
  */
-export type FonteDoTempo = "ao_vivo" | "media" | "estimado" | "saida_terminal";
+export type FonteDoTempo = "ao_vivo" | "media" | "estimado" | "saida_terminal" | "previsto";
 
 const FONTES: Record<FonteDoTempo, { texto: string; legenda: string }> = {
   ao_vivo: {
@@ -22,6 +22,11 @@ const FONTES: Record<FonteDoTempo, { texto: string; legenda: string }> = {
   saida_terminal: {
     texto: "saída do terminal",
     legenda: "Horário em que o ônibus sai da origem da linha — não é a hora em que passa nesta parada",
+  },
+  previsto: {
+    texto: "previsto",
+    legenda:
+      "Sem ônibus a caminho: horário de saída do terminal somado ao tempo de percurso até esta parada",
   },
 };
 

@@ -652,6 +652,84 @@ export async function buscarDetalhesParada(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Card #179 (⑤b) — Quando o ônibus chega NESTA parada
+// ---------------------------------------------------------------------------
+
+/** De onde veio o número: posição real do ônibus, ou saída + percurso. */
+export type FonteChegada = "ao_vivo" | "previsto";
+
+export interface ChegadaNaParada {
+  numero: string;
+  nome: string;
+  rotaSentido: string;
+  /** `null` quando não há dado (nem ônibus a caminho, nem horário). */
+  etaMinutos: number | null;
+  fonte: FonteChegada | null;
+  /** Só `ao_vivo`. */
+  prefixo: string | null;
+  veiculosACaminho: number;
+  /** Só `previsto`: "HH:MM" da passagem prevista nesta parada. */
+  horarioPrevisto: string | null;
+}
+
+export interface ChegadasDaParada {
+  paradaCodigo: string;
+  paradaNome: string;
+  calculadoEm: string;
+  chegadas: ChegadaNaParada[];
+}
+
+/**
+ * Chegadas das linhas numa parada física, pelo `codigo` (estável — ADR-14).
+ *
+ * Devolve `null` em qualquer falha, inclusive 404 (código que não é de uma
+ * parada física conhecida): quem exibe simplesmente não mostra a seção. É um
+ * extra sobre o painel da parada, que não deve quebrar nem mostrar erro por
+ * causa dele — mesma postura de `buscarPosicoesDaLinha`.
+ */
+export async function buscarChegadasParada(
+  codigo: string
+): Promise<ChegadasDaParada | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/paradas/${encodeURIComponent(codigo)}/chegadas`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return {
+      paradaCodigo: data.parada_codigo,
+      paradaNome: data.parada_nome,
+      calculadoEm: data.calculado_em,
+      chegadas: (data.chegadas ?? []).map(
+        (c: {
+          numero: string;
+          nome: string;
+          rota_sentido: string;
+          eta_minutos: number | null;
+          fonte: FonteChegada | null;
+          prefixo: string | null;
+          veiculos_a_caminho: number;
+          horario_previsto: string | null;
+        }) => ({
+          numero: c.numero,
+          nome: c.nome,
+          rotaSentido: c.rota_sentido,
+          etaMinutos: c.eta_minutos ?? null,
+          fonte: c.fonte ?? null,
+          prefixo: c.prefixo ?? null,
+          veiculosACaminho: c.veiculos_a_caminho ?? 0,
+          horarioPrevisto: c.horario_previsto ?? null,
+        })
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface VeiculoAoVivo {
   /** Número da linha que o veículo está fazendo. Necessário porque o
    * mapa rastreia várias linhas ao mesmo tempo quando o usuário escolhe
@@ -670,6 +748,12 @@ export interface VeiculoAoVivo {
    * informamos localização, ou quando o veículo está parado/sem
    * velocidade confiável (Cenário 5: pílula sem tempo). */
   etaMinutos: number | null;
+  /** Card #179 — parada ATÉ A QUAL o `etaMinutos` foi medido (a mais
+   * próxima do usuário, no sentido deste veículo). Ausente/`null` quando
+   * não havia parada ingerida por perto e o tempo veio da projeção do GPS
+   * no traçado. */
+  paradaCodigo?: string | null;
+  paradaNome?: string | null;
 }
 
 /** US #19 — resultado de uma busca de posições, com o fallback do Cenário 3. */
@@ -718,6 +802,8 @@ export async function buscarPosicoesDaLinha(
         atualizado_em: string;
         operadora: string;
         eta_minutos: number | null;
+        parada_codigo?: string | null;
+        parada_nome?: string | null;
       }) => ({
         linha: data.numero ?? numero,
         prefixo: v.prefixo,
@@ -729,6 +815,8 @@ export async function buscarPosicoesDaLinha(
         atualizadoEm: v.atualizado_em,
         operadora: v.operadora,
         etaMinutos: v.eta_minutos ?? null,
+        paradaCodigo: v.parada_codigo ?? null,
+        paradaNome: v.parada_nome ?? null,
       })
     );
 

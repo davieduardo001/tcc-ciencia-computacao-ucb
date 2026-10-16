@@ -1620,6 +1620,40 @@
   color: var(--mc-sucesso-texto);
 }
 
+.mapa-chegadas {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapa-chegada {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mapa-chegada-texto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+.mapa-chegada-texto strong {
+  color: var(--text);
+}
+
+.mapa-chegada-sem-dado {
+  font-style: italic;
+}
+
 .mapa-painel-dica {
   margin: 0 0 8px;
   font-size: 13px;

@@ -7,6 +7,7 @@ describe("SeloFonte", () => {
     ["media", "média", "media"],
     ["estimado", "estimado", "estimado"],
     ["saida_terminal", "saída do terminal", "saida-terminal"],
+    ["previsto", "previsto", "previsto"],
   ];
 
   it.each(CASOS)("%s mostra '%s' e a classe '%s'", (fonte, texto, classe) => {
@@ -34,5 +35,8 @@ describe("SeloFonte", () => {
     expect(legendaDaFonte("ao_vivo")).toMatch(/posição real/);
     expect(legendaDaFonte("estimado")).toMatch(/velocidade média/);
     expect(legendaDaFonte("media")).toMatch(/não um horário marcado/);
+    // "previsto" não é "ao vivo": a legenda diz que é saída + percurso e que não há ônibus a caminho
+    expect(legendaDaFonte("previsto")).toMatch(/Sem ônibus a caminho/);
+    expect(legendaDaFonte("previsto")).toMatch(/tempo de percurso/);
   });
 });
