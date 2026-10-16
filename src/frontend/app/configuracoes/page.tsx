@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "../mapa/AppShell";
 import { buscarUsuarioAtual, atualizarFirstAccess, logoutUsuario } from "@/lib/api";
+import { TEXTOS_AVISOS_PUSH, useAvisosPush } from "./useAvisosPush";
 
 export default function Configuracoes() {
   const router = useRouter();
+  const avisosPush = useAvisosPush();
+  const textoAvisos = TEXTOS_AVISOS_PUSH[avisosPush.estado.tipo];
   const [usuario, setUsuario] = useState<{
     nome: string;
     email: string;
@@ -103,6 +106,39 @@ export default function Configuracoes() {
                   ? "O tutorial será exibido automaticamente no seu próximo acesso."
                   : "O tutorial já foi concluído. Clique acima para rever."}
               </p>
+            </section>
+
+            <section className="config-section" aria-labelledby="avisos-titulo">
+              <h2 id="avisos-titulo">Avisos</h2>
+              <div className="config-item">
+                <div className="config-item-info">
+                  <h3>Avisos com a tela bloqueada</h3>
+                  <p>{textoAvisos.descricao}</p>
+                </div>
+                {textoAvisos.botao === "ativar" && (
+                  <button
+                    className="btn-rever"
+                    onClick={avisosPush.ativar}
+                    disabled={avisosPush.ocupado}
+                  >
+                    {avisosPush.ocupado ? "Ativando..." : "Ativar"}
+                  </button>
+                )}
+                {textoAvisos.botao === "desativar" && (
+                  <button
+                    className="btn-rever"
+                    onClick={avisosPush.desativar}
+                    disabled={avisosPush.ocupado}
+                  >
+                    {avisosPush.ocupado ? "Desativando..." : "Desativar"}
+                  </button>
+                )}
+              </div>
+              {avisosPush.erro && (
+                <p className="config-dica" role="alert">
+                  {avisosPush.erro}
+                </p>
+              )}
             </section>
 
             <section className="config-section danger">
