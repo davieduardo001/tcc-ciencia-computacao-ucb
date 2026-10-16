@@ -6,6 +6,7 @@ import {
   buscarLugares,
   calcularRotas,
   listarFavoritos,
+  buscarParadas,
   nomearLugar,
   sugerirLinhas,
 } from "@/lib/api";
@@ -28,11 +29,17 @@ jest.mock("../MapaInterativo", () => ({
   default: ({
     onLocalizacao,
     viagem,
+    paradasBuscadas,
   }: {
     onLocalizacao?: (c: { lat: number; lng: number } | null) => void;
     viagem?: { pernas: { numero: string }[] } | null;
+    paradasBuscadas?: { paradas: unknown[] } | null;
   }) => (
-    <div data-testid="mapa-interativo" data-viagem={viagem ? "sim" : "nao"}>
+    <div
+      data-testid="mapa-interativo"
+      data-viagem={viagem ? "sim" : "nao"}
+      data-paradas-buscadas={paradasBuscadas?.paradas.length ?? 0}
+    >
       <button
         type="button"
         onClick={() => onLocalizacao?.({ lat: -15.83, lng: -48.04 })}
@@ -61,6 +68,9 @@ jest.mock("@/lib/api", () => ({
   lerFavoritosCache: jest.fn().mockReturnValue([]),
   BuscarLinhaError: class BuscarLinhaError extends Error {},
   CalcularRotaError: class CalcularRotaError extends Error {},
+  // US #21 — busca de parada por nome ou endereço.
+  buscarParadas: jest.fn(),
+  BuscarParadasError: class BuscarParadasError extends Error {},
   SalvarFavoritoError: class SalvarFavoritoError extends Error {},
 }));
 
@@ -527,5 +537,56 @@ describe("MapaPage — rotas favoritas (US #25)", () => {
     await act(async () => {});
 
     expect(calcularRotasMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaPage — buscar parada (US #21)", () => {
+  const buscarParadasMock = buscarParadas as jest.Mock;
+
+  beforeEach(() => {
+    parametrosDaUrl = "";
+    buscarParadasMock.mockReset();
+  });
+
+  it("abre o painel de busca no lugar das entradas do mapa e destaca o resultado", async () => {
+    buscarParadasMock.mockResolvedValue({
+      tipo: "nome",
+      paradas: [
+        { codigo: "PR-1", nome: "Estação Ceilândia", lat: -15.8, lng: -48.1, qtdLinhas: 3, distanciaM: null },
+      ],
+      referencia: null,
+    });
+    render(<MapaPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Buscar parada" }));
+    });
+
+    expect(screen.getByRole("search")).toBeInTheDocument();
+    expect(screen.queryByText("Para onde você vai?")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Nome, referência ou endereço"), {
+      target: { value: "estacao" },
+    });
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("search"));
+    });
+
+    expect(await screen.findByText("Estação Ceilândia")).toBeInTheDocument();
+    expect(screen.getByTestId("mapa-interativo")).toHaveAttribute("data-paradas-buscadas", "1");
+  });
+
+  it("fechar a busca devolve as entradas e limpa os destaques do mapa", async () => {
+    render(<MapaPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Buscar parada" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Fechar busca de parada" }));
+    });
+
+    expect(screen.getByText("Para onde você vai?")).toBeInTheDocument();
+    expect(screen.getByTestId("mapa-interativo")).toHaveAttribute("data-paradas-buscadas", "0");
   });
 });
