@@ -84,7 +84,6 @@ function MapaConteudo() {
   const [escolhendoNoMapa, setEscolhendoNoMapa] = useState<Extremo | null>(null);
   const [localizacao, setLocalizacao] = useState<Coordenadas | null>(null);
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
-  const [focarBusca, setFocarBusca] = useState(0);
 
   // US #25 — favoritas do usuário: alimentam a estrela do planejador e o
   // bloco "Minhas rotas" da tela principal.
@@ -96,9 +95,10 @@ function MapaConteudo() {
   // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
   const [rotaPendente, setRotaPendente] = useState(false);
 
-  // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
-  // página, só que com o painel certo já aberto — as duas
-  // funcionalidades vivem no mapa, não em páginas separadas.
+  // `?painel=rotas` abre o planejador. Não há mais item de menu para isso
+  // (o planejador abre pelo botão "Para onde você vai?"), mas o endereço
+  // continua sendo o contrato dos Favoritos: "Ir" numa rota salva leva pra
+  // cá com origem/destino já preenchidos.
   const searchParams = useSearchParams();
   const painel = searchParams.get("painel");
   // US #25 — query params injetados pelo clique em favorito.
@@ -112,11 +112,6 @@ function MapaConteudo() {
   useEffect(() => {
     if (painel === "rotas") {
       setPlanejadorAberto(true);
-    } else if (painel === "linhas") {
-      setPlanejadorAberto(false);
-      // Nonce em vez de booleano: clicar em "Linhas de Ônibus" duas
-      // vezes seguidas tem que focar o campo nas duas.
-      setFocarBusca((n) => n + 1);
     }
   }, [painel]);
 
@@ -387,7 +382,6 @@ function MapaConteudo() {
       onDigitarBuscaLinha={handleDigitarBuscaLinha}
       sugestoesLinha={sugestoesLinha}
       onSelecionarSugestaoLinha={handleSelecionarSugestaoLinha}
-      focarBusca={focarBusca}
     >
       <MapaInterativo
         linha={linha}

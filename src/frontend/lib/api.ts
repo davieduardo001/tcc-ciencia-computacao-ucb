@@ -913,6 +913,70 @@ export async function reportarOcorrencia(
   };
 }
 
+// ---------------------------------------------------------------------------
+// US #24 — Visualizar Ocorrências Reportadas por Outros Passageiros
+// ---------------------------------------------------------------------------
+
+export type StatusOcorrencia = "pendente" | "confirmada";
+
+export interface OcorrenciaListada {
+  id: string;
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  descricao: string | null;
+  local: string | null;
+  status: StatusOcorrencia;
+  contadorConfirmacoes: number;
+  criadoEm: string;
+  expiraEm: string;
+}
+
+export class ListarOcorrenciasError extends Error {
+  naoAutenticado: boolean;
+
+  constructor(message: string, naoAutenticado = false) {
+    super(message);
+    this.naoAutenticado = naoAutenticado;
+  }
+}
+
+/**
+ * Lista as ocorrências ativas (não expiradas) reportadas por outros
+ * passageiros, da mais recente pra mais antiga. Com `linha`, só as dela.
+ *
+ * `cache: "no-store"`: uma ocorrência expira em minutos — servir uma lista
+ * velha do cache do navegador mostraria problemas que já passaram.
+ */
+export async function listarOcorrencias(linha?: string): Promise<OcorrenciaListada[]> {
+  const termo = linha?.trim();
+  const query = termo ? `?linha=${encodeURIComponent(termo)}` : "";
+
+  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    throw new ListarOcorrenciasError("Sua sessão expirou. Faça login novamente.", true);
+  }
+  if (!response.ok) {
+    throw new ListarOcorrenciasError("Não foi possível carregar as ocorrências.");
+  }
+
+  const lista = await response.json();
+  return lista.map((item: Record<string, unknown>) => ({
+    id: item.id,
+    linhaNumero: item.linha_numero,
+    tipo: item.tipo,
+    descricao: item.descricao ?? null,
+    local: item.local ?? null,
+    status: item.status,
+    contadorConfirmacoes: item.contador_confirmacoes,
+    criadoEm: item.criado_em,
+    expiraEm: item.expira_em,
+  })) as OcorrenciaListada[];
+}
+
 
 // ---------------------------------------------------------------------------
 // US #25 — Salvar e Visualizar Rota Favorita
