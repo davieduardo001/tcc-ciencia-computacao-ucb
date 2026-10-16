@@ -418,6 +418,7 @@ class TestEncerrar:
         assert _ativa([]).json() == {
             "ativa": False, "viagem": None, "sinal": None, "veiculo": None,
             "destino": None, "proxima_parada": None, "paradas_restantes": [],
+            "alerta_proximidade": None,
         }
 
     def test_cenario_7_encerrar_duas_vezes_nao_da_erro_e_nao_muda_o_horario(self, db):

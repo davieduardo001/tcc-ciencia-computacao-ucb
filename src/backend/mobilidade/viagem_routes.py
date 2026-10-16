@@ -3,7 +3,10 @@
 #   POST /viagens                  embarca (valida por proximidade, RN-16)
 #   PUT  /viagens/{id}/destino     escolhe/troca/remove a parada de destino
 #   POST /viagens/{id}/encerrar    desce / "Cheguei" (idempotente)
-#   GET  /viagens/ativa            estado + progresso ao vivo
+#   GET  /viagens/ativa            estado + progresso ao vivo (+ aviso de
+#                                  proximidade pendente, US #172)
+#   POST /viagens/{id}/alerta-proximidade/visto
+#                                  o app confirma que mostrou o aviso (#172)
 #
 # Fica em arquivo próprio para não crescer o routes.py. O PosicaoService é o
 # MESMO do routes.py (um por processo: o cache do feed é compartilhado), por
@@ -12,14 +15,16 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
+from mobilidade import alerta_proximidade_entrega as entrega_alerta
 from mobilidade import routes as _base
 from mobilidade import viagem_service as servico
 from mobilidade.dependencies import get_usuario_atual_id
 from mobilidade.models.viagem import Viagem
 from mobilidade.schemas_viagem import (
+    AlertaProximidadeResponse,
     DestinoRequest,
     DestinoViagemResponse,
     EmbarqueRequest,
@@ -142,6 +147,23 @@ def encerrar_viagem(
     return _viagem_response(viagem)
 
 
+@router.post("/viagens/{viagem_id}/alerta-proximidade/visto", status_code=204)
+def alerta_de_proximidade_visto(
+    viagem_id: uuid.UUID,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    US #172 — o app mostrou o aviso de proximidade e a pessoa o dispensou:
+    ele não volta nas próximas consultas.
+
+    Sempre 204 e idempotente. Só mexe nos alertas do próprio usuário, então
+    uma viagem alheia (ou inexistente) não muda nada nem revela que existe.
+    """
+    entrega_alerta.marcar_como_visto(db, usuario_id, viagem_id)
+    return Response(status_code=204)
+
+
 @router.get("/viagens/ativa", response_model=ViagemAtivaResponse)
 async def viagem_em_andamento(
     usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
@@ -164,8 +186,21 @@ async def viagem_em_andamento(
     def _parada(p) -> ParadaViagemResponse:
         return ParadaViagemResponse(codigo=p.codigo, nome=p.nome, lat=p.lat, lng=p.lng)
 
+    alerta = entrega_alerta.alerta_pendente(db, usuario_id, viagem.id, servico.agora_utc())
+
     return ViagemAtivaResponse(
         ativa=True,
+        alerta_proximidade=(
+            AlertaProximidadeResponse(
+                id=str(alerta.id),
+                parada_codigo=alerta.parada_destino_codigo,
+                parada_nome=alerta.parada_destino_nome,
+                eta_minutos=alerta.eta_minutos,
+                disparado_em=alerta.disparado_em,
+            )
+            if alerta
+            else None
+        ),
         viagem=_viagem_response(viagem),
         sinal=progresso.sinal,
         veiculo=(

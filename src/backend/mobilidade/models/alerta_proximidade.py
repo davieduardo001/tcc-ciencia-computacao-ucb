@@ -23,9 +23,11 @@ class AlertaProximidade(Base):
                                  destino, sem FK porque a tabela `parada`
                                  vem da #173 (PR #177)
         parada_destino_nome    → nome legível, para exibir sem consulta
-        status                 → "disparado" hoje; "cancelado" reserva
-                                 espaço para a viagem terminar antes do
-                                 alerta (US #171)
+        status                 → "disparado" (gravado pelo worker, ainda não
+                                 visto) e "entregue" (o app mostrou o aviso
+                                 e confirmou — ver alerta_proximidade_entrega).
+                                 "cancelado" reserva espaço para a viagem
+                                 terminar antes do alerta
         eta_minutos            → ETA calculado no momento do disparo,
                                  para diagnóstico (ETA em linha reta até
                                  a #173 entregar o trajeto)

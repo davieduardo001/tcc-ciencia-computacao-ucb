@@ -74,6 +74,26 @@ class ViagemResponse(BaseModel):
         return valor
 
 
+class AlertaProximidadeResponse(BaseModel):
+    """
+    Aviso "o ônibus está chegando na sua parada" (US #172), ainda não visto.
+
+    Sem `usuario_id` nem `viagem_id`: o app já sabe de quem e de qual viagem.
+    """
+
+    id: str
+    parada_codigo: str
+    parada_nome: str | None = None
+    eta_minutos: float | None = None
+    disparado_em: datetime
+
+    @field_validator("disparado_em")
+    @classmethod
+    def _marca_como_utc(cls, valor: datetime) -> datetime:
+        # Coluna em UTC sem fuso; sem marcar, o navegador leria como local.
+        return valor.replace(tzinfo=timezone.utc) if valor.tzinfo is None else valor
+
+
 class ViagemAtivaResponse(BaseModel):
     ativa: bool
     viagem: ViagemResponse | None = None
@@ -82,3 +102,5 @@ class ViagemAtivaResponse(BaseModel):
     destino: DestinoViagemResponse | None = None
     proxima_parada: ParadaViagemResponse | None = None
     paradas_restantes: list[ParadaViagemResponse] = []
+    # US #172 — o aviso de proximidade pendente (ou None).
+    alerta_proximidade: AlertaProximidadeResponse | None = None
