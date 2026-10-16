@@ -677,6 +677,78 @@ export async function buscarDetalhesParada(
 }
 
 // ---------------------------------------------------------------------------
+// US #21 — Buscar parada por nome ou endereço
+// ---------------------------------------------------------------------------
+
+export interface ParadaBuscada {
+  codigo: string;
+  /** Vazio quando o SEMOB só traz o CEP do abrigo. */
+  nome: string;
+  lat: number;
+  lng: number;
+  qtdLinhas: number;
+  /** Só na busca por endereço: metros até o lugar encontrado. */
+  distanciaM: number | null;
+}
+
+export interface ResultadoBuscaParada {
+  /** Qual cenário respondeu: nome (1), endereço (2) ou nenhum (3). */
+  tipo: "nome" | "endereco" | "nenhum";
+  paradas: ParadaBuscada[];
+  /** Só na busca por endereço: o lugar em torno do qual o mapa centraliza. */
+  referencia: Lugar | null;
+}
+
+export class BuscarParadasError extends Error {}
+
+/**
+ * US #21 — Paradas pelo nome ou, se nenhuma tiver esse nome, num raio de
+ * 500 m do endereço/ponto de referência digitado.
+ *
+ * "Nada encontrado" não é erro (vem com `tipo: "nenhum"`); só falha de
+ * rede ou do servidor lança BuscarParadasError — são mensagens diferentes
+ * para o usuário.
+ */
+export async function buscarParadas(termo: string): Promise<ResultadoBuscaParada> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/mobilidade/paradas/busca?q=${encodeURIComponent(termo)}`,
+      { credentials: "include", cache: "no-store" }
+    );
+  } catch {
+    throw new BuscarParadasError("Sem conexão. Verifique a internet e tente novamente.");
+  }
+
+  if (!response.ok) {
+    throw new BuscarParadasError("Não foi possível buscar paradas. Tente novamente.");
+  }
+
+  const data = await response.json();
+  return {
+    tipo: data.tipo,
+    paradas: (data.paradas ?? []).map(
+      (p: {
+        codigo: string;
+        nome: string;
+        lat: number;
+        lng: number;
+        qtd_linhas: number;
+        distancia_m: number | null;
+      }) => ({
+        codigo: p.codigo,
+        nome: p.nome,
+        lat: p.lat,
+        lng: p.lng,
+        qtdLinhas: p.qtd_linhas,
+        distanciaM: p.distancia_m ?? null,
+      })
+    ),
+    referencia: data.referencia ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Card #179 (⑤b) — Quando o ônibus chega NESTA parada
 // ---------------------------------------------------------------------------
 

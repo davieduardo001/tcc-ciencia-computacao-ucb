@@ -243,3 +243,29 @@ class ParadaDetalheResponse(BaseModel):
     lng: float
     linhas: list[ParadaLinhaResponse]
     proximos_horarios: list[str]
+
+
+class ParadaBuscadaResponse(BaseModel):
+    """US #21 — uma parada na lista de resultados da busca."""
+
+    codigo: str
+    # Vazio quando o SEMOB só traz o CEP do abrigo — o front mostra um
+    # rótulo neutro.
+    nome: str
+    lat: float
+    lng: float
+    qtd_linhas: int
+    # Só na busca por endereço: metros até o lugar encontrado.
+    distancia_m: int | None = None
+
+
+class BuscaParadaResponse(BaseModel):
+    """
+    US #21. `tipo` diz qual cenário respondeu: `nome` (Cenário 1),
+    `endereco` (Cenário 2, com `referencia` = lugar geocodificado, para o
+    mapa centralizar) ou `nenhum` (Cenário 3, `paradas` vazia).
+    """
+
+    tipo: Literal["nome", "endereco", "nenhum"]
+    paradas: list[ParadaBuscadaResponse]
+    referencia: LugarResponse | None = None

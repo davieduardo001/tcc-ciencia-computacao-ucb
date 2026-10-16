@@ -3,8 +3,9 @@
 import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Navigation } from "lucide-react";
+import { MapPin, Navigation } from "lucide-react";
 import AppShell from "./AppShell";
+import BuscaParada from "./BuscaParada";
 import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import { useChegadasDaRota } from "./useChegadasDaRota";
@@ -20,6 +21,8 @@ import {
   LinhaResumo,
   nomearLugar,
   OpcaoViagem,
+  ParadaBuscada,
+  ResultadoBuscaParada,
   RotaFavorita,
   sugerirLinhas,
   VeiculoAoVivo,
@@ -95,6 +98,15 @@ function MapaConteudo() {
   );
   // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
   const [rotaPendente, setRotaPendente] = useState(false);
+
+  // US #21 — busca de parada por nome ou endereço. Painel próprio, à
+  // esquerda como o planejador: os dois nunca ficam abertos juntos.
+  const [buscaParadaAberta, setBuscaParadaAberta] = useState(false);
+  const [paradasBuscadas, setParadasBuscadas] = useState<ResultadoBuscaParada | null>(null);
+  const [paradaFocada, setParadaFocada] = useState<{
+    parada: ParadaBuscada;
+    pedido: number;
+  } | null>(null);
 
   // `?painel=rotas` abre o planejador. Não há mais item de menu para isso
   // (o planejador abre pelo botão "Para onde você vai?"), mas o endereço
@@ -362,6 +374,26 @@ function MapaConteudo() {
     setRotaPendente(true);
   }, []);
 
+  // -- US #21 ---------------------------------------------------------------
+
+  const handleAbrirBuscaParada = useCallback(() => {
+    setPlanejadorAberto(false);
+    setEscolhendoNoMapa(null);
+    setBuscaParadaAberta(true);
+  }, []);
+
+  const handleFecharBuscaParada = useCallback(() => {
+    setBuscaParadaAberta(false);
+    setParadasBuscadas(null);
+    setParadaFocada(null);
+  }, []);
+
+  const handleSelecionarParadaBuscada = useCallback((parada: ParadaBuscada) => {
+    setParadaFocada((atual) => ({ parada, pedido: (atual?.pedido ?? 0) + 1 }));
+  }, []);
+
+  const buscaVisivel = buscaParadaAberta && !planejadorAberto;
+
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
@@ -401,7 +433,17 @@ function MapaConteudo() {
         onCliqueNoMapa={handleCliqueNoMapa}
         onLocalizacao={setLocalizacao}
         onVeiculos={setVeiculos}
+        paradasBuscadas={buscaVisivel ? paradasBuscadas : null}
+        paradaFocada={buscaVisivel ? paradaFocada : null}
       />
+
+      {buscaVisivel && (
+        <BuscaParada
+          onFechar={handleFecharBuscaParada}
+          onResultado={setParadasBuscadas}
+          onSelecionar={handleSelecionarParadaBuscada}
+        />
+      )}
 
       {planejadorAberto ? (
         <PlanejadorViagem
@@ -428,17 +470,33 @@ function MapaConteudo() {
           localizacao={localizacao}
         />
       ) : (
-        <button
-          type="button"
-          className="plan-abrir"
-          onClick={() => setPlanejadorAberto(true)}
-        >
-          <Navigation size={16} />
-          Para onde você vai?
-        </button>
+        !buscaVisivel && (
+          // US #21 — a busca de parada entra na mesma linha do planejador:
+          // logo abaixo fica o bloco de favoritos.
+          <div className="bp-entradas">
+            <button
+              type="button"
+              className="plan-abrir"
+              onClick={() => setPlanejadorAberto(true)}
+            >
+              <Navigation size={16} />
+              Para onde você vai?
+            </button>
+            <button
+              type="button"
+              className="bp-abrir"
+              aria-label="Buscar parada"
+              title="Buscar parada por nome ou endereço"
+              onClick={handleAbrirBuscaParada}
+            >
+              <MapPin size={16} />
+              <span className="bp-abrir-rotulo">Buscar parada</span>
+            </button>
+          </div>
+        )
       )}
 
-      {!planejadorAberto && !linha && (
+      {!planejadorAberto && !buscaVisivel && !linha && (
         <FavoritosDestaque
           favoritos={favoritos}
           onRastrear={handleRastrearFavorita}

@@ -31,7 +31,9 @@ import {
   DetalhesParada,
   LinhaDetalhada,
   OpcaoViagem,
+  ParadaBuscada,
   ParadaLinha,
+  ResultadoBuscaParada,
   VeiculoAoVivo,
 } from "@/lib/api";
 import type { PontoEscolhido } from "./PlanejadorViagem";
@@ -227,6 +229,20 @@ const iconeParada = L.divIcon({
   iconAnchor: [8, 8],
 });
 
+// US #21 — parada encontrada pela busca: o pino do protótipo (.mk-stop),
+// maior que o ponto das paradas de uma linha, pra se destacar no mapa.
+const iconeParadaBuscada = L.divIcon({
+  className: "mapa-icone-parada-buscada",
+  html:
+    '<span class="mapa-icone-parada-buscada-core">' +
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/>' +
+    '<circle cx="12" cy="10" r="3"/></svg></span>',
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+});
+
 /**
  * 582 dos 7.142 abrigos do SEMOB não têm nome utilizável na fonte — o
  * endereço cadastrado é só o CEP. O backend manda string vazia nesses
@@ -363,7 +379,16 @@ interface MapaInterativoProps {
   /** US #16 + #20 — repassa os ônibus rastreados pra que o painel do
    * itinerário possa mostrar quantos estão rodando em cada perna. */
   onVeiculos?: (veiculos: VeiculoAoVivo[]) => void;
+  /** US #21 — paradas encontradas pela busca, pra destacar no mapa. */
+  paradasBuscadas?: ResultadoBuscaParada | null;
+  /** US #21 — parada escolhida na lista da busca: o mapa centraliza nela e
+   * abre o painel da US #18. `pedido` muda a cada toque, pra reabrir a
+   * mesma parada depois de fechar o painel. */
+  paradaFocada?: { parada: ParadaBuscada; pedido: number } | null;
 }
+
+/** Zoom ao focar uma parada da busca: perto o bastante pra ver a rua. */
+const ZOOM_PARADA_BUSCADA = 17;
 
 export default function MapaInterativo({
   linha,
@@ -377,6 +402,8 @@ export default function MapaInterativo({
   onCliqueNoMapa,
   onLocalizacao,
   onVeiculos,
+  paradasBuscadas = null,
+  paradaFocada = null,
 }: MapaInterativoProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const [status, setStatus] = useState<StatusLocalizacao>("carregando");
@@ -601,6 +628,33 @@ export default function MapaInterativo({
     setDetalheParada(null);
   }
 
+  // US #21 — enquadra as paradas encontradas (e, na busca por endereço, o
+  // lugar pesquisado). Cenários 1 e 2: "destacar paradas no mapa" e
+  // "centralizar o mapa na região".
+  useEffect(() => {
+    if (!paradasBuscadas || paradasBuscadas.paradas.length === 0 || !mapRef.current) return;
+
+    const pontos: [number, number][] = paradasBuscadas.paradas.map((p) => [p.lat, p.lng]);
+    if (paradasBuscadas.referencia) {
+      pontos.push([paradasBuscadas.referencia.lat, paradasBuscadas.referencia.lng]);
+    }
+    mapRef.current.fitBounds(L.latLngBounds(pontos), {
+      padding: [56, 56],
+      maxZoom: ZOOM_PARADA_BUSCADA,
+    });
+  }, [paradasBuscadas]);
+
+  // US #21 — parada escolhida na lista: centraliza e abre o painel da US #18.
+  // `abrirDetalheParada` fica fora das dependências de propósito: ela é
+  // recriada a cada render, e o efeito só deve rodar a cada novo pedido.
+  useEffect(() => {
+    if (!paradaFocada) return;
+    const { parada } = paradaFocada;
+    mapRef.current?.setView([parada.lat, parada.lng], ZOOM_PARADA_BUSCADA);
+    abrirDetalheParada({ nome: parada.nome, lat: parada.lat, lng: parada.lng });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paradaFocada]);
+
   const corLinha = linha ? corDaLinha(linha.numero) : undefined;
 
   // US #17, cenário 3: seta indicando o sentido de operação, posicionada
@@ -815,6 +869,21 @@ export default function MapaInterativo({
             )}
           </>
         )}
+
+        {/* US #21 — paradas encontradas pela busca. Tocar abre o mesmo
+            painel da US #18 que as paradas de uma linha abrem. */}
+        {paradasBuscadas?.paradas.map((parada) => (
+          <Marker
+            key={`busca-${parada.codigo}`}
+            position={[parada.lat, parada.lng]}
+            icon={iconeParadaBuscada}
+            title={nomeDaParada(parada.nome)}
+            eventHandlers={{
+              click: () =>
+                abrirDetalheParada({ nome: parada.nome, lat: parada.lat, lng: parada.lng }),
+            }}
+          />
+        ))}
 
         {/* US #16 — fora do bloco da linha de propósito: os ônibus também
             aparecem quando o que está na tela é um itinerário da US #20. */}
