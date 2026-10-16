@@ -11,7 +11,15 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import Link from "next/link";
-import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
+import { corDaLinha } from "./corDaLinha";
+import BadgeLinha from "./BadgeLinha";
+import SeloFonte, { legendaDaFonte } from "./SeloFonte";
+import { formatarMinutos, minutosInteiros } from "./tempo";
+import { useChegadasDaParada } from "./useChegadasDaParada";
+import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
+import FaixaDaViagem from "./FaixaDaViagem";
+import { useViagem } from "./ViagemContext";
+import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
   buscarPosicoesDaLinha,
@@ -191,7 +199,7 @@ function criarIconeOnibus(
       : "";
   const tempo =
     typeof etaMinutos === "number" && Number.isFinite(etaMinutos)
-      ? ` · ${etaMinutos} min`
+      ? ` · ${minutosInteiros(etaMinutos)} min`
       : "";
   const rotulo = escaparHtml(numeroLinha) + tempo;
 
@@ -214,20 +222,6 @@ const iconeParada = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 });
-
-// Paleta pra diferenciar o trajeto por cor quando houver mais de uma
-// linha selecionada no mapa (PRD da US #17) — hoje só uma linha por
-// vez é buscada, mas a cor já é derivada da própria linha em vez de
-// fixa, então múltiplas linhas simultâneas não colidiriam visualmente.
-const CORES_TRAJETO = ["#1aa0ad", "#c9760a", "#2f72e8", "#1aa05a", "#d6453d"];
-
-function corDaLinha(numero: string): string {
-  let hash = 0;
-  for (let i = 0; i < numero.length; i++) {
-    hash = (hash * 31 + numero.charCodeAt(i)) >>> 0;
-  }
-  return CORES_TRAJETO[hash % CORES_TRAJETO.length];
-}
 
 /**
  * 582 dos 7.142 abrigos do SEMOB não têm nome utilizável na fonte — o
@@ -370,6 +364,18 @@ export default function MapaInterativo({
     carregando: boolean;
     erro: string | null;
   } | null>(null);
+
+  // Card #179 (⑤b) — quando cada linha chega NESTA parada. Só liga quando o
+  // painel tem o código de uma parada física (o hook cuida do polling e de
+  // descartar resposta de parada anterior).
+  const { chegadas: chegadasDaParada } = useChegadasDaParada(
+    detalheParada?.detalhes?.codigo ?? null
+  );
+
+  // US #171 (RN-05) — quem já está a bordo não espera mais: some o ETA de
+  // espera (pílula, popup e painel da parada) e entra a faixa de viagem.
+  const { viagem: viagemEmCurso } = useViagem();
+  const emViagem = viagemEmCurso !== null;
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -572,6 +578,8 @@ export default function MapaInterativo({
         (emZoom ? " em-zoom" : "")
       }
     >
+      <FaixaDaViagem />
+
       {escolhendoNoMapa && (
         <div className="mapa-aviso destaque" role="status">
           Toque no mapa para escolher o ponto.
@@ -731,7 +739,7 @@ export default function MapaInterativo({
                 veiculo.direcao,
                 parado,
                 veiculo.linha,
-                veiculo.etaMinutos
+                emViagem ? null : veiculo.etaMinutos
               )}
             >
               <Popup>
@@ -748,8 +756,20 @@ export default function MapaInterativo({
                     {parado ? "parado" : `${Math.round(veiculo.velocidade)} km/h`}
                   </>
                 )}
+                {!emViagem && veiculo.etaMinutos != null && veiculo.paradaNome && (
+                  <>
+                    <br />
+                    Chega na parada <strong>{veiculo.paradaNome}</strong> em{" "}
+                    {formatarMinutos(veiculo.etaMinutos)}
+                  </>
+                )}
                 <br />
                 <small>{descreverIdade(veiculo.atualizadoEm)}</small>
+                <BotaoPegueiOnibus
+                  numeroLinha={veiculo.linha}
+                  prefixo={veiculo.prefixo}
+                  posicaoDoUsuario={coordenadas}
+                />
               </Popup>
             </Marker>
           );
@@ -812,6 +832,11 @@ export default function MapaInterativo({
 
             {detalheParada.detalhes && (
               <>
+                <BotaoDescerNestaParada
+                  codigoDaParada={detalheParada.detalhes.codigo}
+                  numerosDasLinhas={detalheParada.detalhes.linhas.map((l) => l.numero)}
+                />
+
                 <div className="mapa-painel-titulo">
                   Linhas que passam por aqui ·{" "}
                   {detalheParada.detalhes.linhas.length}
@@ -828,15 +853,62 @@ export default function MapaInterativo({
                   ))}
                 </div>
 
+                {/* Card #179 (⑤b): quando o ônibus chega AQUI — ao vivo
+                    (posição real até esta parada, no sentido dela) ou, sem
+                    ônibus a caminho, o horário previsto de passagem. Cada
+                    linha diz de onde veio o número (RN-10). Sem dado, diz
+                    isso: não inventa (RN-09). */}
+                {!emViagem && chegadasDaParada && chegadasDaParada.chegadas.length > 0 && (
+                  <>
+                    <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
+                      Chegando nesta parada
+                    </div>
+                    <ul className="mapa-chegadas" aria-live="polite">
+                      {chegadasDaParada.chegadas.map((c) => (
+                        <li key={`${c.numero}-${c.rotaSentido}`} className="mapa-chegada">
+                          <BadgeLinha numero={c.numero} />
+                          <span className="mapa-chegada-texto">
+                            {c.fonte === "ao_vivo" && c.etaMinutos !== null && (
+                              <>
+                                Chega em <strong>{formatarMinutos(c.etaMinutos)}</strong>
+                                <SeloFonte fonte="ao_vivo" />
+                              </>
+                            )}
+                            {c.fonte === "previsto" && c.etaMinutos !== null && (
+                              <>
+                                Previsto às <strong>{c.horarioPrevisto}</strong> (em{" "}
+                                {formatarMinutos(c.etaMinutos)})
+                                <SeloFonte fonte="previsto" />
+                              </>
+                            )}
+                            {c.fonte === null && (
+                              <span className="mapa-chegada-sem-dado">
+                                Sem previsão no momento
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {/* Card #179 (RN-10): estes horários são de SAÍDA DO
+                    TERMINAL (a origem da linha), não de passagem nesta
+                    parada. Com o título "Próximos horários", parecia que o
+                    ônibus passava aqui naquela hora. */}
                 <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
-                  Próximos horários
+                  Próximas saídas do terminal
                 </div>
+                <p className="mapa-painel-dica">
+                  {legendaDaFonte("saida_terminal")}.
+                </p>
                 {/* Cenário 2 da US #18: parada sem horário disponível */}
                 {detalheParada.detalhes.proximosHorarios.length > 0 ? (
                   <p>{detalheParada.detalhes.proximosHorarios.join(" · ")}</p>
                 ) : (
                   <p className="mapa-painel-sem-veiculo">
-                    Nenhum horário previsto disponível para esta parada no
+                    Nenhuma saída prevista disponível para esta parada no
                     momento.
                   </p>
                 )}
@@ -882,7 +954,7 @@ export default function MapaInterativo({
                 <span className="mapa-painel-sem-veiculo">
                   {buscouPosicoes
                     ? proximoHorarioPrevisto
-                      ? `Nenhum ônibus em operação no momento. Próximo horário previsto: ${proximoHorarioPrevisto}.`
+                      ? `Nenhum ônibus em operação no momento. Próxima saída prevista do terminal: ${proximoHorarioPrevisto}.`
                       : "Nenhum ônibus desta linha em operação no momento."
                     : "Procurando ônibus em operação..."}
                 </span>
@@ -894,13 +966,24 @@ export default function MapaInterativo({
                 detalhe desta linha). Um atalho contextual aqui, já com a
                 linha preenchida, é o caminho óbvio pra quem quer reportar
                 um problema enquanto olha pra ela. */}
-            <Link
-              href={`/ocorrencias?linha=${encodeURIComponent(linha.numero)}`}
-              className="mapa-painel-reportar"
-            >
-              <TriangleAlert size={15} />
-              Reportar ocorrência nesta linha
-            </Link>
+            <div className="mapa-painel-ocorrencias">
+              {/* US #24 — quem olha a linha também quer saber o que os
+                  outros passageiros reportaram nela, não só reportar. */}
+              <Link
+                href={`/ocorrencias?linha=${encodeURIComponent(linha.numero)}`}
+                className="mapa-painel-ver-ocorrencias"
+              >
+                <List size={15} />
+                Ver ocorrências desta linha
+              </Link>
+              <Link
+                href={`/ocorrencias/reportar?linha=${encodeURIComponent(linha.numero)}`}
+                className="mapa-painel-reportar"
+              >
+                <TriangleAlert size={15} />
+                Reportar ocorrência nesta linha
+              </Link>
+            </div>
 
             <div className="mapa-painel-titulo">Trajeto e paradas</div>
             <div className="mapa-timeline">

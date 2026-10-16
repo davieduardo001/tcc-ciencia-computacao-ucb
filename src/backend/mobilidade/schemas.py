@@ -106,6 +106,39 @@ class PosicaoVeiculoResponse(BaseModel):
     # usuário). `None` quando não informado, ou quando o veículo está
     # parado/sem velocidade (Cenário 5: pílula sem tempo).
     eta_minutos: float | None = None
+    # Card #179 — a parada ATÉ A QUAL o `eta_minutos` foi medido: a mais
+    # próxima do usuário, no sentido deste veículo. `None` quando não havia
+    # parada ingerida por perto e o ETA veio da projeção do GPS no traçado.
+    parada_codigo: str | None = None
+    parada_nome: str | None = None
+
+
+class ChegadaResponse(BaseModel):
+    """
+    Quando o ônibus de uma linha chega numa parada (card #179, ⑤b).
+
+    `fonte` diz de onde veio o número — RN-10: `ao_vivo` é a posição real
+    do ônibus; `previsto` é horário de saída + tempo de percurso, para
+    quando não há ônibus a caminho; `None` é "sem dado" (RN-09: não inventa).
+    """
+
+    numero: str
+    nome: str
+    rota_sentido: str
+    eta_minutos: float | None = None
+    fonte: Literal["ao_vivo", "previsto"] | None = None
+    # só `ao_vivo`
+    prefixo: str | None = None
+    veiculos_a_caminho: int = 0
+    # só `previsto`: "HH:MM" da passagem prevista nesta parada
+    horario_previsto: str | None = None
+
+
+class ChegadasParadaResponse(BaseModel):
+    parada_codigo: str
+    parada_nome: str
+    calculado_em: str
+    chegadas: list[ChegadaResponse]
 
 
 class PosicoesLinhaResponse(BaseModel):

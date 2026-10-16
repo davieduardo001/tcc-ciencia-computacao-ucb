@@ -652,6 +652,84 @@ export async function buscarDetalhesParada(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Card #179 (⑤b) — Quando o ônibus chega NESTA parada
+// ---------------------------------------------------------------------------
+
+/** De onde veio o número: posição real do ônibus, ou saída + percurso. */
+export type FonteChegada = "ao_vivo" | "previsto";
+
+export interface ChegadaNaParada {
+  numero: string;
+  nome: string;
+  rotaSentido: string;
+  /** `null` quando não há dado (nem ônibus a caminho, nem horário). */
+  etaMinutos: number | null;
+  fonte: FonteChegada | null;
+  /** Só `ao_vivo`. */
+  prefixo: string | null;
+  veiculosACaminho: number;
+  /** Só `previsto`: "HH:MM" da passagem prevista nesta parada. */
+  horarioPrevisto: string | null;
+}
+
+export interface ChegadasDaParada {
+  paradaCodigo: string;
+  paradaNome: string;
+  calculadoEm: string;
+  chegadas: ChegadaNaParada[];
+}
+
+/**
+ * Chegadas das linhas numa parada física, pelo `codigo` (estável — ADR-14).
+ *
+ * Devolve `null` em qualquer falha, inclusive 404 (código que não é de uma
+ * parada física conhecida): quem exibe simplesmente não mostra a seção. É um
+ * extra sobre o painel da parada, que não deve quebrar nem mostrar erro por
+ * causa dele — mesma postura de `buscarPosicoesDaLinha`.
+ */
+export async function buscarChegadasParada(
+  codigo: string
+): Promise<ChegadasDaParada | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/mobilidade/paradas/${encodeURIComponent(codigo)}/chegadas`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return {
+      paradaCodigo: data.parada_codigo,
+      paradaNome: data.parada_nome,
+      calculadoEm: data.calculado_em,
+      chegadas: (data.chegadas ?? []).map(
+        (c: {
+          numero: string;
+          nome: string;
+          rota_sentido: string;
+          eta_minutos: number | null;
+          fonte: FonteChegada | null;
+          prefixo: string | null;
+          veiculos_a_caminho: number;
+          horario_previsto: string | null;
+        }) => ({
+          numero: c.numero,
+          nome: c.nome,
+          rotaSentido: c.rota_sentido,
+          etaMinutos: c.eta_minutos ?? null,
+          fonte: c.fonte ?? null,
+          prefixo: c.prefixo ?? null,
+          veiculosACaminho: c.veiculos_a_caminho ?? 0,
+          horarioPrevisto: c.horario_previsto ?? null,
+        })
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface VeiculoAoVivo {
   /** Número da linha que o veículo está fazendo. Necessário porque o
    * mapa rastreia várias linhas ao mesmo tempo quando o usuário escolhe
@@ -670,6 +748,12 @@ export interface VeiculoAoVivo {
    * informamos localização, ou quando o veículo está parado/sem
    * velocidade confiável (Cenário 5: pílula sem tempo). */
   etaMinutos: number | null;
+  /** Card #179 — parada ATÉ A QUAL o `etaMinutos` foi medido (a mais
+   * próxima do usuário, no sentido deste veículo). Ausente/`null` quando
+   * não havia parada ingerida por perto e o tempo veio da projeção do GPS
+   * no traçado. */
+  paradaCodigo?: string | null;
+  paradaNome?: string | null;
 }
 
 /** US #19 — resultado de uma busca de posições, com o fallback do Cenário 3. */
@@ -718,6 +802,8 @@ export async function buscarPosicoesDaLinha(
         atualizado_em: string;
         operadora: string;
         eta_minutos: number | null;
+        parada_codigo?: string | null;
+        parada_nome?: string | null;
       }) => ({
         linha: data.numero ?? numero,
         prefixo: v.prefixo,
@@ -729,6 +815,8 @@ export async function buscarPosicoesDaLinha(
         atualizadoEm: v.atualizado_em,
         operadora: v.operadora,
         etaMinutos: v.eta_minutos ?? null,
+        paradaCodigo: v.parada_codigo ?? null,
+        paradaNome: v.parada_nome ?? null,
       })
     );
 
@@ -823,6 +911,70 @@ export async function reportarOcorrencia(
     criadoEm: data.criado_em,
     expiraEm: data.expira_em,
   };
+}
+
+// ---------------------------------------------------------------------------
+// US #24 — Visualizar Ocorrências Reportadas por Outros Passageiros
+// ---------------------------------------------------------------------------
+
+export type StatusOcorrencia = "pendente" | "confirmada";
+
+export interface OcorrenciaListada {
+  id: string;
+  linhaNumero: string;
+  tipo: TipoOcorrencia;
+  descricao: string | null;
+  local: string | null;
+  status: StatusOcorrencia;
+  contadorConfirmacoes: number;
+  criadoEm: string;
+  expiraEm: string;
+}
+
+export class ListarOcorrenciasError extends Error {
+  naoAutenticado: boolean;
+
+  constructor(message: string, naoAutenticado = false) {
+    super(message);
+    this.naoAutenticado = naoAutenticado;
+  }
+}
+
+/**
+ * Lista as ocorrências ativas (não expiradas) reportadas por outros
+ * passageiros, da mais recente pra mais antiga. Com `linha`, só as dela.
+ *
+ * `cache: "no-store"`: uma ocorrência expira em minutos — servir uma lista
+ * velha do cache do navegador mostraria problemas que já passaram.
+ */
+export async function listarOcorrencias(linha?: string): Promise<OcorrenciaListada[]> {
+  const termo = linha?.trim();
+  const query = termo ? `?linha=${encodeURIComponent(termo)}` : "";
+
+  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    throw new ListarOcorrenciasError("Sua sessão expirou. Faça login novamente.", true);
+  }
+  if (!response.ok) {
+    throw new ListarOcorrenciasError("Não foi possível carregar as ocorrências.");
+  }
+
+  const lista = await response.json();
+  return lista.map((item: Record<string, unknown>) => ({
+    id: item.id,
+    linhaNumero: item.linha_numero,
+    tipo: item.tipo,
+    descricao: item.descricao ?? null,
+    local: item.local ?? null,
+    status: item.status,
+    contadorConfirmacoes: item.contador_confirmacoes,
+    criadoEm: item.criado_em,
+    expiraEm: item.expira_em,
+  })) as OcorrenciaListada[];
 }
 
 
@@ -1013,4 +1165,207 @@ export async function removerFavorito(id: string): Promise<void> {
     );
   }
   // 204 No Content — sem corpo.
+}
+
+// ---------------------------------------------------------------------------
+// US #171 — Pegar o ônibus: embarcar, acompanhar e encerrar a viagem
+// ---------------------------------------------------------------------------
+
+export interface ParadaDaViagem {
+  codigo: string;
+  nome: string;
+  lat: number;
+  lng: number;
+}
+
+export interface ViagemAtiva {
+  id: string;
+  numeroLinha: string;
+  sentido: string | null;
+  veiculoPrefixo: string;
+  paradaDestinoCodigo: string | null;
+  embarcouEm: string;
+  /** "sem_sinal": o ônibus não está no feed ou a posição é velha — a tela
+   * diz isso em vez de estimar (RN-09). */
+  sinal: "ao_vivo" | "sem_sinal";
+  veiculo: {
+    prefixo: string;
+    lat: number;
+    lng: number;
+    direcao: number | null;
+    atualizadoEm: string;
+  } | null;
+  destino: (ParadaDaViagem & { ultrapassado: boolean }) | null;
+  proximaParada: ParadaDaViagem | null;
+  paradasRestantes: ParadaDaViagem[];
+}
+
+/** `falhou` separa "o servidor disse que não há viagem" de "não consegui
+ * perguntar": no segundo caso quem chama mantém o que já mostrava. */
+export type ResultadoViagemAtiva =
+  | { falhou: true }
+  | { falhou: false; viagem: ViagemAtiva | null };
+
+/** `status` deixa a tela distinguir 409 (já em viagem) de 422 (sem veículo
+ * perto). `message` já vem em português do servidor nesses dois casos. */
+export class ViagemError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function paradaDaViagem(p: {
+  codigo: string;
+  nome: string;
+  lat: number;
+  lng: number;
+}): ParadaDaViagem {
+  return { codigo: p.codigo, nome: p.nome, lat: p.lat, lng: p.lng };
+}
+
+/**
+ * Viagem em andamento do usuário, com o progresso ao vivo. Nunca lança:
+ * é uma consulta periódica de fundo e não deve quebrar a tela.
+ */
+export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
+  try {
+    const response = await fetch(`${API_URL}/api/mobilidade/viagens/ativa`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    // Sem sessão não há viagem: é o estado "aguardando", não uma falha.
+    if (response.status === 401) return { falhou: false, viagem: null };
+    if (!response.ok) return { falhou: true };
+
+    const data = await response.json();
+    if (!data.ativa || !data.viagem) return { falhou: false, viagem: null };
+
+    return {
+      falhou: false,
+      viagem: {
+        id: data.viagem.id,
+        numeroLinha: data.viagem.numero_linha,
+        sentido: data.viagem.sentido ?? null,
+        veiculoPrefixo: data.viagem.veiculo_prefixo,
+        paradaDestinoCodigo: data.viagem.parada_destino_codigo ?? null,
+        embarcouEm: data.viagem.embarcou_em,
+        sinal: data.sinal === "ao_vivo" ? "ao_vivo" : "sem_sinal",
+        veiculo: data.veiculo
+          ? {
+              prefixo: data.veiculo.prefixo,
+              lat: data.veiculo.lat,
+              lng: data.veiculo.lng,
+              direcao: data.veiculo.direcao ?? null,
+              atualizadoEm: data.veiculo.atualizado_em,
+            }
+          : null,
+        destino: data.destino
+          ? { ...paradaDaViagem(data.destino), ultrapassado: !!data.destino.ultrapassado }
+          : null,
+        proximaParada: data.proxima_parada ? paradaDaViagem(data.proxima_parada) : null,
+        paradasRestantes: (data.paradas_restantes ?? []).map(paradaDaViagem),
+      },
+    };
+  } catch {
+    return { falhou: true };
+  }
+}
+
+async function erroDaViagem(response: Response, padrao: string): Promise<ViagemError> {
+  if (response.status === 401) {
+    return new ViagemError("Faça login para registrar a viagem.", 401);
+  }
+  // 404/409/422 trazem uma frase pronta em português no `detail`. Qualquer
+  // outra coisa (500, 502 do Gateway) não deve vazar texto técnico.
+  if ([404, 409, 422].includes(response.status)) {
+    try {
+      const data = await response.json();
+      if (typeof data.detail === "string") {
+        return new ViagemError(data.detail, response.status);
+      }
+    } catch {
+      // cai no texto padrão
+    }
+  }
+  return new ViagemError(padrao, response.status);
+}
+
+export interface EmbarquePayload {
+  numeroLinha: string;
+  /** Só confirma que o usuário está perto do ônibus; o servidor não guarda. */
+  lat: number;
+  lng: number;
+  paradaDestinoCodigo?: string;
+}
+
+/**
+ * Cenários 1 e 4 — registra o embarque. Lança `ViagemError` com `status`
+ * 409 (já em viagem) ou 422 (sem veículo perto / parada inválida).
+ */
+export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/mobilidade/viagens`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        numero_linha: dados.numeroLinha,
+        lat: dados.lat,
+        lng: dados.lng,
+        parada_destino_codigo: dados.paradaDestinoCodigo,
+      }),
+    });
+  } catch {
+    throw new ViagemError("Não foi possível registrar o embarque. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(response, "Não foi possível registrar o embarque. Tente novamente.");
+  }
+}
+
+/** Escolhe, troca ou tira (`null`) a parada de destino da viagem. */
+export async function definirDestinoDaViagem(
+  viagemId: string,
+  paradaDestinoCodigo: string | null
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/destino`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parada_destino_codigo: paradaDestinoCodigo }),
+      }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível salvar o destino. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(response, "Não foi possível salvar o destino. Tente novamente.");
+  }
+}
+
+/** Cenário 3 — "Cheguei". Idempotente no servidor: repetir não dá erro. */
+export async function encerrarViagem(viagemId: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/encerrar`,
+      { method: "POST", credentials: "include" }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível encerrar a viagem. Verifique sua conexão.");
+  }
+  // 404 = a viagem já não existe para este usuário (expirou, ou foi
+  // encerrada em outro aparelho): o objetivo de quem tocou em "Cheguei"
+  // está cumprido, então não é erro.
+  if (!response.ok && response.status !== 404) {
+    throw await erroDaViagem(response, "Não foi possível encerrar a viagem. Tente novamente.");
+  }
 }

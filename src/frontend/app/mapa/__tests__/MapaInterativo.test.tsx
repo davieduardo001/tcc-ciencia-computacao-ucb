@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
-import { DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
-import { buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
+import { ChegadasDaParada, DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
+import { buscarChegadasParada, buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
+import { buscarViagemAtiva, embarcarNoOnibus, ViagemAtiva } from "@/lib/api";
+import { ViagemProvider } from "../ViagemContext";
 
 // US #16 e #18: o componente busca posição ao vivo e detalhes de parada
 // sozinho — precisam de dublê. `BuscarParadaError` é uma classe usada em
@@ -13,7 +15,20 @@ jest.mock("@/lib/api", () => ({
     .fn()
     .mockResolvedValue({ veiculos: [], proximoHorarioPrevisto: null }),
   buscarDetalhesParada: jest.fn().mockResolvedValue(null),
+  buscarChegadasParada: jest.fn().mockResolvedValue(null),
   BuscarParadaError: class BuscarParadaError extends Error {},
+  // US #171 — usadas só pelos testes que montam o ViagemProvider.
+  buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
+  embarcarNoOnibus: jest.fn(),
+  definirDestinoDaViagem: jest.fn(),
+  encerrarViagem: jest.fn(),
+  ViagemError: class ViagemError extends Error {
+    status?: number;
+    constructor(message: string, status?: number) {
+      super(message);
+      this.status = status;
+    }
+  },
 }));
 
 /** US #19: embrulha uma lista de veículos no formato que a API devolve. */
@@ -26,6 +41,7 @@ function resultadoPosicoes(
 
 const buscarPosicoesMock = buscarPosicoesDaLinha as jest.Mock;
 const buscarDetalhesParadaMock = buscarDetalhesParada as jest.Mock;
+const buscarChegadasParadaMock = buscarChegadasParada as jest.Mock;
 
 jest.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -140,6 +156,7 @@ describe("MapaInterativo", () => {
       getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
     });
     buscarDetalhesParadaMock.mockClear().mockResolvedValue(null);
+    buscarChegadasParadaMock.mockClear().mockResolvedValue(null);
   });
 
   it("centraliza o mapa e exibe o marcador quando a localização é concedida", async () => {
@@ -241,8 +258,15 @@ describe("MapaInterativo", () => {
     const atalho = screen.getByText("Reportar ocorrência nesta linha");
     expect(atalho.closest("a")).toHaveAttribute(
       "href",
-      "/ocorrencias?linha=0.110"
+      "/ocorrencias/reportar?linha=0.110"
     );
+  });
+
+  it("tem um atalho pra ver as ocorrências já filtradas pela linha (US #24)", () => {
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const atalho = screen.getByText("Ver ocorrências desta linha");
+    expect(atalho.closest("a")).toHaveAttribute("href", "/ocorrencias?linha=0.110");
   });
 
   it("chama onFecharLinha ao clicar em fechar o painel", () => {
@@ -311,6 +335,13 @@ describe("MapaInterativo", () => {
     expect(
       screen.getByText(/0\.110 — Taguatinga \/ Rodoviária/)
     ).toBeInTheDocument();
+
+    // Card #179 (RN-10): são saídas do TERMINAL, e o painel diz isso — com o
+    // título "Próximos horários" parecia que o ônibus passava ali na hora.
+    expect(screen.getByText("Próximas saídas do terminal")).toBeInTheDocument();
+    expect(screen.queryByText("Próximos horários")).not.toBeInTheDocument();
+    expect(screen.getByText(/não é a hora em que passa nesta parada/)).toBeInTheDocument();
+
     expect(buscarDetalhesParadaMock).toHaveBeenCalledWith(
       LINHA_TESTE.paradas[0].lat,
       LINHA_TESTE.paradas[0].lng
@@ -329,11 +360,138 @@ describe("MapaInterativo", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Nenhum horário previsto disponível para esta parada no momento."
+          "Nenhuma saída prevista disponível para esta parada no momento."
         )
       ).toBeInTheDocument();
     });
   });
+
+
+  // ---------------------------------------------------------------------
+  // Card #179 (⑤b) — Chegando nesta parada
+  // ---------------------------------------------------------------------
+
+  const CHEGADAS_TESTE: ChegadasDaParada = {
+    paradaCodigo: "PR-12345",
+    paradaNome: "W3 Sul — 502",
+    calculadoEm: "2026-10-14T15:00:00+00:00",
+    chegadas: [
+      {
+        numero: "0.110",
+        nome: "0.110 — Taguatinga / Rodoviária",
+        rotaSentido: "IDA",
+        etaMinutos: 4.3,
+        fonte: "ao_vivo",
+        prefixo: "440001",
+        veiculosACaminho: 1,
+        horarioPrevisto: null,
+      },
+      {
+        numero: "875A",
+        nome: "875A — Perdizes",
+        rotaSentido: "IDA",
+        etaMinutos: 17.6,
+        fonte: "previsto",
+        prefixo: null,
+        veiculosACaminho: 0,
+        horarioPrevisto: "15:18",
+      },
+      {
+        numero: "106.2",
+        nome: "106.2 — Aeroporto",
+        rotaSentido: "IDA",
+        etaMinutos: null,
+        fonte: null,
+        prefixo: null,
+        veiculosACaminho: 0,
+        horarioPrevisto: null,
+      },
+    ],
+  };
+
+  async function abrirPainelDaParada() {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+    await screen.findByText("Parada PR-12345");
+  }
+
+  it("mostra quando cada linha chega na parada, dizendo de onde vem o número", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText("Chegando nesta parada")).toBeInTheDocument();
+    expect(buscarChegadasParadaMock).toHaveBeenCalledWith("PR-12345");
+
+    const linhas = screen.getAllByRole("listitem").filter((li) => li.classList.contains("mapa-chegada"));
+    expect(linhas).toHaveLength(3);
+
+    // ao vivo: minutos inteiros (4,3 → 4) e o selo
+    expect(linhas[0]).toHaveTextContent("0.110");
+    expect(linhas[0]).toHaveTextContent("Chega em 4 min");
+    expect(linhas[0].querySelector(".selo-fonte")).toHaveTextContent("ao vivo");
+
+    // previsto: o horário em que passa AQUI, e o selo "previsto"
+    expect(linhas[1]).toHaveTextContent("Previsto às 15:18 (em 18 min)");
+    expect(linhas[1].querySelector(".selo-fonte")).toHaveTextContent("previsto");
+
+    // sem dado: diz isso, sem inventar número
+    expect(linhas[2]).toHaveTextContent("Sem previsão no momento");
+    expect(linhas[2].querySelector(".selo-fonte")).toBeNull();
+  });
+
+  it("menos de 1 minuto não vira '0 min'", async () => {
+    buscarChegadasParadaMock.mockResolvedValue({
+      ...CHEGADAS_TESTE,
+      chegadas: [{ ...CHEGADAS_TESTE.chegadas[0], etaMinutos: 0.3 }],
+    });
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText(/menos de 1 min/)).toBeInTheDocument();
+    expect(screen.queryByText(/\b0 min\b/)).not.toBeInTheDocument();
+  });
+
+  it("sem chegadas da API (404/falha), o painel segue igual e sem a seção", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(null);
+
+    await abrirPainelDaParada();
+
+    await waitFor(() => expect(buscarChegadasParadaMock).toHaveBeenCalled());
+    expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument();
+    // o resto do painel continua lá
+    expect(screen.getByText("06:20 · 06:40 · 07:00")).toBeInTheDocument();
+  });
+
+  it("parada com lista de chegadas vazia não mostra a seção", async () => {
+    buscarChegadasParadaMock.mockResolvedValue({ ...CHEGADAS_TESTE, chegadas: [] });
+
+    await abrirPainelDaParada();
+
+    await waitFor(() => expect(buscarChegadasParadaMock).toHaveBeenCalled());
+    expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument();
+  });
+
+  it("as saídas do terminal continuam rotuladas como saídas, ao lado das chegadas", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+
+    await abrirPainelDaParada();
+
+    expect(await screen.findByText("Chegando nesta parada")).toBeInTheDocument();
+    expect(screen.getByText("Próximas saídas do terminal")).toBeInTheDocument();
+  });
+
+  it("fechar o painel da parada para de buscar chegadas", async () => {
+    buscarChegadasParadaMock.mockResolvedValue(CHEGADAS_TESTE);
+    await abrirPainelDaParada();
+    await screen.findByText("Chegando nesta parada");
+
+    fireEvent.click(screen.getAllByTitle("Fechar")[0]);
+
+    await waitFor(() => expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument());
+  });
+
 
   it("fecha o painel de detalhes e volta ao painel da linha (cenário 3)", async () => {
     buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
@@ -633,7 +791,7 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Próximo horário previsto: 06:20/)
+        screen.getByText(/Próxima saída prevista do terminal: 06:20/)
       ).toBeInTheDocument();
     });
   });
@@ -904,5 +1062,256 @@ describe("MapaInterativo — o ônibus parece que anda (US #16)", () => {
       handlersDeMapa.zoomend?.();
     });
     expect(canvas.className).not.toContain("em-zoom");
+  });
+  // ---------------------------------------------------------------------
+  // Card #179 (⑤b) — pílula e popup do ônibus
+  // ---------------------------------------------------------------------
+
+  it("a pílula mostra minutos inteiros, e não '4.3 min'", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 4.3 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    expect(marcador.getAttribute("data-html")).toContain(">0.110 · 4 min<");
+  });
+
+  it("menos de 1 minuto na pílula vira '<1 min'", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 0.4 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+    expect(marcador.getAttribute("data-html")).toContain(">0.110 · <1 min<");
+  });
+
+  it("o popup do ônibus diz até QUAL parada o tempo foi medido", async () => {
+    buscarPosicoesMock.mockResolvedValue(
+      resultadoPosicoes([
+        { ...VEICULO, etaMinutos: 4.3, paradaCodigo: "PR-12345", paradaNome: "W3 Sul — 502" },
+      ])
+    );
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).toHaveTextContent("Chega na parada W3 Sul — 502 em 4 min");
+  });
+
+  it("sem parada de referência (projeção no traçado), o popup não afirma nenhuma", async () => {
+    buscarPosicoesMock.mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 4 }]));
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const popup = await screen.findByTestId("popup");
+    expect(popup).not.toHaveTextContent(/Chega na parada/);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// US #171 — Pegar o ônibus: o mapa em viagem × aguardando
+// ---------------------------------------------------------------------------
+
+describe("MapaInterativo — viagem em andamento (US #171)", () => {
+  const buscarViagemMock = buscarViagemAtiva as jest.Mock;
+  const embarcarMock = embarcarNoOnibus as jest.Mock;
+
+  const POSICAO = { latitude: -15.83, longitude: -48.04 };
+
+  function viagemEmCurso(sobre: Partial<ViagemAtiva> = {}): ViagemAtiva {
+    return {
+      id: "v-1",
+      numeroLinha: "0.110",
+      sentido: "IDA",
+      veiculoPrefixo: VEICULO.prefixo,
+      paradaDestinoCodigo: null,
+      embarcouEm: "2026-10-14T15:00:00Z",
+      sinal: "ao_vivo",
+      veiculo: null,
+      destino: null,
+      proximaParada: { codigo: "PR-B", nome: "W3 Sul 502", lat: -15.8, lng: -47.9 },
+      paradasRestantes: [],
+      ...sobre,
+    };
+  }
+
+  function comProvider(props: React.ComponentProps<typeof MapaInterativo> = {}) {
+    return render(
+      <ViagemProvider>
+        <MapaInterativo {...props} />
+      </ViagemProvider>
+    );
+  }
+
+  beforeEach(() => {
+    mockGeolocation({
+      getCurrentPosition: jest.fn((sucesso) =>
+        sucesso({ coords: POSICAO } as GeolocationPosition)
+      ) as unknown as Geolocation["getCurrentPosition"],
+    });
+    buscarPosicoesMock
+      .mockReset()
+      .mockResolvedValue(resultadoPosicoes([{ ...VEICULO, etaMinutos: 4.3, paradaNome: "W3 Sul — 502" }]));
+    buscarViagemMock.mockReset().mockResolvedValue({ falhou: false, viagem: null });
+    embarcarMock.mockReset();
+    buscarDetalhesParadaMock.mockReset().mockResolvedValue(null);
+    buscarChegadasParadaMock.mockReset().mockResolvedValue(null);
+  });
+
+  describe("aguardando (comportamento de sempre)", () => {
+    it("não mostra a faixa de viagem", async () => {
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByTestId("marcador-mapa-icone-onibus");
+
+      expect(screen.queryByRole("region", { name: "Viagem em andamento" })).not.toBeInTheDocument();
+    });
+
+    it("a pílula e o popup seguem mostrando o tempo de espera", async () => {
+      comProvider({ linha: LINHA_TESTE });
+
+      const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+      expect(marcador.getAttribute("data-html")).toContain(">0.110 · 4 min<");
+      expect(screen.getByTestId("popup")).toHaveTextContent("Chega na parada W3 Sul — 502 em 4 min");
+    });
+
+    it("o popup do ônibus oferece 'Peguei este ônibus' quando há localização", async () => {
+      comProvider({ linha: LINHA_TESTE });
+
+      expect(await screen.findByRole("button", { name: "Peguei este ônibus" })).toBeInTheDocument();
+    });
+
+    it("sem localização, o popup explica em vez de oferecer o botão", async () => {
+      mockGeolocation({
+        getCurrentPosition: jest.fn() as unknown as Geolocation["getCurrentPosition"],
+      });
+
+      comProvider({ linha: LINHA_TESTE });
+
+      expect(await screen.findByText(/Ative a localização/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Peguei este ônibus" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("embarcar pelo popup (Cenário 1)", () => {
+    it("manda a linha do ônibus tocado e a posição do usuário; depois a faixa aparece", async () => {
+      buscarViagemMock
+        .mockResolvedValueOnce({ falhou: false, viagem: null })
+        .mockResolvedValue({ falhou: false, viagem: viagemEmCurso() });
+      embarcarMock.mockResolvedValue(undefined);
+
+      comProvider({ linha: LINHA_TESTE });
+      fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
+
+      await waitFor(() =>
+        expect(embarcarMock).toHaveBeenCalledWith({
+          numeroLinha: "0.110",
+          lat: POSICAO.latitude,
+          lng: POSICAO.longitude,
+        })
+      );
+      const faixa = await screen.findByRole("region", { name: "Viagem em andamento" });
+      expect(faixa).toHaveTextContent("Em viagem · linha 0.110");
+      expect(screen.getByText("Você está neste ônibus.")).toBeInTheDocument();
+    });
+  });
+
+  describe("em viagem (RN-05)", () => {
+    beforeEach(() => {
+      buscarViagemMock.mockResolvedValue({ falhou: false, viagem: viagemEmCurso() });
+    });
+
+    it("mostra a faixa com a próxima parada", async () => {
+      comProvider({ linha: LINHA_TESTE });
+
+      const faixa = await screen.findByRole("region", { name: "Viagem em andamento" });
+      expect(faixa).toHaveTextContent("Próxima parada: W3 Sul 502");
+    });
+
+    it("a pílula do ônibus deixa de mostrar o tempo de ESPERA", async () => {
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+
+      const marcador = await screen.findByTestId("marcador-mapa-icone-onibus");
+      expect(marcador.getAttribute("data-html")).not.toContain("4 min");
+      expect(marcador.getAttribute("data-html")).toContain("0.110");
+    });
+
+    it("o popup deixa de dizer quando o ônibus chega na parada", async () => {
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+
+      expect(screen.getByTestId("popup")).not.toHaveTextContent(/Chega na parada/);
+    });
+
+    it("o painel da parada esconde 'Chegando nesta parada' (já está a bordo)", async () => {
+      buscarDetalhesParadaMock.mockResolvedValue({
+        nome: "W3 Sul — 502",
+        codigo: "PR-12345",
+        lat: -15.8,
+        lng: -47.9,
+        linhas: [{ numero: "0.110", nome: "0.110", sentido: "IDA" }],
+        proximosHorarios: [],
+      });
+      buscarChegadasParadaMock.mockResolvedValue({
+        paradaCodigo: "PR-12345",
+        paradaNome: "W3 Sul — 502",
+        calculadoEm: "2026-10-14T15:00:00+00:00",
+        chegadas: [
+          {
+            numero: "0.110",
+            nome: "0.110",
+            rotaSentido: "IDA",
+            etaMinutos: 4,
+            fonte: "ao_vivo",
+            prefixo: "1",
+            veiculosACaminho: 1,
+            horarioPrevisto: null,
+          },
+        ],
+      });
+
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+      fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+      await screen.findByText("Parada PR-12345");
+
+      expect(screen.queryByText("Chegando nesta parada")).not.toBeInTheDocument();
+    });
+
+    it("o painel de uma parada da linha oferece 'Descer nesta parada'", async () => {
+      buscarDetalhesParadaMock.mockResolvedValue({
+        nome: "W3 Sul — 502",
+        codigo: "PR-12345",
+        lat: -15.8,
+        lng: -47.9,
+        linhas: [{ numero: "0.110", nome: "0.110", sentido: "IDA" }],
+        proximosHorarios: [],
+      });
+
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+      fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+      expect(await screen.findByRole("button", { name: "Descer nesta parada" })).toBeInTheDocument();
+    });
+
+    it("parada por onde a linha da viagem não passa: sem 'Descer nesta parada'", async () => {
+      buscarDetalhesParadaMock.mockResolvedValue({
+        nome: "Outra",
+        codigo: "PR-99999",
+        lat: -15.8,
+        lng: -47.9,
+        linhas: [{ numero: "875A", nome: "875A", sentido: "IDA" }],
+        proximosHorarios: [],
+      });
+
+      comProvider({ linha: LINHA_TESTE });
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+      fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+      await screen.findByText("Parada PR-99999");
+
+      expect(screen.queryByRole("button", { name: "Descer nesta parada" })).not.toBeInTheDocument();
+    });
   });
 });

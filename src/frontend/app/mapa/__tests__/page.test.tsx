@@ -11,8 +11,8 @@ import {
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
-  // A página lê ?painel= pra abrir o planejador quando o usuário chega
-  // pelo item "Rotas" da navegação.
+  // A página lê ?painel=rotas pra abrir o planejador quando o usuário
+  // chega por uma rota favorita (/favoritos → "Ir").
   useSearchParams: () => new URLSearchParams(parametrosDaUrl),
 }));
 
@@ -50,6 +50,8 @@ jest.mock("@/lib/api", () => ({
   calcularRotas: jest.fn().mockResolvedValue([]),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
+  // O AppShell consulta a viagem em andamento (US #171): sem viagem.
+  buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
   // US #25 — funções de favoritos usadas pelo MapaConteudo
   listarFavoritos: jest.fn().mockResolvedValue([]),
   cachearFavoritos: jest.fn(),
@@ -293,7 +295,7 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     // A linha aparece duas vezes: no resumo da opção e no passo
     // expandido logo abaixo (a primeira opção abre já expandida).
     expect(screen.getAllByText("0.382")).toHaveLength(2);
-    expect(screen.getByText("~76 min")).toBeInTheDocument();
+    expect(screen.getByText("76 min")).toBeInTheDocument();
     expect(screen.getByText(/Avenida Hélio Prates/)).toBeInTheDocument();
     expect(screen.getByText(/Eixo L Central/)).toBeInTheDocument();
     expect(screen.getByText(/33 paradas/)).toBeInTheDocument();
