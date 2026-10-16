@@ -9,9 +9,13 @@
 # SUPosições PROVISÓRIAS — ajustar quando as dependências fecharem
 # ---------------------------------------------------------------------------
 #
-# 1. VIAGEM ATIVA (depende da US #171, "Pegar o ônibus" — ABERTA)
-#    A #172 só dispara dentro de uma viagem, mas a entidade "viagem" ainda
-#    não existe no banco. Enquanto isso:
+# 1. VIAGEM ATIVA — RESOLVIDO pela US #171 ("Pegar o ônibus")
+#    A entidade existe (tabela `viagem`) e o mobilidade/main.py já usa
+#    `ViagensAtivasDoBanco` (providers/viagens_ativas_banco.py). O texto
+#    abaixo é o histórico de por que existiu um provider provisório; a
+#    classe provisória segue aqui só como dublê de teste.
+#    Antes da #171, a #172 só disparava dentro de uma viagem que ainda
+#    não existia no banco, então:
 #      - `ViagemAtiva` é o formato mínimo que o alerta precisa (id da
 #        viagem, usuário, linha e parada de destino com coordenadas);
 #      - `ViagensAtivasProvisorias` devolve sempre `[]` — sem viagem, o
@@ -184,7 +188,7 @@ class VeiculosProvider(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Implementação provisória — remover quando a US #171 entregar a real
+# Implementação provisória — substituída em produção por ViagensAtivasDoBanco
 # ---------------------------------------------------------------------------
 
 

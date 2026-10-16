@@ -9,7 +9,8 @@ from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.services.servico_proximidade import ServicoProximidade
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
-from mobilidade.providers.contratos_proximidade import ViagensAtivasProvisorias
+from mobilidade.providers.viagens_ativas_banco import ViagensAtivasDoBanco
+from mobilidade.viagem_routes import router as viagem_router
 from mobilidade.providers.preferencias_banco import PreferenciasDoBanco
 from mobilidade.providers.veiculos_ao_vivo import VeiculosAoVivo
 
@@ -31,17 +32,17 @@ app.add_middleware(
 )
 
 app.include_router(mobilidade_router, prefix="/mobilidade", tags=["mobilidade"])
+app.include_router(viagem_router, prefix="/mobilidade", tags=["viagem"])
 
 
 @app.on_event("startup")
 def startup():
     servico = ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
 
-    # US #172 — alerta de proximidade da parada. `ViagensAtivasProvisorias`
-    # devolve [] até a US #171 entregar a entidade de viagem: é o único
-    # ponto de troca quando ela fechar (ver contratos_proximidade.py).
+    # US #172 — alerta de proximidade da parada, agora sobre as viagens
+    # reais da US #171 (o provider provisório devolvia sempre []).
     servico_proximidade = ServicoProximidade(
-        viagens=ViagensAtivasProvisorias(),
+        viagens=ViagensAtivasDoBanco(),
         veiculos=VeiculosAoVivo(),
         preferencias=PreferenciasDoBanco(),
         notificador=NotificadorNulo(),

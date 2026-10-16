@@ -19,10 +19,9 @@
 # SUPosições PROVISÓRIAS (dependências abertas da Sprint 3)
 # ---------------------------------------------------------------------------
 #
-# * Viagem ativa — depende da US #171 ("Pegar o ônibus", @Kelvin963).
-#   Enquanto a entidade não existe, o worker recebe
-#   `ViagensAtivasProvisorias` (devolve []) e o ciclo roda sem disparar.
-#   Quando a #171 fechar o formato, trocar o provider em main.py.
+# * Viagem ativa — vem da US #171 ("Pegar o ônibus"), via ViagensAtivasDoBanco
+#   (já ligado em main.py). `ViagensAtivasProvisorias` (devolve []) ficou
+#   só como dublê de teste.
 #
 # * Identidade da parada — depende da #173 ("mapeamento entre paradas",
 #   @davieduardo001, PR #177). `parada_destino_codigo` ainda não é chave

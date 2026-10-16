@@ -64,25 +64,48 @@ describe("AppShell", () => {
     links.forEach((link) => expect(link).toHaveAttribute("href", "/favoritos"));
   });
 
-  it("linhas e rotas navegam para o mapa com o painel certo", () => {
-    // As duas funcionalidades vivem dentro do mapa, não em páginas
-    // separadas — marcá-las como "em breve" dizia ao usuário que não
-    // existiam, sendo que as US #15, #17 e #20 estão entregues.
+  it("não tem item de menu 'Linhas de Ônibus' nem 'Rotas' (card #179)", () => {
+    // Os dois só repetiam entradas que já existem no mapa: "Linhas" apenas
+    // dava foco na busca do topo e "Rotas" apenas abria o planejador. Uma
+    // função, um ponto de entrada.
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>
       </AppShell>
     );
 
-    const linhas = screen.getAllByRole("link", { name: /Linhas de Ônibus/i });
-    expect(linhas.length).toBeGreaterThan(0);
-    linhas.forEach((l) =>
-      expect(l).toHaveAttribute("href", "/mapa?painel=linhas")
+    expect(screen.queryByRole("link", { name: /Linhas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Rotas$/i })).not.toBeInTheDocument();
+    // "Rotas Salvas" é outra coisa (US #25) e continua.
+    expect(screen.getAllByRole("link", { name: "Rotas Salvas" }).length).toBeGreaterThan(0);
+  });
+
+  it("a busca de linha continua na barra do topo", () => {
+    render(
+      <AppShell active="mapa" onBuscarLinha={jest.fn()}>
+        <div>conteúdo</div>
+      </AppShell>
     );
 
-    const rotas = screen.getAllByRole("link", { name: /^Rotas$/i });
-    expect(rotas.length).toBeGreaterThan(0);
-    rotas.forEach((l) => expect(l).toHaveAttribute("href", "/mapa?painel=rotas"));
+    expect(screen.getByPlaceholderText(/Buscar linha ou destino/)).toBeInTheDocument();
+  });
+
+  it("navegação inferior: Mapa e Perfil, com o vão do botão central entre os dois", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    const destinos = [...inferior.querySelectorAll(".ms-bottomnav-rotulo")].map(
+      (e) => e.textContent
+    );
+    expect(destinos).toEqual(["Mapa", "Perfil"]);
+
+    const vao = inferior.querySelector(".ms-bottomnav-vao") as HTMLElement;
+    expect(vao.previousElementSibling).toHaveTextContent("Mapa");
+    expect(vao.nextElementSibling).toHaveTextContent("Perfil");
   });
 
   it("perfil fica na navegação inferior, não na barra lateral", () => {

@@ -19,7 +19,7 @@ import { useChegadasDaParada } from "./useChegadasDaParada";
 import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
 import FaixaDaViagem from "./FaixaDaViagem";
 import { useViagem } from "./ViagemContext";
-import { Bus, Crosshair, Layers, TriangleAlert, X } from "lucide-react";
+import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
 import {
   buscarDetalhesParada,
   buscarPosicoesDaLinha,
@@ -966,13 +966,24 @@ export default function MapaInterativo({
                 detalhe desta linha). Um atalho contextual aqui, já com a
                 linha preenchida, é o caminho óbvio pra quem quer reportar
                 um problema enquanto olha pra ela. */}
-            <Link
-              href={`/ocorrencias?linha=${encodeURIComponent(linha.numero)}`}
-              className="mapa-painel-reportar"
-            >
-              <TriangleAlert size={15} />
-              Reportar ocorrência nesta linha
-            </Link>
+            <div className="mapa-painel-ocorrencias">
+              {/* US #24 — quem olha a linha também quer saber o que os
+                  outros passageiros reportaram nela, não só reportar. */}
+              <Link
+                href={`/ocorrencias?linha=${encodeURIComponent(linha.numero)}`}
+                className="mapa-painel-ver-ocorrencias"
+              >
+                <List size={15} />
+                Ver ocorrências desta linha
+              </Link>
+              <Link
+                href={`/ocorrencias/reportar?linha=${encodeURIComponent(linha.numero)}`}
+                className="mapa-painel-reportar"
+              >
+                <TriangleAlert size={15} />
+                Reportar ocorrência nesta linha
+              </Link>
+            </div>
 
             <div className="mapa-painel-titulo">Trajeto e paradas</div>
             <div className="mapa-timeline">
