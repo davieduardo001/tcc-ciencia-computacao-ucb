@@ -1,0 +1,213 @@
+@startuml UC171_PegarOnibus
+hide footbox
+title Diagrama de Sequencia - Pegar o Onibus: Indicar Embarque e Acompanhar a Viagem (US #171)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaRastreamento" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoViagem" as Service <<servico mobilidade>>
+participant ":ModeloVeiculo" as Veiculo <<modelo>>
+participant ":ModeloViagem" as Model <<modelo>>
+
+== Indicar o Embarque ==
+
+Passageiro -> View : tocarPegueiEsteOnibus(linha, paradaDestino?)
+activate View
+
+View -> View : obterPosicaoDoPassageiro()
+
+View -> Gateway : requisicao(token, linha, posicaoPassageiro, paradaDestino?)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : consultarViagemAtiva(identidadeUsuario)
+  activate Model
+  Model --> Service : viagemAtiva | nenhuma
+  deactivate Model
+
+  alt passageiro ja esta em viagem
+    Service --> Gateway : respostaErro(conflito, 409)
+    deactivate Service
+    Gateway --> View : retornarResposta(conflito)
+    View -> View : exibirAviso("Voce ja esta em uma viagem.")
+
+  else sem viagem ativa
+    Service -> Veiculo : obterVeiculosProximos(linha, posicaoPassageiro, raioMaximo)
+    activate Veiculo
+
+    alt veiculo da linha dentro do raio, com posicao recente
+      Veiculo --> Service : veiculoMaisProximo(prefixo, sentido)
+      deactivate Veiculo
+      note right of Service : A posicao do passageiro so confirma o\nembarque e e descartada (LGPD).\nNada de trilha de posicao.
+      Service -> Model : registrarViagem(identidadeUsuario, linha, sentido, prefixo, paradaDestino?)
+      activate Model
+      Model --> Service : viagemRegistrada
+      deactivate Model
+      Service --> Gateway : resposta(viagemRegistrada, 201)
+      deactivate Service
+      Gateway --> View : retornarResposta(viagemRegistrada)
+      View -> View : passarParaModoEmViagem(viagemRegistrada)
+
+    else nenhum veiculo identificavel
+      Veiculo --> Service : semVeiculoProximo()
+      deactivate Veiculo
+      Service --> Gateway : respostaErro(naoConfirmado, 422)
+      deactivate Service
+      Gateway --> View : retornarResposta(naoConfirmado)
+      View -> View : exibirAviso("Nao conseguimos confirmar seu embarque.")
+    end
+  end
+
+else token expirado
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+  Sessao --> Auth : tokenValido
+  deactivate Sessao
+  Auth -> Sessao : emitirNovoTokenAcesso(usuarioId)
+  activate Sessao
+  Sessao --> Auth : novoToken
+  deactivate Sessao
+  Auth --> Gateway : sessaoRenovada(novoToken)
+  deactivate Auth
+
+  Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+  activate Service
+  Service -> Model : registrarViagemSeConfirmada(req)
+  activate Model
+  Model --> Service : viagemRegistrada
+  deactivate Model
+  Service --> Gateway : resposta(viagemRegistrada, 201)
+  deactivate Service
+  Gateway --> View : retornarResposta(viagemRegistrada)
+  View -> View : passarParaModoEmViagem(viagemRegistrada)
+
+else token invalido ou refresh revogado
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin("Sua sessao expirou. Faca login novamente.")
+end
+
+deactivate Gateway
+deactivate View
+
+== Escolher o Destino (opcional, depois de embarcar) ==
+
+Passageiro -> View : tocarDescerNestaParada(paradaTocadaNoMapa)
+activate View
+View -> Gateway : requisicao(token, viagemId, paradaDestino)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+
+Service -> Model : definirDestino(viagemId, identidadeUsuario, paradaDestino)
+activate Model
+
+alt viagem ativa do passageiro e parada pertence a linha
+  Model --> Service : viagemAtualizada
+  deactivate Model
+  Service --> Gateway : resposta(viagemAtualizada)
+  deactivate Service
+  Gateway --> View : retornarResposta(viagemAtualizada)
+  View -> View : exibirParadasRestantesAteODestino()
+
+else viagem encerrada, de outro passageiro ou parada invalida
+  Model --> Service : recusada(motivo)
+  deactivate Model
+  Service --> Gateway : respostaErro(409 | 404 | 422)
+  deactivate Service
+  Gateway --> View : retornarResposta(erro)
+  View -> View : exibirAviso(motivo)
+end
+
+deactivate Gateway
+deactivate View
+
+== Acompanhar a Viagem ==
+
+loop enquanto em viagem (a cada atualizacao da posicao ao vivo)
+  View -> Gateway : requisicao(token)
+  activate View
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : consultarViagemAtiva(identidadeUsuario)
+  activate Model
+  Model --> Service : viagemAtiva
+  deactivate Model
+
+  Service -> Model : expirarSeVencida(viagemAtiva)
+  activate Model
+  Model --> Service : viagemAtiva | encerradaPorExpiracao
+  deactivate Model
+
+  Service -> Veiculo : obterPosicaoDoVeiculo(prefixo)
+  activate Veiculo
+
+  alt veiculo com posicao recente e trajeto conhecido
+    Veiculo --> Service : posicaoAoVivo
+    deactivate Veiculo
+    Service -> Service : calcularProximaParadaEParadasRestantes(posicaoAoVivo, paradaDestino)
+    Service --> Gateway : resposta(veiculo, proximaParada, paradasRestantes)
+    deactivate Service
+    Gateway --> View : retornarResposta(progresso)
+    View -> View : exibirVeiculoProximaParadaEParadasRestantes(progresso)
+
+  else veiculo sem sinal ou sentido desconhecido
+    Veiculo --> Service : semPosicaoRecente()
+    deactivate Veiculo
+    Service --> Gateway : resposta(semSinal)
+    deactivate Service
+    Gateway --> View : retornarResposta(semSinal)
+    View -> View : exibirAvisoSemSinalSemEstimar()
+  end
+
+  deactivate Gateway
+  deactivate View
+end
+
+== Encerrar a Viagem ==
+
+Passageiro -> View : tocarCheguei()
+activate View
+View -> Gateway : requisicao(token, viagemId)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+
+Service -> Model : encerrarViagem(viagemId, identidadeUsuario)
+activate Model
+
+alt viagem do passageiro (ou ja encerrada)
+  Model --> Service : viagemEncerrada
+  deactivate Model
+  Service --> Gateway : resposta(viagemEncerrada)
+  deactivate Service
+  Gateway --> View : retornarResposta(viagemEncerrada)
+  View -> View : voltarAoEstadoNormal()
+
+else viagem inexistente ou de outro passageiro
+  Model --> Service : naoEncontrada()
+  deactivate Model
+  Service --> Gateway : respostaErro(naoEncontrada, 404)
+  deactivate Service
+  Gateway --> View : retornarResposta(naoEncontrada)
+  View -> View : voltarAoEstadoNormal()
+end
+
+deactivate Gateway
+deactivate View
+
+@enduml
