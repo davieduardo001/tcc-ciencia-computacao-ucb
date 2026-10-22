@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ParadaResponse(BaseModel):
@@ -47,6 +47,10 @@ class PontoEmbarqueResponse(BaseModel):
     lng: float
     parada_nome: str
     caminhada_metros: int
+    # Issue #190 — código da parada física (`parada.codigo`) deste ponto na
+    # rota do trecho. `None` quando não há parada ingerida a até 40 m: o
+    # front mostra o ponto no mapa e não consegue pedir o tempo.
+    parada_codigo: str | None = None
 
 
 class PernaResponse(BaseModel):
@@ -106,6 +110,87 @@ class PosicaoVeiculoResponse(BaseModel):
     # usuário). `None` quando não informado, ou quando o veículo está
     # parado/sem velocidade (Cenário 5: pílula sem tempo).
     eta_minutos: float | None = None
+    # Card #179 — a parada ATÉ A QUAL o `eta_minutos` foi medido: a mais
+    # próxima do usuário, no sentido deste veículo. `None` quando não havia
+    # parada ingerida por perto e o ETA veio da projeção do GPS no traçado.
+    parada_codigo: str | None = None
+    parada_nome: str | None = None
+
+
+class ChegadaResponse(BaseModel):
+    """
+    Quando o ônibus de uma linha chega numa parada (card #179, ⑤b).
+
+    `fonte` diz de onde veio o número — RN-10: `ao_vivo` é a posição real
+    do ônibus; `previsto` é horário de saída + tempo de percurso, para
+    quando não há ônibus a caminho; `None` é "sem dado" (RN-09: não inventa).
+    """
+
+    numero: str
+    nome: str
+    rota_sentido: str
+    eta_minutos: float | None = None
+    fonte: Literal["ao_vivo", "previsto"] | None = None
+    # só `ao_vivo`
+    prefixo: str | None = None
+    veiculos_a_caminho: int = 0
+    # só `previsto`: "HH:MM" da passagem prevista nesta parada
+    horario_previsto: str | None = None
+
+
+class ChegadasParadaResponse(BaseModel):
+    parada_codigo: str
+    parada_nome: str
+    calculado_em: str
+    chegadas: list[ChegadaResponse]
+
+
+# ---------------------------------------------------------------------------
+# Issue #190 — tempo do ônibus nas paradas de subir e descer de uma rota
+# ---------------------------------------------------------------------------
+
+
+class PernaChegadaRequest(BaseModel):
+    """Um trecho da rota escolhida: a linha, o sentido e as duas paradas."""
+
+    numero: str = Field(min_length=1, max_length=20)
+    sentido: str = Field(min_length=1, max_length=20)
+    embarque_codigo: str | None = Field(default=None, max_length=40)
+    desembarque_codigo: str | None = Field(default=None, max_length=40)
+
+
+class ChegadasDaRotaRequest(BaseModel):
+    # Uma rota tem 1 ou 2 trechos hoje; o teto protege o custo do cálculo.
+    pernas: list[PernaChegadaRequest] = Field(min_length=1, max_length=6)
+
+
+class ChegadaNoPontoResponse(BaseModel):
+    """
+    Quando o ônibus daquele trecho chega a uma parada de subir ou descer.
+
+    `fonte` (RN-10): `ao_vivo` é a posição real do ônibus; `previsto` é
+    horário de saída + tempo de percurso; `None` é "sem dado" (RN-09).
+    """
+
+    parada_codigo: str | None = None
+    eta_minutos: float | None = None
+    fonte: Literal["ao_vivo", "previsto"] | None = None
+    # só `ao_vivo`: o ônibus que o passageiro pegaria
+    prefixo: str | None = None
+    # só `previsto`: "HH:MM" da passagem prevista
+    horario_previsto: str | None = None
+
+
+class ChegadasDaPernaResponse(BaseModel):
+    numero: str
+    sentido: str
+    embarque: ChegadaNoPontoResponse
+    desembarque: ChegadaNoPontoResponse
+
+
+class ChegadasDaRotaResponse(BaseModel):
+    calculado_em: str
+    pernas: list[ChegadasDaPernaResponse]
 
 
 class PosicoesLinhaResponse(BaseModel):
@@ -135,12 +220,20 @@ class ParadaLinhaResponse(BaseModel):
     numero: str
     nome: str
     sentido: str
+    # US #173 — sentido da rota e posição da parada nela. Nulos quando a
+    # parada foi resolvida pelo caminho antigo (antes da reingestão).
+    rota_sentido: str | None = None
+    ordem: int | None = None
+    # Issue #174 — os próximos horários DESTA linha (até 3). Campo novo e
+    # opcional: clientes antigos seguem lendo `proximos_horarios` da parada.
+    proximos_horarios: list[str] = []
 
 
 class ParadaDetalheResponse(BaseModel):
     """
     Cenário 1: `proximos_horarios` traz os horários previstos mais
-    próximos. Cenário 2 (parada sem horário disponível) é a lista vazia —
+    próximos (até 3, combinados entre as linhas — mantido por
+    compatibilidade; o painel usa os de cada linha em `linhas[]`). Cenário 2 (parada sem horário disponível) é a lista vazia —
     o front trata isso como aviso, não erro.
     """
 
@@ -150,3 +243,29 @@ class ParadaDetalheResponse(BaseModel):
     lng: float
     linhas: list[ParadaLinhaResponse]
     proximos_horarios: list[str]
+
+
+class ParadaBuscadaResponse(BaseModel):
+    """US #21 — uma parada na lista de resultados da busca."""
+
+    codigo: str
+    # Vazio quando o SEMOB só traz o CEP do abrigo — o front mostra um
+    # rótulo neutro.
+    nome: str
+    lat: float
+    lng: float
+    qtd_linhas: int
+    # Só na busca por endereço: metros até o lugar encontrado.
+    distancia_m: int | None = None
+
+
+class BuscaParadaResponse(BaseModel):
+    """
+    US #21. `tipo` diz qual cenário respondeu: `nome` (Cenário 1),
+    `endereco` (Cenário 2, com `referencia` = lugar geocodificado, para o
+    mapa centralizar) ou `nenhum` (Cenário 3, `paradas` vazia).
+    """
+
+    tipo: Literal["nome", "endereco", "nenhum"]
+    paradas: list[ParadaBuscadaResponse]
+    referencia: LugarResponse | None = None

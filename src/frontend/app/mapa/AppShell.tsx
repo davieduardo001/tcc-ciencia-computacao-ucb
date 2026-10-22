@@ -10,7 +10,6 @@ import {
   HelpCircle,
   LogOut,
   Map as MapIcon,
-  Navigation,
   Plus,
   Search,
   Settings,
@@ -20,6 +19,8 @@ import {
 } from "lucide-react";
 import { atualizarFirstAccess, buscarUsuarioAtual, logoutUsuario, LinhaResumo, UsuarioAtual } from "@/lib/api";
 import AvisoEmBreve from "../AvisoEmBreve";
+import AvisoDeProximidade from "./AvisoDeProximidade";
+import { useViagem, ViagemProvider } from "./ViagemContext";
 import "./mapa.css";
 
 function iniciais(nome: string): string {
@@ -29,32 +30,17 @@ function iniciais(nome: string): string {
   return (primeira + ultima).toUpperCase();
 }
 
-// "Linhas de Ônibus" e "Rotas" não são páginas separadas: as duas
-// funcionalidades vivem dentro do mapa (busca de linha na barra de
-// cima, planejador no painel lateral). Marcá-las como "em breve" dizia
-// ao usuário que não existiam, sendo que estão entregues — as US #15,
-// #17 e #20 estão em produção. Os links abrem o mapa já com o painel
-// certo, via ?painel=.
+// Busca de linha e cálculo de rota vivem dentro do mapa (busca na barra de
+// cima, planejador pelo botão "Para onde você vai?") e NÃO têm item próprio
+// aqui: os antigos "Linhas de Ônibus" e "Rotas" só repetiam essas duas
+// entradas — o primeiro apenas dava foco no campo de busca do topo, o
+// segundo apenas abria o mesmo planejador. Uma função, um ponto de entrada.
 //
 // "Perfil" saiu daqui: já existe o botão de perfil na barra de cima, e
 // ter os dois duplicava a mesma entrada.
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
-  {
-    id: "linhas",
-    href: "/mapa?painel=linhas",
-    label: "Linhas de Ônibus",
-    Icone: Bus,
-    disponivel: true,
-  },
-  {
-    id: "rotas",
-    href: "/mapa?painel=rotas",
-    label: "Rotas",
-    Icone: Navigation,
-    disponivel: true,
-  },
-  { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: false },
+  { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: true },
   {
     id: "ocorrencias",
     href: "/ocorrencias",
@@ -69,35 +55,24 @@ const NAV_ITEMS = [
   { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: false },
 ] as const;
 
-// Navegação inferior (mobile), conforme o protótipo v3: quatro destinos e
-// o botão de ação no centro. É uma lista própria, e não um recorte de
-// NAV_ITEMS, porque a barra lateral do desktop e a barra inferior do
-// celular respondem a perguntas diferentes — a lateral lista tudo que
-// existe, a inferior lista para onde se vai o tempo todo.
+// Navegação inferior (mobile): um destino de cada lado do botão de ação no
+// centro. É uma lista própria, e não um recorte de NAV_ITEMS, porque a
+// barra lateral do desktop e a barra inferior do celular respondem a
+// perguntas diferentes — a lateral lista tudo que existe, a inferior lista
+// para onde se vai o tempo todo.
+//
+// Sem "Linhas" e "Rotas" (ver NAV_ITEMS): eram atalhos redundantes da
+// busca do topo e do planejador do mapa.
 const NAV_INFERIOR = [
   { id: "mapa", href: "/mapa", label: "Mapa", Icone: MapIcon, disponivel: true },
-  {
-    id: "linhas",
-    href: "/mapa?painel=linhas",
-    label: "Linhas",
-    Icone: Bus,
-    disponivel: true,
-  },
-  {
-    id: "rotas",
-    href: "/mapa?painel=rotas",
-    label: "Rotas",
-    Icone: Navigation,
-    disponivel: true,
-  },
   { id: "perfil", href: "/perfil", label: "Perfil", Icone: User, disponivel: false },
 ] as const;
 
-// O arco que abre no botão central. São as três seções que o protótipo
-// tira da barra para caberem os quatro destinos principais. "Ocorrências"
-// (US #23) já tem tela — as outras duas ainda abrem o aviso de "em breve".
+// O arco que abre no botão central: as seções que não cabem na barra
+// inferior. "Ocorrências" (US #23/#24) e "Rotas salvas" (US #25) já têm
+// tela — "Alertas" ainda abre o aviso de "em breve".
 const ACOES_RAPIDAS = [
-  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: undefined },
+  { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: "/favoritos" },
   { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84, href: "/ocorrencias" },
   { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54, href: undefined },
 ] as const;
@@ -120,9 +95,6 @@ interface AppShellProps {
   onDigitarBuscaLinha?: (termo: string) => void;
   sugestoesLinha?: LinhaResumo[];
   onSelecionarSugestaoLinha?: (numero: string) => void;
-  /** Nonce: quando muda, o campo de busca recebe foco. Usado pelo item
-   * "Linhas de Ônibus" da navegação, que aponta pra esta mesma página. */
-  focarBusca?: number;
 }
 
 function ItemNav({
@@ -155,7 +127,7 @@ function ItemNav({
   );
 }
 
-export default function AppShell({
+function AppShellConteudo({
   active,
   children,
   onBuscarLinha,
@@ -163,9 +135,9 @@ export default function AppShell({
   onDigitarBuscaLinha,
   sugestoesLinha,
   onSelecionarSugestaoLinha,
-  focarBusca,
 }: AppShellProps) {
   const router = useRouter();
+  const { viagem } = useViagem();
   const [usuario, setUsuario] = useState<UsuarioAtual | null>(null);
   const [carregandoUsuario, setCarregandoUsuario] = useState(true);
   const [saindo, setSaindo] = useState(false);
@@ -194,13 +166,6 @@ export default function AppShell({
   }, [fabAberto]);
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
   const fecharSugestoesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const buscaRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (focarBusca) {
-      buscaRef.current?.focus();
-    }
-  }, [focarBusca]);
 
   function fecharSugestoesComAtraso() {
     // Atraso pequeno pra permitir o onClick da sugestão disparar antes
@@ -249,6 +214,7 @@ export default function AppShell({
 
   return (
     <div className="app-shell">
+      <AvisoDeProximidade />
       <aside className="ms-sidebar">
         <div className="ms-brand">
           <div className="ms-brand-mark">
@@ -273,11 +239,6 @@ export default function AppShell({
         </nav>
 
         <div className="ms-spacer" />
-
-        <span className="ms-nova-viagem indisponivel" aria-disabled="true" title="Ainda não disponível">
-          <Plus size={17} /> Nova Viagem
-          <em className="ms-badge-em-breve">Em breve</em>
-        </span>
 
         <div className="ms-user">
           <div className="ms-avatar">
@@ -339,7 +300,6 @@ export default function AppShell({
         >
           <Search size={17} className="ms-search-icon" />
           <input
-            ref={buscaRef}
             name="busca-linha"
             placeholder="Buscar linha ou destino (ex: 0.110 ou Ceilândia)"
             disabled={buscandoLinha}
@@ -381,6 +341,20 @@ export default function AppShell({
           )}
         </form>
         <div className="ms-actions">
+          {/* US #171 — nas outras telas o usuário não vê a faixa do mapa; o
+              chip lembra que há uma viagem em andamento e leva de volta a
+              ela. No mapa a faixa já diz isso, então o chip sai. */}
+          {viagem && active !== "mapa" && (
+            <Link
+              href="/mapa"
+              className="ms-viagem-chip"
+              aria-label={`Em viagem na linha ${viagem.numeroLinha}. Voltar ao mapa`}
+            >
+              <Bus size={16} aria-hidden="true" />
+              <span className="ms-viagem-chip-rotulo">Em viagem · </span>
+              <strong>{viagem.numeroLinha}</strong>
+            </Link>
+          )}
           <button type="button" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
           </button>
@@ -393,12 +367,14 @@ export default function AppShell({
         </div>
       </header>
 
-      <main className="ms-content">{children}</main>
+      <main className={`ms-content${viagem && active === "mapa" ? " com-viagem" : ""}`}>
+        {children}
+      </main>
 
       <nav className="ms-bottomnav" aria-label="Navegação principal">
         {NAV_INFERIOR.map(({ id, href, label, Icone, disponivel }, indice) => (
           <Fragment key={id}>
-            {indice === 2 && <span className="ms-bottomnav-vao" aria-hidden="true" />}
+            {indice === 1 && <span className="ms-bottomnav-vao" aria-hidden="true" />}
             {disponivel ? (
               <Link
                 href={href}
@@ -474,5 +450,18 @@ export default function AppShell({
         Essa seção ainda está sendo construída. Em breve ela aparece por aqui.
       </AvisoEmBreve>
     </div>
+  );
+}
+
+/**
+ * O estado de viagem (Aguardando × Em viagem) mora aqui, no AppShell, e não
+ * numa tela só: o chip do topo e o mapa leem o mesmo estado, e todas as
+ * telas autenticadas passam por este componente.
+ */
+export default function AppShell(props: AppShellProps) {
+  return (
+    <ViagemProvider>
+      <AppShellConteudo {...props} />
+    </ViagemProvider>
   );
 }

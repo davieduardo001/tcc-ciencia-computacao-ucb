@@ -1,16 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaPage from "../page";
 import {
+  buscarChegadasDaRota,
+  buscarLinha,
   buscarLugares,
   calcularRotas,
+  listarFavoritos,
+  buscarParadas,
   nomearLugar,
   sugerirLinhas,
 } from "@/lib/api";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
-  // A página lê ?painel= pra abrir o planejador quando o usuário chega
-  // pelo item "Rotas" da navegação.
+  // A página lê ?painel=rotas pra abrir o planejador quando o usuário
+  // chega por uma rota favorita (/favoritos → "Ir").
   useSearchParams: () => new URLSearchParams(parametrosDaUrl),
 }));
 
@@ -25,11 +29,17 @@ jest.mock("../MapaInterativo", () => ({
   default: ({
     onLocalizacao,
     viagem,
+    paradasBuscadas,
   }: {
     onLocalizacao?: (c: { lat: number; lng: number } | null) => void;
     viagem?: { pernas: { numero: string }[] } | null;
+    paradasBuscadas?: { paradas: unknown[] } | null;
   }) => (
-    <div data-testid="mapa-interativo" data-viagem={viagem ? "sim" : "nao"}>
+    <div
+      data-testid="mapa-interativo"
+      data-viagem={viagem ? "sim" : "nao"}
+      data-paradas-buscadas={paradasBuscadas?.paradas.length ?? 0}
+    >
       <button
         type="button"
         onClick={() => onLocalizacao?.({ lat: -15.83, lng: -48.04 })}
@@ -46,15 +56,28 @@ jest.mock("@/lib/api", () => ({
   buscarLugares: jest.fn().mockResolvedValue([]),
   nomearLugar: jest.fn().mockResolvedValue(null),
   calcularRotas: jest.fn().mockResolvedValue([]),
+  // Issue #190 — tempo do ônibus nas paradas da rota escolhida.
+  buscarChegadasDaRota: jest.fn().mockResolvedValue(null),
   buscarUsuarioAtual: jest.fn().mockResolvedValue(null),
   logoutUsuario: jest.fn().mockResolvedValue(undefined),
+  // O AppShell consulta a viagem em andamento (US #171): sem viagem.
+  buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
+  // US #25 — funções de favoritos usadas pelo MapaConteudo
+  listarFavoritos: jest.fn().mockResolvedValue([]),
+  cachearFavoritos: jest.fn(),
+  lerFavoritosCache: jest.fn().mockReturnValue([]),
   BuscarLinhaError: class BuscarLinhaError extends Error {},
   CalcularRotaError: class CalcularRotaError extends Error {},
+  // US #21 — busca de parada por nome ou endereço.
+  buscarParadas: jest.fn(),
+  BuscarParadasError: class BuscarParadasError extends Error {},
+  SalvarFavoritoError: class SalvarFavoritoError extends Error {},
 }));
 
 const sugerirLinhasMock = sugerirLinhas as jest.Mock;
 const buscarLugaresMock = buscarLugares as jest.Mock;
 const calcularRotasMock = calcularRotas as jest.Mock;
+const buscarChegadasDaRotaMock = buscarChegadasDaRota as jest.Mock;
 const nomearLugarMock = nomearLugar as jest.Mock;
 const PLACEHOLDER = "Buscar linha ou destino (ex: 0.110 ou Ceilândia)";
 
@@ -267,6 +290,60 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     expect(botao).toBeEnabled();
   });
 
+  async function calcularComVia(viagem: unknown) {
+    calcularRotasMock.mockResolvedValue([viagem]);
+    await abrirPlanejador();
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /ver opções de ônibus/i }));
+    });
+  }
+
+  it("issue #190: a opção escolhida pede o tempo do ônibus nas paradas e o card mostra", async () => {
+    buscarChegadasDaRotaMock.mockReset().mockResolvedValue({
+      calculadoEm: "2026-10-14T15:00:00+00:00",
+      pernas: [
+        {
+          numero: "0.382",
+          sentido: "IDA",
+          embarque: { paradaCodigo: "PR-E", etaMinutos: 5, fonte: "ao_vivo", prefixo: "440001", horarioPrevisto: null },
+          desembarque: { paradaCodigo: "PR-D", etaMinutos: 31, fonte: "ao_vivo", prefixo: "440001", horarioPrevisto: null },
+        },
+      ],
+    });
+    const perna = VIAGEM_DIRETA.pernas[0];
+
+    await calcularComVia({
+      ...VIAGEM_DIRETA,
+      pernas: [
+        {
+          ...perna,
+          embarque: { ...perna.embarque, parada_codigo: "PR-E" },
+          desembarque: { ...perna.desembarque, parada_codigo: "PR-D" },
+        },
+      ],
+    });
+    await act(async () => {});
+
+    expect(buscarChegadasDaRotaMock).toHaveBeenCalledWith([
+      { numero: "0.382", sentido: "IDA", embarqueCodigo: "PR-E", desembarqueCodigo: "PR-D" },
+    ]);
+    expect(screen.getByLabelText("Tempo até o embarque")).toHaveTextContent("Chega em 5 min");
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Chega em 31 min");
+  });
+
+  it("issue #190: rota sem códigos de parada não pergunta nada ao servidor", async () => {
+    buscarChegadasDaRotaMock.mockReset().mockResolvedValue(null);
+
+    await calcularComVia(VIAGEM_DIRETA);
+    await act(async () => {});
+
+    expect(buscarChegadasDaRotaMock).not.toHaveBeenCalled();
+    // sem código: o desembarque diz que não há previsão (Cenário 7)
+    expect(screen.getByLabelText("Tempo até o desembarque")).toHaveTextContent("Sem previsão no momento");
+  });
+
   it("calcula a rota com as coordenadas dos dois pontos escolhidos", async () => {
     calcularRotasMock.mockResolvedValue([VIAGEM_DIRETA]);
     await abrirPlanejador();
@@ -286,7 +363,7 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     // A linha aparece duas vezes: no resumo da opção e no passo
     // expandido logo abaixo (a primeira opção abre já expandida).
     expect(screen.getAllByText("0.382")).toHaveLength(2);
-    expect(screen.getByText("~76 min")).toBeInTheDocument();
+    expect(screen.getByText("76 min")).toBeInTheDocument();
     expect(screen.getByText(/Avenida Hélio Prates/)).toBeInTheDocument();
     expect(screen.getByText(/Eixo L Central/)).toBeInTheDocument();
     expect(screen.getByText(/33 paradas/)).toBeInTheDocument();
@@ -376,5 +453,140 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     });
 
     expect(buscarLugaresMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaPage — rotas favoritas (US #25)", () => {
+  const FAVORITA = {
+    id: "fav-1",
+    usuario_id: "user-1",
+    numero_linha: "0.382",
+    nome_linha: "0.382 — Ceilândia / Rodoviária",
+    label: "Casa → Trabalho",
+    origem_lat: -15.83,
+    origem_lng: -48.04,
+    destino_lat: -15.79,
+    destino_lng: -47.88,
+    criado_em: "2026-10-05T14:30:00",
+  };
+
+  beforeEach(() => {
+    parametrosDaUrl = "";
+    (listarFavoritos as jest.Mock).mockReset().mockResolvedValue([]);
+    (buscarLinha as jest.Mock).mockReset().mockResolvedValue(null);
+    calcularRotasMock.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    parametrosDaUrl = "";
+  });
+
+  it("não mostra o bloco quando não há favoritas", async () => {
+    render(<MapaPage />);
+    await act(async () => {});
+    expect(screen.queryByText("Minhas rotas")).not.toBeInTheDocument();
+  });
+
+  it("mostra as favoritas em destaque na tela principal", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    expect(await screen.findByText("Minhas rotas")).toBeInTheDocument();
+    expect(screen.getByText("Casa → Trabalho")).toBeInTheDocument();
+  });
+
+  it("'Rastrear' busca a linha da favorita direto", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    fireEvent.click(await screen.findByLabelText(/Rastrear linha 0\.382/));
+
+    await waitFor(() => {
+      expect(buscarLinha).toHaveBeenCalledWith("0.382");
+    });
+  });
+
+  it("'Rota' abre o planejador e calcula a rota salva", async () => {
+    (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
+    render(<MapaPage />);
+
+    fireEvent.click(await screen.findByLabelText("Abrir rota Casa → Trabalho"));
+
+    await waitFor(() => {
+      expect(calcularRotasMock).toHaveBeenCalledWith(
+        { nome: "Casa", lat: -15.83, lng: -48.04 },
+        { nome: "Trabalho", lat: -15.79, lng: -47.88 }
+      );
+    });
+  });
+
+  it("calcula a rota ao chegar de /favoritos com query params válidos", async () => {
+    parametrosDaUrl =
+      "painel=rotas&origem_lat=-15.83&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88&origem_nome=Casa&destino_nome=Trabalho";
+    render(<MapaPage />);
+
+    await waitFor(() => {
+      expect(calcularRotasMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("ignora query params que não são números", async () => {
+    parametrosDaUrl =
+      "painel=rotas&origem_lat=abc&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88";
+    render(<MapaPage />);
+    await act(async () => {});
+
+    expect(calcularRotasMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapaPage — buscar parada (US #21)", () => {
+  const buscarParadasMock = buscarParadas as jest.Mock;
+
+  beforeEach(() => {
+    parametrosDaUrl = "";
+    buscarParadasMock.mockReset();
+  });
+
+  it("abre o painel de busca no lugar das entradas do mapa e destaca o resultado", async () => {
+    buscarParadasMock.mockResolvedValue({
+      tipo: "nome",
+      paradas: [
+        { codigo: "PR-1", nome: "Estação Ceilândia", lat: -15.8, lng: -48.1, qtdLinhas: 3, distanciaM: null },
+      ],
+      referencia: null,
+    });
+    render(<MapaPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Buscar parada" }));
+    });
+
+    expect(screen.getByRole("search")).toBeInTheDocument();
+    expect(screen.queryByText("Para onde você vai?")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Nome, referência ou endereço"), {
+      target: { value: "estacao" },
+    });
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("search"));
+    });
+
+    expect(await screen.findByText("Estação Ceilândia")).toBeInTheDocument();
+    expect(screen.getByTestId("mapa-interativo")).toHaveAttribute("data-paradas-buscadas", "1");
+  });
+
+  it("fechar a busca devolve as entradas e limpa os destaques do mapa", async () => {
+    render(<MapaPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Buscar parada" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Fechar busca de parada" }));
+    });
+
+    expect(screen.getByText("Para onde você vai?")).toBeInTheDocument();
+    expect(screen.getByTestId("mapa-interativo")).toHaveAttribute("data-paradas-buscadas", "0");
   });
 });

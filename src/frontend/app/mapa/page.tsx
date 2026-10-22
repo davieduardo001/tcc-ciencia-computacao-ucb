@@ -1,20 +1,29 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Navigation } from "lucide-react";
+import { MapPin, Navigation } from "lucide-react";
 import AppShell from "./AppShell";
+import BuscaParada from "./BuscaParada";
+import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
+import { useChegadasDaRota } from "./useChegadasDaRota";
 import {
   buscarLinha,
   BuscarLinhaError,
   calcularRotas,
   CalcularRotaError,
+  cachearFavoritos,
+  lerFavoritosCache,
+  listarFavoritos,
   LinhaDetalhada,
   LinhaResumo,
   nomearLugar,
   OpcaoViagem,
+  ParadaBuscada,
+  ResultadoBuscaParada,
+  RotaFavorita,
   sugerirLinhas,
   VeiculoAoVivo,
 } from "@/lib/api";
@@ -25,6 +34,22 @@ const MapaInterativo = dynamic(() => import("./MapaInterativo"), {
 });
 
 const DEBOUNCE_SUGESTOES_MS = 250;
+
+/** Rótulo de um ponto escolhido no mapa/por link cujo nome ainda não existe
+ *  (ou nunca vai existir, se a geocodificação reversa falhar). */
+const ROTULO_PONTO_NO_MAPA = "Ponto no mapa";
+
+/** Converte um query param em coordenada; `null` se não for número finito. */
+function lerCoordenada(valor: string | null): number | null {
+  if (valor === null || valor.trim() === "") return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Chave lógica da rota favorita (mesma regra de duplicata do backend). */
+function chaveFavorito(f: RotaFavorita): string {
+  return `${f.numero_linha}:${f.origem_lat.toFixed(4)},${f.origem_lng.toFixed(4)}:${f.destino_lat.toFixed(4)},${f.destino_lng.toFixed(4)}`;
+}
 
 interface Coordenadas {
   lat: number;
@@ -63,23 +88,82 @@ function MapaConteudo() {
   const [escolhendoNoMapa, setEscolhendoNoMapa] = useState<Extremo | null>(null);
   const [localizacao, setLocalizacao] = useState<Coordenadas | null>(null);
   const [veiculos, setVeiculos] = useState<VeiculoAoVivo[] | null>(null);
-  const [focarBusca, setFocarBusca] = useState(0);
 
-  // Os itens "Rotas" e "Linhas de Ônibus" da navegação abrem esta mesma
-  // página, só que com o painel certo já aberto — as duas
-  // funcionalidades vivem no mapa, não em páginas separadas.
-  const painel = useSearchParams().get("painel");
+  // US #25 — favoritas do usuário: alimentam a estrela do planejador e o
+  // bloco "Minhas rotas" da tela principal.
+  const [favoritos, setFavoritos] = useState<RotaFavorita[]>([]);
+  const favoritosChaves = useMemo(
+    () => new Set(favoritos.map(chaveFavorito)),
+    [favoritos]
+  );
+  // Há uma rota a calcular assim que origem/destino (já definidos) chegarem.
+  const [rotaPendente, setRotaPendente] = useState(false);
+
+  // US #21 — busca de parada por nome ou endereço. Painel próprio, à
+  // esquerda como o planejador: os dois nunca ficam abertos juntos.
+  const [buscaParadaAberta, setBuscaParadaAberta] = useState(false);
+  const [paradasBuscadas, setParadasBuscadas] = useState<ResultadoBuscaParada | null>(null);
+  const [paradaFocada, setParadaFocada] = useState<{
+    parada: ParadaBuscada;
+    pedido: number;
+  } | null>(null);
+
+  // `?painel=rotas` abre o planejador. Não há mais item de menu para isso
+  // (o planejador abre pelo botão "Para onde você vai?"), mas o endereço
+  // continua sendo o contrato dos Favoritos: "Ir" numa rota salva leva pra
+  // cá com origem/destino já preenchidos.
+  const searchParams = useSearchParams();
+  const painel = searchParams.get("painel");
+  // US #25 — query params injetados pelo clique em favorito.
+  const origemLatParam = searchParams.get("origem_lat");
+  const origemLngParam = searchParams.get("origem_lng");
+  const destinoLatParam = searchParams.get("destino_lat");
+  const destinoLngParam = searchParams.get("destino_lng");
+  const origemNomeParam = searchParams.get("origem_nome");
+  const destinoNomeParam = searchParams.get("destino_nome");
 
   useEffect(() => {
     if (painel === "rotas") {
       setPlanejadorAberto(true);
-    } else if (painel === "linhas") {
-      setPlanejadorAberto(false);
-      // Nonce em vez de booleano: clicar em "Linhas de Ônibus" duas
-      // vezes seguidas tem que focar o campo nas duas.
-      setFocarBusca((n) => n + 1);
     }
   }, [painel]);
+
+  // US #25 — ao abrir o planejador via favorito (/favoritos → "Ir"),
+  // pré-preenche origem/destino pelos query params e pede o cálculo.
+  useEffect(() => {
+    if (painel !== "rotas") return;
+    const origemLat = lerCoordenada(origemLatParam);
+    const origemLng = lerCoordenada(origemLngParam);
+    const destinoLat = lerCoordenada(destinoLatParam);
+    const destinoLng = lerCoordenada(destinoLngParam);
+    if (
+      origemLat === null ||
+      origemLng === null ||
+      destinoLat === null ||
+      destinoLng === null
+    ) {
+      return;
+    }
+    setOrigem({
+      nome: origemNomeParam ?? ROTULO_PONTO_NO_MAPA,
+      lat: origemLat,
+      lng: origemLng,
+    });
+    setDestino({
+      nome: destinoNomeParam ?? ROTULO_PONTO_NO_MAPA,
+      lat: destinoLat,
+      lng: destinoLng,
+    });
+    setRotaPendente(true);
+  }, [
+    painel,
+    origemLatParam,
+    origemLngParam,
+    destinoLatParam,
+    destinoLngParam,
+    origemNomeParam,
+    destinoNomeParam,
+  ]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -203,11 +287,9 @@ function MapaConteudo() {
       if (!extremo) return;
 
       setEscolhendoNoMapa(null);
-      definirPonto(extremo, {
-        nome: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-        lat,
-        lng,
-      });
+      // Nome provisório humano, e não "-15.8131, -48.0123": se o Nominatim
+      // não responder, é isso que fica no campo.
+      definirPonto(extremo, { nome: ROTULO_PONTO_NO_MAPA, lat, lng });
 
       const lugar = await nomearLugar(lat, lng);
       if (lugar) {
@@ -244,13 +326,81 @@ function MapaConteudo() {
     }
   }, [origem, destino]);
 
+  // US #25 — calcula a rota de uma favorita assim que o estado de
+  // origem/destino reflete o pedido (query params ou bloco da tela principal).
+  useEffect(() => {
+    if (rotaPendente && origem && destino) {
+      setRotaPendente(false);
+      handleCalcularRota();
+    }
+  }, [rotaPendente, origem, destino, handleCalcularRota]);
+
   const handleFecharPlanejador = useCallback(() => {
     setPlanejadorAberto(false);
     setEscolhendoNoMapa(null);
   }, []);
 
+  // US #25 — carrega favoritas na montagem.
+  useEffect(() => {
+    listarFavoritos().then(setFavoritos);
+  }, []);
+
+  // US #25 — ao salvar, acrescenta à lista (a estrela e o bloco se atualizam)
+  // e mantém o cache local em dia.
+  const handleFavoritoSalvo = useCallback((favorito: RotaFavorita) => {
+    setFavoritos((prev) => [favorito, ...prev]);
+    cachearFavoritos([favorito, ...lerFavoritosCache()]);
+  }, []);
+
+  // US #25 — Cenário 2: rastreamento direto da linha da favorita.
+  const handleRastrearFavorita = useCallback(
+    (numeroLinha: string) => {
+      setPlanejadorAberto(false);
+      handleBuscarLinha(numeroLinha);
+    },
+    [handleBuscarLinha]
+  );
+
+  // US #25 — reabre a rota salva já calculada.
+  const handleAbrirRotaFavorita = useCallback((favorito: RotaFavorita) => {
+    const separador = favorito.label.indexOf(" → ");
+    const nomeOrigem =
+      separador > 0 ? favorito.label.slice(0, separador).trim() : "Origem";
+    const nomeDestino =
+      separador > 0 ? favorito.label.slice(separador + 3).trim() : "Destino";
+    setOrigem({ nome: nomeOrigem, lat: favorito.origem_lat, lng: favorito.origem_lng });
+    setDestino({ nome: nomeDestino, lat: favorito.destino_lat, lng: favorito.destino_lng });
+    setPlanejadorAberto(true);
+    setRotaPendente(true);
+  }, []);
+
+  // -- US #21 ---------------------------------------------------------------
+
+  const handleAbrirBuscaParada = useCallback(() => {
+    setPlanejadorAberto(false);
+    setEscolhendoNoMapa(null);
+    setBuscaParadaAberta(true);
+  }, []);
+
+  const handleFecharBuscaParada = useCallback(() => {
+    setBuscaParadaAberta(false);
+    setParadasBuscadas(null);
+    setParadaFocada(null);
+  }, []);
+
+  const handleSelecionarParadaBuscada = useCallback((parada: ParadaBuscada) => {
+    setParadaFocada((atual) => ({ parada, pedido: (atual?.pedido ?? 0) + 1 }));
+  }, []);
+
+  const buscaVisivel = buscaParadaAberta && !planejadorAberto;
+
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
+
+  // Issue #190 — quando o ônibus de cada trecho da opção escolhida chega às
+  // paradas de subir e de descer. Vive aqui porque o card do planejador e os
+  // marcadores do mapa mostram o mesmo número.
+  const { chegadas: chegadasDaRota } = useChegadasDaRota(viagem?.pernas ?? null);
 
   // US #16 no painel da US #20: quantos ônibus estão rodando cada linha
   // do itinerário escolhido.
@@ -270,20 +420,30 @@ function MapaConteudo() {
       onDigitarBuscaLinha={handleDigitarBuscaLinha}
       sugestoesLinha={sugestoesLinha}
       onSelecionarSugestaoLinha={handleSelecionarSugestaoLinha}
-      focarBusca={focarBusca}
     >
       <MapaInterativo
         linha={linha}
         erroBusca={erroBusca}
         onFecharLinha={handleFecharLinha}
         viagem={viagem}
+        chegadasDaRota={chegadasDaRota}
         origemViagem={origem}
         destinoViagem={destino}
         escolhendoNoMapa={escolhendoNoMapa !== null}
         onCliqueNoMapa={handleCliqueNoMapa}
         onLocalizacao={setLocalizacao}
         onVeiculos={setVeiculos}
+        paradasBuscadas={buscaVisivel ? paradasBuscadas : null}
+        paradaFocada={buscaVisivel ? paradaFocada : null}
       />
+
+      {buscaVisivel && (
+        <BuscaParada
+          onFechar={handleFecharBuscaParada}
+          onResultado={setParadasBuscadas}
+          onSelecionar={handleSelecionarParadaBuscada}
+        />
+      )}
 
       {planejadorAberto ? (
         <PlanejadorViagem
@@ -304,16 +464,44 @@ function MapaConteudo() {
           onFechar={handleFecharPlanejador}
           veiculosPorLinha={veiculosPorLinha}
           rastreando={veiculos !== null}
+          favoritosIds={favoritosChaves}
+          onFavoritoSalvo={handleFavoritoSalvo}
+          chegadasDaRota={chegadasDaRota}
+          localizacao={localizacao}
         />
       ) : (
-        <button
-          type="button"
-          className="plan-abrir"
-          onClick={() => setPlanejadorAberto(true)}
-        >
-          <Navigation size={16} />
-          Para onde você vai?
-        </button>
+        !buscaVisivel && (
+          // US #21 — a busca de parada entra na mesma linha do planejador:
+          // logo abaixo fica o bloco de favoritos.
+          <div className="bp-entradas">
+            <button
+              type="button"
+              className="plan-abrir"
+              onClick={() => setPlanejadorAberto(true)}
+            >
+              <Navigation size={16} />
+              Para onde você vai?
+            </button>
+            <button
+              type="button"
+              className="bp-abrir"
+              aria-label="Buscar parada"
+              title="Buscar parada por nome ou endereço"
+              onClick={handleAbrirBuscaParada}
+            >
+              <MapPin size={16} />
+              <span className="bp-abrir-rotulo">Buscar parada</span>
+            </button>
+          </div>
+        )
+      )}
+
+      {!planejadorAberto && !buscaVisivel && !linha && (
+        <FavoritosDestaque
+          favoritos={favoritos}
+          onRastrear={handleRastrearFavorita}
+          onAbrirRota={handleAbrirRotaFavorita}
+        />
       )}
     </AppShell>
   );

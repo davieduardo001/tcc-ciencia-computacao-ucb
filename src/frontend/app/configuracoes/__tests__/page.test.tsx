@@ -6,6 +6,8 @@ jest.mock("@/lib/api", () => ({
   buscarUsuarioAtual: jest.fn(),
   atualizarFirstAccess: jest.fn(),
   logoutUsuario: jest.fn(),
+  // O AppShell consulta a viagem em andamento (US #171): sem viagem.
+  buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
 }));
 
 const pushMock = jest.fn();

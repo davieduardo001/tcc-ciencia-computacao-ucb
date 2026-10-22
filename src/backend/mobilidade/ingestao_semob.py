@@ -19,8 +19,16 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from mobilidade.geometria import TrajetoMedido
 from mobilidade.models.linha import Linha
+from mobilidade.models.parada import Parada, RotaParada
 from mobilidade.models.rota import Rota, RotaCelula
+from mobilidade.paradas_fisicas import (
+    PontoParada,
+    fundir_pontos,
+    indexar_por_ponto,
+    vincular,
+)
 from mobilidade.rota_service import celula
 from mobilidade.semob_source import (
     URL_ESPACIAIS,
@@ -31,6 +39,7 @@ from mobilidade.semob_source import (
     coordenadas_para_trajeto,
     escolher_sentido_principal,
     formatar_nome_linha,
+    horarios_por_dia,
     horarios_por_linha,
     indexar_pontos,
     paradas_ao_longo_do_trajeto,
@@ -51,6 +60,8 @@ class ResumoIngestao:
     linhas_sem_trajeto: int = 0
     linhas_sem_nome_oficial: int = 0
     paradas_encontradas: int = 0
+    paradas_fisicas: int = 0
+    vinculos_gravados: int = 0
     rotas_gravadas: int = 0
     celulas_gravadas: int = 0
 
@@ -60,6 +71,8 @@ class ResumoIngestao:
             f"{self.rotas_gravadas} rotas (linha × sentido) | "
             f"{self.celulas_gravadas} células de índice espacial | "
             f"{self.paradas_encontradas} paradas associadas | "
+            f"{self.paradas_fisicas} paradas físicas únicas | "
+            f"{self.vinculos_gravados} vínculos parada×rota | "
             f"{self.linhas_sem_nome_oficial} sem nome oficial | "
             f"{self.linhas_sem_trajeto} descartadas sem trajeto"
         )
@@ -82,6 +95,7 @@ async def ingerir(db: Session) -> ResumoIngestao:
 
     nomes_oficiais = carregar_nomes_oficiais()
     indice_horarios = horarios_por_linha(horarios_brutos)
+    indice_horarios_dia = horarios_por_dia(horarios_brutos)
     indice_pontos = indexar_pontos(pontos)
 
     # Agrupa os trajetos por número de linha: o SEMOB publica um por
@@ -96,18 +110,52 @@ async def ingerir(db: Session) -> ResumoIngestao:
         if trajeto:
             por_numero.setdefault(numero, {})[sentido] = trajeto
 
-    resumo = ResumoIngestao()
+    # Paradas de cada sentido. A US #15 exibe só o sentido principal,
+    # mas a US #20 precisa dos dois: quem vai de Ceilândia ao Plano
+    # usa a IDA e quem volta usa a VOLTA — com um sentido só, metade
+    # das viagens não teria resposta. Calculadas antes do loop porque a
+    # fusão em paradas físicas (US #173) precisa de todas de uma vez.
+    paradas_por_rota = {
+        (numero, sentido): paradas_ao_longo_do_trajeto(trajeto, indice_pontos)
+        for numero, trajetos_por_sentido in por_numero.items()
+        for sentido, trajeto in trajetos_por_sentido.items()
+        if trajeto
+    }
+    paradas_fisicas = fundir_pontos(
+        [
+            PontoParada(nome=p.nome, lat=p.lat, lng=p.lng)
+            for paradas in paradas_por_rota.values()
+            for p in paradas
+        ]
+    )
+    parada_do_ponto = indexar_por_ponto(paradas_fisicas)
+
+    resumo = ResumoIngestao(paradas_fisicas=len(paradas_fisicas))
 
     # A tabela `rota` é reconstruída do zero a cada ingestão: o SEMOB
     # aposenta e renumera linhas, e manter registro órfão faria a busca
     # origem→destino (US #20) sugerir linha que não existe mais.
     db.query(RotaCelula).delete(synchronize_session=False)
     db.query(Rota).delete(synchronize_session=False)
+    # Mesma razão para as paradas físicas: rota_parada primeiro (FK).
+    db.query(RotaParada).delete(synchronize_session=False)
+    db.query(Parada).delete(synchronize_session=False)
+
+    # Um flush só: o ORM insere em lote e preenche os ids de volta, em
+    # vez de ~4.300 idas ao banco.
+    registros_parada = [
+        Parada(codigo=p.codigo, nome=p.nome, lat=p.lat, lng=p.lng)
+        for p in paradas_fisicas
+    ]
+    db.add_all(registros_parada)
+    db.flush()
+    id_da_parada = {r.codigo: r.id for r in registros_parada}
 
     # Acumula e grava em lote no fim: são ~1.400 rotas e ~180 mil
     # células, e um db.add() por registro faria a ingestão levar minutos
     # só no ORM.
     rotas_novas: list[dict] = []
+    vinculos_novos: list[dict] = []
     celulas_novas: list[dict] = []
 
     for numero, trajetos_por_sentido in por_numero.items():
@@ -118,12 +166,8 @@ async def ingerir(db: Session) -> ResumoIngestao:
             nome = f"Linha {numero}"
             resumo.linhas_sem_nome_oficial += 1
 
-        # Paradas de cada sentido. A US #15 exibe só o sentido principal,
-        # mas a US #20 precisa dos dois: quem vai de Ceilândia ao Plano
-        # usa a IDA e quem volta usa a VOLTA — com um sentido só, metade
-        # das viagens não teria resposta.
         paradas_por_sentido = {
-            sentido: paradas_ao_longo_do_trajeto(trajeto, indice_pontos)
+            sentido: paradas_por_rota[(numero, sentido)]
             for sentido, trajeto in trajetos_por_sentido.items()
             if trajeto
         }
@@ -132,6 +176,7 @@ async def ingerir(db: Session) -> ResumoIngestao:
             if not trajeto:
                 continue
             paradas = paradas_por_sentido[sentido]
+            horarios_rota = indice_horarios_dia.get((numero, sentido))
             rotas_novas.append(
                 {
                     "numero": numero,
@@ -141,9 +186,31 @@ async def ingerir(db: Session) -> ResumoIngestao:
                     "paradas": [
                         {"nome": p.nome, "lat": p.lat, "lng": p.lng} for p in paradas
                     ],
+                    "horarios_por_dia": horarios_rota.por_dia if horarios_rota else None,
+                    "tempo_percurso_min": (
+                        horarios_rota.tempo_percurso_min if horarios_rota else None
+                    ),
                 }
             )
             resumo.rotas_gravadas += 1
+
+            for vinculo in vincular(
+                TrajetoMedido(trajeto),
+                [PontoParada(nome=p.nome, lat=p.lat, lng=p.lng) for p in paradas],
+                parada_do_ponto,
+            ):
+                vinculos_novos.append(
+                    {
+                        "numero": numero,
+                        "sentido": sentido,
+                        "parada_id": id_da_parada[vinculo.parada.codigo],
+                        "ordem": vinculo.ordem,
+                        "indice_trajeto": vinculo.indice_trajeto,
+                        "distancia_acumulada_m": vinculo.distancia_acumulada_m,
+                        "distancia_ao_trajeto_m": vinculo.distancia_ao_trajeto_m,
+                    }
+                )
+                resumo.vinculos_gravados += 1
 
             for (cel_lat, cel_lng), (minimo, maximo) in _celulas_do_trajeto(trajeto).items():
                 celulas_novas.append(
@@ -188,6 +255,10 @@ async def ingerir(db: Session) -> ResumoIngestao:
     )
     if rotas_novas:
         db.bulk_insert_mappings(Rota, rotas_novas)
+    for inicio in range(0, len(vinculos_novos), _LOTE_CELULAS):
+        db.bulk_insert_mappings(
+            RotaParada, vinculos_novos[inicio : inicio + _LOTE_CELULAS]
+        )
     for inicio in range(0, len(celulas_novas), _LOTE_CELULAS):
         db.bulk_insert_mappings(
             RotaCelula, celulas_novas[inicio : inicio + _LOTE_CELULAS]

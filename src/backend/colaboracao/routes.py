@@ -2,7 +2,10 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
@@ -13,7 +16,7 @@ from colaboracao.monitoring_worker import MonitoramentoWorker
 from colaboracao.providers.eta_mock import ETAMockProvider
 from colaboracao.providers.favoritos_mock import FavoritosMockProvider
 from colaboracao.push_service import PushService
-from colaboracao.models import PreferenciaNotificacao, Ocorrencia
+from colaboracao.models import PreferenciaNotificacao, Ocorrencia, RotaFavorita
 from colaboracao.schemas import (
     PreferenciaNotificacaoResponse,
     AntecedenciaInput,
@@ -22,6 +25,9 @@ from colaboracao.schemas import (
     RespostaGenerica,
     OcorrenciaInput,
     OcorrenciaResponse,
+    OcorrenciaListaResponse,
+    RotaFavoritaInput,
+    RotaFavoritaResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -280,3 +286,221 @@ def reportar_ocorrencia(
         criado_em=ocorrencia.criado_em,
         expira_em=ocorrencia.expira_em,
     )
+
+
+# ---------------------------------------------------------------------------
+# US #24 — Visualizar Ocorrências Reportadas por Outros Passageiros
+# ---------------------------------------------------------------------------
+
+LIMITE_LISTAGEM_OCORRENCIAS = 100
+
+
+@router.get("/ocorrencias", response_model=list[OcorrenciaListaResponse])
+def listar_ocorrencias(
+    linha: Optional[str] = Query(None, min_length=1, max_length=20),
+    _usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """Ocorrências ativas (não expiradas), da mais recente pra mais antiga.
+
+    Exige sessão (o Gateway já validou o JWT) mas não filtra por usuário —
+    a ideia é justamente ver o que *outros* passageiros reportaram.
+
+    Expiração resolvida na leitura, não por job agendado: os serviços do
+    Fly escalam a zero (`min_machines_running = 0`), então um job em
+    processo não rodaria de forma confiável. Quem passou de `expira_em`
+    nunca aparece e é marcado `expirada` aqui mesmo (o registro não é
+    apagado — a retenção é de 30 dias).
+    """
+    agora = datetime.utcnow()
+
+    db.query(Ocorrencia).filter(
+        Ocorrencia.expira_em <= agora,
+        Ocorrencia.status != "expirada",
+    ).update({"status": "expirada"}, synchronize_session=False)
+    db.commit()
+
+    consulta = db.query(Ocorrencia).filter(
+        Ocorrencia.expira_em > agora,
+        Ocorrencia.status != "expirada",
+    )
+    if linha:
+        consulta = consulta.filter(Ocorrencia.linha_numero == linha)
+
+    ocorrencias = (
+        consulta.order_by(Ocorrencia.criado_em.desc())
+        .limit(LIMITE_LISTAGEM_OCORRENCIAS)
+        .all()
+    )
+
+    return [
+        OcorrenciaListaResponse(
+            id=str(o.id),
+            linha_numero=o.linha_numero,
+            tipo=o.tipo,
+            descricao=o.descricao,
+            local=o.local,
+            lat=o.lat,
+            lng=o.lng,
+            status=o.status,
+            contador_confirmacoes=o.contador_confirmacoes,
+            criado_em=o.criado_em,
+            expira_em=o.expira_em,
+        )
+        for o in ocorrencias
+    ]
+
+
+# ---------------------------------------------------------------------------
+# US #25 — Salvar e Visualizar Rota Favorita
+# ---------------------------------------------------------------------------
+
+
+@router.post("/favoritos", response_model=RotaFavoritaResponse, status_code=201)
+def salvar_favorito(
+    dados: RotaFavoritaInput,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Salva uma rota calculada como favorita do usuário autenticado.
+
+    Regras:
+    - `usuario_id` vem do `X-User-Id` injetado pelo Gateway — nunca do body.
+    - Máximo de 20 favoritos por usuário (LIMITE_FAVORITOS).
+    - Duplicata (mesma origem+destino+linha para o mesmo usuário) retorna 409.
+    """
+    # Regra: máximo de 20 favoritos por usuário.
+    total = (
+        db.query(func.count(RotaFavorita.id))
+        .filter(RotaFavorita.usuario_id == usuario_id)
+        .scalar()
+    )
+    if total >= RotaFavorita.LIMITE_FAVORITOS:
+        raise HTTPException(
+            status_code=422,
+            detail="limite_favoritos_atingido",
+        )
+
+    # Regra: impedir duplicata (mesma origem+destino+linha para o usuário).
+    # Comparação com tolerância de 4 casas decimais (~11 metros) — suficiente
+    # para detectar cliques no mesmo ponto (as coordenadas vêm do mesmo
+    # geocoder e serão idênticas na prática). Buscamos todos os favoritos do
+    # usuário para a mesma linha e comparamos as coordenadas no Python — o
+    # volume por usuário é pequeno (máx. 20) então não há custo relevante.
+    candidatos = (
+        db.query(RotaFavorita)
+        .filter(
+            RotaFavorita.usuario_id == usuario_id,
+            RotaFavorita.numero_linha == dados.numero_linha,
+        )
+        .all()
+    )
+    for c in candidatos:
+        if (
+            round(c.origem_lat, 4) == round(dados.origem_lat, 4)
+            and round(c.origem_lng, 4) == round(dados.origem_lng, 4)
+            and round(c.destino_lat, 4) == round(dados.destino_lat, 4)
+            and round(c.destino_lng, 4) == round(dados.destino_lng, 4)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="rota_ja_favoritada",
+            )
+
+    favorito = RotaFavorita(
+        id=uuid.uuid4(),
+        usuario_id=usuario_id,
+        numero_linha=dados.numero_linha,
+        nome_linha=dados.nome_linha,
+        label=dados.label,
+        origem_lat=dados.origem_lat,
+        origem_lng=dados.origem_lng,
+        destino_lat=dados.destino_lat,
+        destino_lng=dados.destino_lng,
+        criado_em=datetime.utcnow(),
+        atualizado_em=datetime.utcnow(),
+    )
+    db.add(favorito)
+    db.commit()
+    db.refresh(favorito)
+
+    return RotaFavoritaResponse(
+        id=str(favorito.id),
+        usuario_id=str(favorito.usuario_id),
+        numero_linha=favorito.numero_linha,
+        nome_linha=favorito.nome_linha,
+        label=favorito.label,
+        origem_lat=favorito.origem_lat,
+        origem_lng=favorito.origem_lng,
+        destino_lat=favorito.destino_lat,
+        destino_lng=favorito.destino_lng,
+        criado_em=favorito.criado_em,
+    )
+
+
+@router.get("/favoritos", response_model=list[RotaFavoritaResponse])
+def listar_favoritos(
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Lista todas as rotas favoritas do usuário autenticado.
+
+    Retorna somente os registros cujo `usuario_id` corresponde ao usuário
+    identificado pelo Gateway via `X-User-Id`. Nunca retorna favoritos de
+    outros usuários.
+    """
+    favoritos = (
+        db.query(RotaFavorita)
+        .filter(RotaFavorita.usuario_id == usuario_id)
+        .order_by(RotaFavorita.criado_em.desc())
+        .all()
+    )
+    return [
+        RotaFavoritaResponse(
+            id=str(f.id),
+            usuario_id=str(f.usuario_id),
+            numero_linha=f.numero_linha,
+            nome_linha=f.nome_linha,
+            label=f.label,
+            origem_lat=f.origem_lat,
+            origem_lng=f.origem_lng,
+            destino_lat=f.destino_lat,
+            destino_lng=f.destino_lng,
+            criado_em=f.criado_em,
+        )
+        for f in favoritos
+    ]
+
+
+@router.delete("/favoritos/{favorito_id}", status_code=204)
+def remover_favorito(
+    favorito_id: uuid.UUID,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Remove uma rota favorita do usuário autenticado.
+
+    - 404: favorito não encontrado.
+    - 403: favorito existe mas pertence a outro usuário.
+    - 204: removido com sucesso (sem corpo na resposta).
+
+    A distinção entre 403 e 404 é intencional: retornar 404 para um favorito
+    alheio esconderia a regra de negócio; 403 torna explícito que o acesso
+    foi negado. Seguindo a diretriz da análise técnica aprovada.
+    """
+    favorito = db.query(RotaFavorita).filter(RotaFavorita.id == favorito_id).first()
+
+    if favorito is None:
+        raise HTTPException(status_code=404, detail="Favorito não encontrado.")
+
+    if favorito.usuario_id != usuario_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado: este favorito pertence a outro usuário.",
+        )
+
+    db.delete(favorito)
+    db.commit()

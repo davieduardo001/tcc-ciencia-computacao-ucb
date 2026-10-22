@@ -1,7 +1,11 @@
 import uuid
 from unittest.mock import MagicMock
 
-from mobilidade.services.servico_notificacoes import NotificadorMock
+from mobilidade.services.servico_notificacoes import (
+    Notificador,
+    NotificadorMock,
+    NotificadorNulo,
+)
 
 
 def test_notificador_mock_registra_disparado():
@@ -35,3 +39,21 @@ def test_notificador_mock_conta_por_tipo():
 
     tipos = [c[0] for c in notif.chamadas]
     assert tipos == ["disparado", "atualizado", "cancelado"]
+
+
+def test_notificador_mock_registra_proximidade():
+    notif = NotificadorMock()
+    notif.alerta_proximidade("u1", "0.110", "Terminal Central", 4.5)
+
+    assert notif.chamadas == [
+        ("proximidade", "u1", "0.110", "Terminal Central", 4.5)
+    ]
+
+
+def test_notificador_nulo_aceita_proximidade_sem_erros():
+    notif = NotificadorNulo()
+    # Só precisa não levantar: é o Nulo que roda em produção hoje (mesmo
+    # estado da US #27).
+    notif.alerta_proximidade("u1", "0.110", "Terminal Central", 4.5)
+
+    assert isinstance(notif, Notificador)
