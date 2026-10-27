@@ -390,7 +390,7 @@ def test_painel_mostra_o_mesmo_sentido_que_as_chegadas_escolhem(db, parada):
 # --------------------------------------------------------------------------
 
 
-def test_api_traz_horarios_por_linha_e_mantem_a_lista_da_parada(db, parada):
+def test_api_traz_horarios_por_linha_e_mantem_a_lista_da_parada(db, parada, monkeypatch):
     todos_os_dias = {
         str(d): [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)] for d in range(7)
     }
@@ -399,6 +399,15 @@ def test_api_traz_horarios_por_linha_e_mantem_a_lista_da_parada(db, parada):
     _vincular(db, parada, LINHA_A)
     _vincular(db, parada, LINHA_B)
     db.commit()
+
+    # Relógio fixo: a grade é de 00:00 a 23:30 e, depois das 23:30, não sobra
+    # saída no dia (issue #215), o que faria o teste depender da hora real.
+    class Falso(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return SEGUNDA_10H.replace(tzinfo=tz)
+
+    monkeypatch.setattr("mobilidade.parada_service.datetime", Falso)
 
     resposta = client.get("/mobilidade/paradas", params={"lat": LAT, "lng": LNG})
 
