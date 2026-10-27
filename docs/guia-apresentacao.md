@@ -143,7 +143,7 @@ Fluxo único e contínuo, passando o "bastão" entre os três:
 ## 6.1 Limites conhecidos para declarar na defesa
 
 - **O sistema não envia e-mails.** A confirmação de conta e a recuperação de senha por e-mail ficam como trabalho futuro (exigem provedor de e-mail). A tela ainda diz "Verifique seu e-mail", o que não corresponde ao comportamento.
-- **Embarque com raio de 100 km** (`RAIO_EMBARQUE_M=100000`), de propósito, para demonstrar de qualquer lugar. A regra documentada é 100 m.
+- **Embarque com raio de 100 km** (`RAIO_EMBARQUE_M=100000`). Abrimos o raio só para validar o fluxo de viagem sem precisar estar dentro de um ônibus, e na defesa dizemos isso com todas as letras. A regra documentada e a de uso real é 100 m.
 - **Alertas sem entrega:** a tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28).
 - **Sem ambiente de homologação separado** (decisão de custo).
 
