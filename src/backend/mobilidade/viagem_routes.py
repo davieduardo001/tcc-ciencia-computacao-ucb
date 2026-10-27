@@ -78,6 +78,7 @@ async def pegar_onibus(
             lat=corpo.lat,
             lng=corpo.lng,
             parada_destino_codigo=corpo.parada_destino_codigo,
+            veiculo_prefixo=corpo.veiculo_prefixo,
             veiculos=veiculos,
             agora=servico.agora_utc(),
             rota_service=_base._rota_service,

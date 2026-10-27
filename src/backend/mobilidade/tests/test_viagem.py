@@ -147,7 +147,9 @@ def _feed(veiculos):
     )
 
 
-def _embarcar(veiculos, *, linha=LINHA, destino=None, usuario=PASSAGEIRO, lat=None, lng=None):
+def _embarcar(
+    veiculos, *, linha=LINHA, destino=None, usuario=PASSAGEIRO, lat=None, lng=None, prefixo=None
+):
     corpo = {
         "numero_linha": linha,
         "lat": LAT_USUARIO if lat is None else lat,
@@ -155,6 +157,8 @@ def _embarcar(veiculos, *, linha=LINHA, destino=None, usuario=PASSAGEIRO, lat=No
     }
     if destino is not None:
         corpo["parada_destino_codigo"] = destino
+    if prefixo is not None:
+        corpo["veiculo_prefixo"] = prefixo
     with _feed(veiculos):
         return client.post("/mobilidade/viagens", json=corpo, headers=_h(usuario))
 
@@ -297,6 +301,30 @@ class TestEmbarque:
         longe = _veiculo(prefixo="LONGE", deslocar_lat=0.0008)  # ~89 m
         perto = _veiculo(prefixo="PERTO", deslocar_lat=0.0002)  # ~22 m
         r = _embarcar([longe, perto])
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "PERTO"
+
+    def test_popup_de_onibus_longe_e_recusado_mesmo_com_outro_da_linha_perto(self, db):
+        """Issue #216: o ônibus tocado está longe; outro da linha está ao lado."""
+        longe = _veiculo(70, prefixo="TOCADO", deslocar_lat=0.0012)
+        perto = _veiculo(prefixo="OUTRO")
+
+        r = _embarcar([longe, perto], prefixo="TOCADO")
+
+        assert r.status_code == 422
+        assert db.query(Viagem).count() == 0
+
+    def test_popup_do_onibus_perto_registra_esse_veiculo(self, db):
+        perto = _veiculo(prefixo="TOCADO")
+
+        r = _embarcar([_veiculo(prefixo="OUTRO", deslocar_lat=0.0004), perto], prefixo="TOCADO")
+
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "TOCADO"
+
+    def test_sem_prefixo_qualquer_onibus_da_linha_perto_vale(self, db):
+        """Embarque pela rota (#190): continua como antes."""
+        r = _embarcar([_veiculo(70, prefixo="LONGE"), _veiculo(prefixo="PERTO")])
         assert r.status_code == 201
         assert r.json()["veiculo_prefixo"] == "PERTO"
 
