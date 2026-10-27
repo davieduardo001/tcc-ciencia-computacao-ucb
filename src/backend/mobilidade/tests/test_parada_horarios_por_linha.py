@@ -410,3 +410,47 @@ def test_api_traz_horarios_por_linha_e_mantem_a_lista_da_parada(db, parada):
         assert len(linha["proximos_horarios"]) == 3
     # compatibilidade: o campo antigo continua lá, com até 3 horários
     assert 1 <= len(dados["proximos_horarios"]) <= 3
+
+
+# --------------------------------------------------------------------------
+# issue #215 — só saídas que ainda não passaram
+# --------------------------------------------------------------------------
+
+
+def test_proximos_horarios_antes_da_primeira_saida_traz_as_primeiras():
+    from mobilidade.parada_service import _proximos_horarios
+
+    grade = ["06:00", "06:20", "06:40", "07:00"]
+    assert _proximos_horarios(grade, "05:00") == ["06:00", "06:20", "06:40"]
+
+
+def test_proximos_horarios_depois_da_ultima_saida_fica_vazio():
+    """Antes completava com as da manhã (06:00 às 07:58)."""
+    from mobilidade.parada_service import _proximos_horarios
+
+    assert _proximos_horarios(["06:00", "06:20", "06:40"], "07:58") == []
+
+
+def test_proximos_horarios_nao_completa_com_horarios_que_ja_passaram():
+    from mobilidade.parada_service import _proximos_horarios
+
+    grade = ["06:00", "06:20", "08:00"]
+    assert _proximos_horarios(grade, "07:58") == ["08:00"]
+
+
+def test_proximos_horarios_saida_exatamente_agora_ainda_conta():
+    from mobilidade.parada_service import _proximos_horarios
+
+    assert _proximos_horarios(["07:58", "08:10"], "07:58") == ["07:58", "08:10"]
+
+
+def test_painel_depois_da_ultima_saida_do_dia_nao_lista_horarios_passados(db, parada):
+    _rota(db, LINHA_A, por_dia=_por_dia(uteis=["06:00", "06:20", "06:40"]))
+    _vincular(db, parada, LINHA_A)
+    db.commit()
+    oito_da_manha = datetime(2026, 10, 12, 7, 58, tzinfo=FUSO_SEMOB)
+
+    encontrada = ParadaService()._por_parada_fisica(db, LAT, LNG, oito_da_manha)
+
+    assert _linha(encontrada, LINHA_A).proximos_horarios == []
+    assert encontrada.proximos_horarios == []
