@@ -222,6 +222,14 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 4. **"Parada sem nome":** embarque e desembarque de trechos das rotas 0.306 e 0.376/0.092 aparecem como "Parada sem nome" (falta o nome no cadastro da parada).
 5. `GET /api/mobilidade/linhas/0.110/posicoes` traz `eta_minutos: null` sem posição do usuário, como esperado; o ETA com localização é o CT-ETA-01 (pendente).
 
+## CT-MAP-07, CT-ROT-06 e CT-PAR-02 (27/10, ~15:10, produção, conta do usuário, desktop 1366 px)
+
+| Caso | Estado | O que foi feito e visto |
+|---|---|---|
+| CT-MAP-07 | **Aprovado** | Busquei a linha 0.306 (2 ônibus em operação) e deixei o mapa aberto sem recarregar. Aos ~33 s as posições ainda eram as mesmas; aos ~100 s os dois ônibus tinham andado (o de baixo foi de y=433 para y=409 na tela, o de cima de y=307 para y=279). A requisição `GET /api/mobilidade/linhas/0.306/posicoes` se repete sozinha e responde 200. Evidências: `CT-MAP-07-antes.jpg` e `CT-MAP-07-depois.jpg`. |
+| CT-ROT-06 | **Aprovado com ressalva** | Rota Terminal de Taguatinga Sul → Rodoviária do Plano Piloto, opção 1 (0.306, direta). O card mostra só o embarque e o desembarque, sem as paradas do meio. No embarque aparece "2 ônibus rodando agora" com o selo "ao vivo"; no desembarque, "Sem previsão no momento" (sem número inventado). Ressalva: no embarque não há um tempo numérico em minutos, só o selo; e o nome do embarque vem como "Parada sem nome". Evidência: `CT-ROT-06-paradas-embarque-desembarque.jpg`. |
+| CT-PAR-02 | **Aprovado** | Em "Buscar parada" digitei "Terminal" e confirmei com Enter (a busca só dispara no Enter, por projeto: o Nominatim limita 1 requisição por segundo). Na parada "Setor Terminal Norte, HCGN 716" (7 linhas), as linhas 0.411, 0.953, 374.2, 379.2 e 910.1 aparecem como "sem saída prevista hoje" em "Próximas saídas do terminal" e como "Sem previsão no momento" em "Chegando nesta parada"; 0.171 e 156.6 mostram horários. Não há lista vazia quebrada. Evidência: `CT-PAR-02-saidas-sem-previsao-hoje.jpg`. |
+
 ## Pendentes
 
 Nenhum caso P1. Seguem os 31 casos P2/P3 e a repetição do ETA-01 em largura de celular (390 px).
