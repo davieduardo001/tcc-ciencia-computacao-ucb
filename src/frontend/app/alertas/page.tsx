@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, CircleAlert, CircleCheck } from "lucide-react";
@@ -57,6 +57,11 @@ function mensagemDeErro(erro: unknown, padrao: string): string {
 
 export default function AlertasPage() {
   const router = useRouter();
+  // O router fica numa ref para a carga não depender da identidade dele:
+  // se o objeto mudar a cada render (como no mock dos testes), o efeito
+  // refazia a carga em loop e a tela nunca saía de "Carregando".
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const avisosPush = useAvisosPush();
   const textoPush = TEXTOS_AVISOS_PUSH[avisosPush.estado.tipo];
 
@@ -73,7 +78,7 @@ export default function AlertasPage() {
     try {
       const usuario = await buscarUsuarioAtual();
       if (!usuario) {
-        router.push("/login");
+        routerRef.current.push("/login");
         return;
       }
       setUsuarioId(usuario.id);
@@ -85,7 +90,7 @@ export default function AlertasPage() {
     } finally {
       setCarregando(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     carregar();
