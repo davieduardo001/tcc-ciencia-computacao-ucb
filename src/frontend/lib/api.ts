@@ -1876,3 +1876,134 @@ export async function removerInscricaoPush(endpoint: string): Promise<void> {
     throw new PushError("Não foi possível desativar os avisos. Tente novamente.");
   }
 }
+
+// ---------------------------------------------------------------------------
+// US #29 — Preferências de Notificação
+// ---------------------------------------------------------------------------
+
+export const ANTECEDENCIAS_ALERTA = [5, 10, 30, 60] as const;
+export type AntecedenciaAlerta = (typeof ANTECEDENCIAS_ALERTA)[number];
+export type TipoNotificacao = "chegada" | "cancelamento";
+
+export interface PreferenciasNotificacao {
+  antecedenciaMinutos: number;
+  /** Chave geral: false = "desativar todas" (os tipos individuais são preservados). */
+  notificacoesAtivas: boolean;
+  alertaChegada: boolean;
+  alertaCancelamento: boolean;
+}
+
+export class PreferenciasError extends Error {
+  /** HTTP status retornado pelo servidor, quando disponível. */
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+interface PreferenciasResposta {
+  antecedencia_minutos: number;
+  notificacoes_ativas: boolean;
+  alerta_chegada: boolean;
+  alerta_cancelamento: boolean;
+}
+
+/**
+ * As rotas exigem o `usuario_id` da URL igual ao do usuário logado; o
+ * cabeçalho de identidade (X-User-Id) quem injeta é o Gateway, a partir
+ * do cookie. Por isso o id vem de `buscarUsuarioAtual` (/api/auth/me).
+ */
+async function chamarPreferencias(
+  usuarioId: string,
+  sufixo: string,
+  init: { method: "GET" | "PUT"; corpo?: unknown },
+  falhaPadrao: string
+): Promise<PreferenciasNotificacao> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/colaboracao/preferencias/${encodeURIComponent(usuarioId)}${sufixo}`,
+      {
+        method: init.method,
+        credentials: "include",
+        cache: "no-store",
+        ...(init.corpo !== undefined && {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(init.corpo),
+        }),
+      }
+    );
+  } catch {
+    throw new PreferenciasError("Sem conexão. Verifique sua internet e tente novamente.");
+  }
+
+  if (response.status === 401) {
+    throw new PreferenciasError("Sua sessão expirou. Entre novamente.", 401);
+  }
+  if (response.status === 403) {
+    throw new PreferenciasError("Você não tem acesso a essas preferências.", 403);
+  }
+  if (!response.ok) {
+    throw new PreferenciasError(falhaPadrao, response.status);
+  }
+
+  const dados: PreferenciasResposta = await response.json();
+  return {
+    antecedenciaMinutos: dados.antecedencia_minutos,
+    notificacoesAtivas: dados.notificacoes_ativas,
+    alertaChegada: dados.alerta_chegada,
+    alertaCancelamento: dados.alerta_cancelamento,
+  };
+}
+
+/** Carrega as preferências (o servidor cria o padrão — 30 min, tudo ativo — se não existirem). */
+export function buscarPreferencias(usuarioId: string): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "",
+    { method: "GET" },
+    "Não foi possível carregar suas preferências. Tente novamente."
+  );
+}
+
+/** Cenário 1 — antecedência dos alertas de chegada (5, 10, 30 ou 60 min). */
+export function salvarAntecedencia(
+  usuarioId: string,
+  antecedenciaMinutos: number
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "/antecedencia",
+    { method: "PUT", corpo: { antecedencia_minutos: antecedenciaMinutos } },
+    "Não foi possível salvar a antecedência. Tente novamente."
+  );
+}
+
+/** Cenário 2 — liga/desliga um tipo de notificação sem mexer nos outros. */
+export function atualizarTipoNotificacao(
+  usuarioId: string,
+  tipo: TipoNotificacao,
+  ativo: boolean
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    `/tipo/${tipo}`,
+    { method: "PUT", corpo: { ativo } },
+    "Não foi possível salvar a preferência. Tente novamente."
+  );
+}
+
+/** Cenário 3 — chave geral: `false` desativa todas, `true` reativa. */
+export function alternarTodasNotificacoes(
+  usuarioId: string,
+  ativas: boolean
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "/desativar-todas",
+    { method: "PUT", corpo: { ativas } },
+    "Não foi possível salvar a preferência. Tente novamente."
+  );
+}
