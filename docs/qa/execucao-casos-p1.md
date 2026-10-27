@@ -230,6 +230,16 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 | CT-ROT-06 | **Aprovado com ressalva** | Rota Terminal de Taguatinga Sul → Rodoviária do Plano Piloto, opção 1 (0.306, direta). O card mostra só o embarque e o desembarque, sem as paradas do meio. No embarque aparece "2 ônibus rodando agora" com o selo "ao vivo"; no desembarque, "Sem previsão no momento" (sem número inventado). Ressalva: no embarque não há um tempo numérico em minutos, só o selo; e o nome do embarque vem como "Parada sem nome". Evidência: `CT-ROT-06-paradas-embarque-desembarque.jpg`. |
 | CT-PAR-02 | **Aprovado** | Em "Buscar parada" digitei "Terminal" e confirmei com Enter (a busca só dispara no Enter, por projeto: o Nominatim limita 1 requisição por segundo). Na parada "Setor Terminal Norte, HCGN 716" (7 linhas), as linhas 0.411, 0.953, 374.2, 379.2 e 910.1 aparecem como "sem saída prevista hoje" em "Próximas saídas do terminal" e como "Sem previsão no momento" em "Chegando nesta parada"; 0.171 e 156.6 mostram horários. Não há lista vazia quebrada. Evidência: `CT-PAR-02-saidas-sem-previsao-hoje.jpg`. |
 
+## CT-VIA-07 — embarque com o ônibus chegando (27/10, ~15:20, produção, conta do usuário, desktop)
+
+**Estado: não verificável hoje (precondição de tempo não ocorreu e a regra fica mascarada pelo raio).**
+
+- **Regra no código** (`viagem_service.py`, `embarcar`): primeiro vale o raio `RAIO_EMBARQUE_M`; só se nenhum ônibus estiver dentro dele vale "ônibus chegando" (usuário a até 400 m de uma parada da linha e ônibus a até 2 min dela). A regra que decidiu vai para o log do servidor (`regra=raio` ou `regra=onibus_chegando`), não para a resposta da API.
+- **Precondição de distância:** da posição do usuário ("Setor J Norte CNJ 33"), o planejador achou o embarque a 339 m, dentro dos 400 m.
+- **Precondição de tempo:** nenhuma das 9 opções mostrou ônibus a 2 min ou menos do embarque. A única com "AO VIVO" (0.300) soma 105 min; a opção mais rápida (373.3) mostra "1 ônibus rodando agora" sem tempo de espera.
+- **Por que não dá para fechar mesmo com o ônibus perto:** com `RAIO_EMBARQUE_M` em 100 km (decisão de custo até a defesa), o embarque é aceito pela regra do raio antes de a segunda regra ser avaliada, então o log diria `regra=raio`. Tocar em "Peguei este ônibus" aqui aceitaria a viagem sem provar nada sobre o #191, e por isso não toquei.
+- **Como fechar:** voltar o raio para 100 m (`flyctl secrets set RAIO_EMBARQUE_M=100 -a movecity-mobilidade`) e, com um ônibus a 2 min de uma parada a até 400 m, tocar em "Peguei este ônibus" e conferir `regra=onibus_chegando` no log.
+
 ## Pendentes
 
 Nenhum caso P1. Seguem os 31 casos P2/P3 e a repetição do ETA-01 em largura de celular (390 px).
