@@ -89,15 +89,15 @@ EOF
 
 Guarde a privada no gerenciador de senhas do time. **Gere o par uma vez só:** trocar as chaves depois invalida todas as inscrições existentes, e cada pessoa precisa ativar de novo em Configurações.
 
-**2. Configurar no Fly** (o `set` reinicia as máquinas do serviço; faça com o par já gerado):
+**2. Cadastrar no GitHub** (o pipeline aplica no Fly; não use `fly secrets set` na mão). Sem imprimir o valor, direto do gerador:
 
 ```bash
-fly secrets set \
-  VAPID_PRIVATE_KEY="<privada>" \
-  VAPID_PUBLIC_KEY="<publica>" \
-  VAPID_SUBJECT="mailto:contato-do-time@exemplo.com" \
-  --app movecity-mobilidade
+gh secret set VAPID_PRIVATE_KEY   # cole a privada no prompt
+gh secret set VAPID_PUBLIC_KEY
+gh secret set VAPID_SUBJECT       # mailto:contato-do-time@exemplo.com
 ```
+
+O job `deploy-mobilidade` do `deploy-fly.yml` roda `flyctl secrets set --stage` com os três antes do `flyctl deploy`, então as chaves entram no mesmo release. O passo só roda se **os três** secrets existirem; se faltar algum, ele é pulado, o deploy conclui e o push segue desligado. Os valores não aparecem nos logs (ficam em variáveis de ambiente mascaradas e a saída do `flyctl` é descartada). Para trocar o contato ou as chaves, atualize o secret no GitHub e dispare o workflow (`workflow_dispatch`).
 
 **3. Validar:**
 1. Logado no app, abra `GET /api/mobilidade/push/chave` (ou a tela de Configurações): deve responder `"disponivel": true` e a chave pública.
