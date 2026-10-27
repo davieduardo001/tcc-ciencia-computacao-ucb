@@ -151,8 +151,9 @@ def _obter_ou_criar_preferencias(usuario_id, db: Session) -> PreferenciaNotifica
         try:
             db.commit()
         except IntegrityError:
-            # preferencias_notificacao.usuario_id tem FK para usuarios.id:
-            # usuário inexistente violava a FK no commit e virava 500.
+            # A FK para usuarios.id existe só no banco (migration), não no
+            # ORM: um usuario_id sem registro em usuarios viola a constraint
+            # no commit e vira 404 em vez de 500.
             db.rollback()
             raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         db.refresh(preferencia)
