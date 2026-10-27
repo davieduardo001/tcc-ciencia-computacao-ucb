@@ -582,18 +582,25 @@ def confirmar_ocorrencia(
             detail="confirmacao_duplicada",
         )
 
-    # 5. Incrementa o contador e, se necessário, muda o status.
-    # Os valores são capturados em variáveis Python antes do commit
-    # para evitar acesso a atributo ORM após a sessão fechar
-    # (StaticPool do SQLite desvincula instâncias após commit).
-    novo_contador = ocorrencia.contador_confirmacoes + 1
+    # 5. Incrementa o contador direto no banco (UPDATE ... SET c = c + 1), sem
+    #    ler-e-somar em Python: duas confirmações simultâneas de usuários
+    #    diferentes não perdem incremento, porque o UPDATE trava a linha.
+    #    O valor novo é relido na mesma transação e capturado em variáveis
+    #    Python antes do commit (StaticPool do SQLite desvincula instâncias
+    #    após commit).
+    filtro = Ocorrencia.id == ocorrencia_id
+    db.query(Ocorrencia).filter(filtro).update(
+        {Ocorrencia.contador_confirmacoes: Ocorrencia.contador_confirmacoes + 1},
+        synchronize_session=False,
+    )
+    novo_contador = db.query(Ocorrencia.contador_confirmacoes).filter(filtro).scalar()
     novo_status = ocorrencia.status
     if novo_contador >= Ocorrencia.LIMITE_CONFIRMACOES:
         novo_status = "confirmada"
-    ocorrencia_id_str = str(ocorrencia_id)  # UUID já está disponível como param
-
-    ocorrencia.contador_confirmacoes = novo_contador
-    ocorrencia.status = novo_status
+        db.query(Ocorrencia).filter(filtro).update(
+            {Ocorrencia.status: novo_status}, synchronize_session=False
+        )
+    ocorrencia_id_str = str(ocorrencia_id)
 
     db.commit()
 
