@@ -36,8 +36,9 @@ function iniciais(nome: string): string {
 // entradas — o primeiro apenas dava foco no campo de busca do topo, o
 // segundo apenas abria o mesmo planejador. Uma função, um ponto de entrada.
 //
-// "Perfil" saiu daqui: já existe o botão de perfil na barra de cima, e
-// ter os dois duplicava a mesma entrada.
+// "Perfil" saiu daqui: o bloco do usuário (avatar, nome, e-mail, "Rever o
+// guia" e "Sair") já fica no rodapé deste menu, e a barra de cima não tem
+// botão de perfil. No celular, "Perfil" mora na barra de baixo.
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
   { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: true },
@@ -361,9 +362,6 @@ function AppShellConteudo({
           <Link href="/configuracoes" className="ms-icon-btn" title="Configurações">
             <Settings size={17} />
           </Link>
-          <button type="button" className="ms-icon-btn" title="Perfil">
-            <User size={17} />
-          </button>
         </div>
       </header>
 

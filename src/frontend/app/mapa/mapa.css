@@ -2002,12 +2002,6 @@
     z-index: calc(var(--z-nav) - 1);
     cursor: pointer;
   }
-
-  /* Perfil passou a morar na barra de baixo; manter o ícone na barra de
-     cima duplicaria a mesma entrada na mesma tela. */
-  .ms-actions .ms-icon-btn[title="Perfil"] {
-    display: none;
-  }
 }
 
 /* ===== Ônibus ao vivo (US #16) ===== */

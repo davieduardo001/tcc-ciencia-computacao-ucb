@@ -121,8 +121,30 @@ describe("AppShell", () => {
     const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
     expect(within(inferior).getByText("Perfil")).toBeInTheDocument();
 
-    // O botão de perfil da topbar continua no DOM (o CSS o esconde no mobile).
-    expect(screen.getByTitle("Perfil")).toBeInTheDocument();
+    // A barra de cima não tem botão de perfil (o bloco do usuário fica no menu lateral).
+    expect(screen.queryByTitle("Perfil")).not.toBeInTheDocument();
+    const topbar = document.querySelector(".ms-topbar") as HTMLElement;
+    expect(within(topbar).queryByRole("button", { name: /perfil/i })).not.toBeInTheDocument();
+  });
+
+  it("bloco do usuário do menu lateral mantém Sair e Rever o guia", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue({
+      id: "1",
+      nome: "Ana Passageira",
+      email: "ana@teste.com",
+      avatarUrl: null,
+    });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    expect(await within(sidebar).findByTitle("Sair")).toBeInTheDocument();
+    expect(within(sidebar).getByTitle("Rever o guia")).toBeInTheDocument();
+    expect(within(sidebar).getByText("ana@teste.com")).toBeInTheDocument();
   });
 
   it("marca o destino atual da navegação inferior com aria-current", () => {
