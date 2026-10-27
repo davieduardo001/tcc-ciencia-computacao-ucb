@@ -279,10 +279,22 @@ def embarcar(
 
     agora_com_fuso = agora.replace(tzinfo=timezone.utc)
     veiculo = veiculo_mais_proximo(veiculos, lat, lng, agora=agora_com_fuso)
+    regra = "raio"
     if veiculo is None and rota_service is not None:
+        regra = "onibus_chegando"
         veiculo = veiculo_chegando_na_parada_do_usuario(
             db, rota_service, numero_linha, veiculos, lat, lng, agora_com_fuso
         )
+    # Issue #216: registra QUAL regra decidiu e se o prefixo veio, sem a
+    # posição do usuário (RN-06). Torna conclusiva a próxima revalidação.
+    logger.info(
+        "embarque linha=%s prefixo_informado=%s regra=%s resultado=%s veiculo=%s",
+        numero_linha,
+        veiculo_prefixo,
+        regra,
+        "aceito" if veiculo is not None else "recusado",
+        veiculo.prefixo if veiculo is not None else None,
+    )
     if veiculo is None:
         raise SemVeiculoProximo()
 

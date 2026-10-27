@@ -966,6 +966,31 @@ class TestEmbarqueComOnibusChegando:
         assert "não conseguimos confirmar" in r.json()["detail"].lower()
         assert db.query(Viagem).count() == 0
 
+    def test_popup_de_onibus_longe_nao_herda_o_onibus_que_esta_chegando(self, db):
+        """
+        Issue #216: o usuário espera na parada B e OUTRO ônibus da linha está
+        chegando (ETA dentro do limite). Tocar no popup do ônibus distante
+        (carro 124931, a dezenas de km) não pode registrar embarque.
+        """
+        chegando = _onibus(92, prefixo="CHEGANDO")
+        distante = _onibus(0, prefixo="124931")
+        assert _eta_para_b(chegando) <= servico.ETA_MAXIMO_EMBARQUE_MIN
+
+        r = _embarcar([distante, chegando], prefixo="124931")
+
+        assert r.status_code == 422
+        assert "não conseguimos confirmar" in r.json()["detail"].lower()
+        assert db.query(Viagem).count() == 0
+
+    def test_popup_do_onibus_que_esta_chegando_registra_esse_veiculo(self, db):
+        chegando = _onibus(92, prefixo="CHEGANDO")
+        outro = _onibus(0, prefixo="124931")
+
+        r = _embarcar([outro, chegando], prefixo="CHEGANDO")
+
+        assert r.status_code == 201
+        assert r.json()["veiculo_prefixo"] == "CHEGANDO"
+
     def test_o_limite_de_tempo_e_inclusivo_e_configuravel(self, db, monkeypatch):
         onibus = _onibus(92)
         eta = _eta_para_b(onibus)
