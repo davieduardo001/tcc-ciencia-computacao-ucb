@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import OcorrenciasPage from "../page";
 import {
   listarOcorrencias,
+  confirmarOcorrencia,
   ListarOcorrenciasError,
+  ConfirmarOcorrenciaError,
   OcorrenciaListada,
 } from "@/lib/api";
 
@@ -14,6 +16,14 @@ jest.mock("@/lib/api", () => {
     logoutUsuario: jest.fn(),
     sugerirLinhas: jest.fn().mockResolvedValue([]),
     listarOcorrencias: jest.fn(),
+    confirmarOcorrencia: jest.fn(),
+    ConfirmarOcorrenciaError: class ConfirmarOcorrenciaError extends Error {
+      status: number;
+      constructor(message: string, status: number) {
+        super(message);
+        this.status = status;
+      }
+    },
   };
 });
 
@@ -27,6 +37,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 const listarMock = listarOcorrencias as jest.Mock;
+const confirmarMock = confirmarOcorrencia as jest.Mock;
 
 const AGORA = new Date("2026-10-14T15:00:00Z").getTime();
 
@@ -41,6 +52,7 @@ function ocorrencia(parcial: Partial<OcorrenciaListada> = {}): OcorrenciaListada
     contadorConfirmacoes: 0,
     criadoEm: "2026-10-14T14:55:00Z",
     expiraEm: "2026-10-14T15:25:00Z",
+    ehAutor: false,
     ...parcial,
   };
 }
@@ -49,6 +61,7 @@ describe("OcorrenciasPage (lista — US #24)", () => {
   beforeEach(() => {
     pushMock.mockReset();
     listarMock.mockReset();
+    confirmarMock.mockReset();
     listarMock.mockResolvedValue([]);
     paramsLinha = "";
     jest.spyOn(Date, "now").mockReturnValue(AGORA);
@@ -215,5 +228,265 @@ describe("OcorrenciasPage (lista — US #24)", () => {
     render(<OcorrenciasPage />);
 
     expect(await screen.findByText("Não foi possível carregar as ocorrências.")).toBeInTheDocument();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// US #26 — Botão de confirmação de ocorrência
+// ---------------------------------------------------------------------------
+
+describe("OcorrenciasPage — confirmar ocorrência (US #26)", () => {
+  beforeEach(() => {
+    pushMock.mockReset();
+    listarMock.mockReset();
+    confirmarMock.mockReset();
+    listarMock.mockResolvedValue([]); // default: lista vazia para evitar erro no carregamento
+    paramsLinha = "";
+    jest.spyOn(Date, "now").mockReturnValue(AGORA);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("exibe o botão 'Eu também vi isso' para ocorrência pendente de outro usuário", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+
+    render(<OcorrenciasPage />);
+
+    // O aria-label inclui o tipo/linha; buscamos pelo texto visível do botão.
+    await screen.findByText("Atraso — 0.110");
+    expect(screen.getByText("Eu também vi isso")).toBeInTheDocument();
+  });
+
+  it("NÃO exibe o botão para o autor da própria ocorrência (Cenário 2)", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: true }),
+    ]);
+
+    render(<OcorrenciasPage />);
+
+    await screen.findByText("Aguardando confirmação");
+    expect(screen.queryByText("Eu também vi isso")).not.toBeInTheDocument();
+  });
+
+  it("NÃO exibe o botão para ocorrência já confirmada", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "confirmada", contadorConfirmacoes: 3, ehAutor: false }),
+    ]);
+
+    render(<OcorrenciasPage />);
+
+    await screen.findByText("Confirmada · 3 confirmações");
+    expect(screen.queryByText("Eu também vi isso")).not.toBeInTheDocument();
+  });
+
+  it("ao clicar, chama confirmarOcorrencia com o id correto", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc-abc", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockResolvedValue({
+      ocorrencia_id: "oc-abc",
+      status: "pendente",
+      contador_confirmacoes: 1,
+      mensagem: "Confirmação registrada.",
+    });
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(confirmarMock).toHaveBeenCalledWith("oc-abc");
+    });
+  });
+
+  it("exibe indicador de carregamento durante a confirmação", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockReturnValue(new Promise(() => {}));
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    expect(await screen.findByText(/Confirmando/i)).toBeInTheDocument();
+    // Após clicar, o botão deve estar desabilitado
+    expect(screen.getByRole("button", { name: /Confirmar ocorr/i })).toBeDisabled();
+  });
+
+  it("NÃO exibe o botão para o autor da própria ocorrência (Cenário 2)", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: true }),
+    ]);
+
+    render(<OcorrenciasPage />);
+
+    await screen.findByText("Aguardando confirmação");
+    expect(
+      screen.queryByRole("button", { name: /Eu também vi isso/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("NÃO exibe o botão para ocorrência já confirmada", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "confirmada", contadorConfirmacoes: 3, ehAutor: false }),
+    ]);
+
+    render(<OcorrenciasPage />);
+
+    await screen.findByText("Confirmada · 3 confirmações");
+    expect(
+      screen.queryByRole("button", { name: /Eu também vi isso/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("ao clicar, chama confirmarOcorrencia com o id correto", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc-abc", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockResolvedValue({
+      ocorrencia_id: "oc-abc",
+      status: "pendente",
+      contador_confirmacoes: 1,
+      mensagem: "Confirmação registrada.",
+    });
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(confirmarMock).toHaveBeenCalledWith("oc-abc");
+    });
+  });
+
+  it("exibe indicador de carregamento durante a confirmação", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockReturnValue(new Promise(() => {}));
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    expect(await screen.findByText(/Confirmando/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Confirmar ocorr/i })).toBeDisabled();
+  });
+
+  it("exibe mensagem de sucesso e atualiza o contador após confirmação", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", contadorConfirmacoes: 0, ehAutor: false }),
+    ]);
+    confirmarMock.mockResolvedValue({
+      ocorrencia_id: "oc1",
+      status: "pendente",
+      contador_confirmacoes: 1,
+      mensagem: "Confirmação registrada.",
+    });
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmação registrada.")).toBeInTheDocument();
+    });
+  });
+
+  it("ao atingir 3 confirmações, status muda para confirmada e botão some", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", contadorConfirmacoes: 2, ehAutor: false }),
+    ]);
+    confirmarMock.mockResolvedValue({
+      ocorrencia_id: "oc1",
+      status: "confirmada",
+      contador_confirmacoes: 3,
+      mensagem: "Ocorrência confirmada pela comunidade.",
+    });
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Ocorrência confirmada pela comunidade.")).toBeInTheDocument();
+      expect(screen.queryByText("Eu também vi isso")).not.toBeInTheDocument();
+    });
+  });
+
+  it("exibe mensagem de erro 403 — autor tentando confirmar", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockRejectedValue(
+      new ConfirmarOcorrenciaError("Você não pode confirmar uma ocorrência que reportou.", 403)
+    );
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Você não pode confirmar uma ocorrência que reportou.")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("exibe mensagem de erro 409 — já confirmou", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockRejectedValue(
+      new ConfirmarOcorrenciaError("Você já confirmou esta ocorrência.", 409)
+    );
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Você já confirmou esta ocorrência.")).toBeInTheDocument();
+    });
+  });
+
+  it("exibe mensagem de expiração (422) — alerta não está mais ativo", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockRejectedValue(
+      new ConfirmarOcorrenciaError("Este alerta não está mais ativo.", 422)
+    );
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Este alerta não está mais ativo.")).toBeInTheDocument();
+    });
+  });
+
+  it("erro 401 redireciona para login sem quebrar a tela", async () => {
+    listarMock.mockResolvedValue([
+      ocorrencia({ id: "oc1", status: "pendente", ehAutor: false }),
+    ]);
+    confirmarMock.mockRejectedValue(
+      new ConfirmarOcorrenciaError("Faça login para confirmar ocorrências.", 401)
+    );
+
+    render(<OcorrenciasPage />);
+    await screen.findByText("Eu também vi isso");
+    fireEvent.click(screen.getByText("Eu também vi isso"));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/login");
+    });
   });
 });

@@ -67,8 +67,9 @@ class OcorrenciaResponse(BaseModel):
 class OcorrenciaListaResponse(BaseModel):
     """Item da listagem de ocorrências ativas.
 
-    Deliberadamente sem `usuario_id`: quem reportou não é informação que
-    outros passageiros precisem (nem devam) ter — LGPD.
+    `eh_autor` indica se o usuário autenticado criou esta ocorrência —
+    usado pelo frontend para esconder o botão de confirmação (Cenário 2
+    da US #26). Nunca expõe o `usuario_id` real (LGPD).
 
     O banco guarda `criado_em`/`expira_em` em UTC *sem fuso* (naive). Sem
     marcar o fuso aqui, o JSON sairia sem "Z" e o navegador leria o horário
@@ -86,6 +87,8 @@ class OcorrenciaListaResponse(BaseModel):
     contador_confirmacoes: int
     criado_em: datetime
     expira_em: datetime
+    # US #26: True quando o usuário autenticado é o autor desta ocorrência.
+    eh_autor: bool = False
 
     @field_validator("criado_em", "expira_em")
     @classmethod
@@ -131,6 +134,27 @@ class RotaFavoritaResponse(BaseModel):
     destino_lat: float
     destino_lng: float
     criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# US #26 — Confirmar Ocorrência Reportada por Outro Passageiro
+# ---------------------------------------------------------------------------
+
+
+class ConfirmacaoOcorrenciaResponse(BaseModel):
+    """Resposta retornada após confirmar uma ocorrência.
+
+    Contém somente dados públicos — o `usuario_id` de quem confirmou
+    nunca é exposto (LGPD).
+    """
+
+    ocorrencia_id: str
+    status: str
+    contador_confirmacoes: int
+    mensagem: str
 
     class Config:
         from_attributes = True
