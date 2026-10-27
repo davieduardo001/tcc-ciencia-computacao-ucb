@@ -140,6 +140,13 @@ Fluxo único e contínuo, passando o "bastão" entre os três:
 
 ---
 
+## 6.1 Limites conhecidos para declarar na defesa
+
+- **O sistema não envia e-mails.** A confirmação de conta e a recuperação de senha por e-mail ficam como trabalho futuro (exigem provedor de e-mail). A tela ainda diz "Verifique seu e-mail", o que não corresponde ao comportamento.
+- **Embarque com raio de 100 km** (`RAIO_EMBARQUE_M=100000`), de propósito, para demonstrar de qualquer lugar. A regra documentada é 100 m.
+- **Alertas sem entrega:** a tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28).
+- **Sem ambiente de homologação separado** (decisão de custo).
+
 ## 7. Documentação final (próximo passo)
 
 A defesa depende da documentação final (#204). Os modelos entregues pela disciplina são: **Documento de Arquitetura de Software v2**, **DRS** (requisitos) e **Documento de Visão** (`.dotx`). Estes templates ainda não foram abertos neste planejamento; o mapeamento de cada seção para o que já existe em `docs/` é o passo seguinte.
