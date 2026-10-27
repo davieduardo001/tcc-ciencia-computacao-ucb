@@ -65,7 +65,12 @@ describe("BotaoPegueiOnibus", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
 
     await waitFor(() =>
-      expect(embarcarMock).toHaveBeenCalledWith({ numeroLinha: "0.110", lat: -15.8, lng: -48.05 })
+      expect(embarcarMock).toHaveBeenCalledWith({
+        numeroLinha: "0.110",
+        lat: -15.8,
+        lng: -48.05,
+        veiculoPrefixo: "440001", // issue #216: só ESTE ônibus confirma o embarque
+      })
     );
     // Espera a tela assentar no estado novo (e o botão virar o aviso).
     expect(await screen.findByText("Você está neste ônibus.")).toBeInTheDocument();
