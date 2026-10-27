@@ -278,6 +278,37 @@ describe("MapaInterativo", () => {
     expect(onFecharLinha).toHaveBeenCalledTimes(1);
   });
 
+  it("issue #217: o painel da linha é a folha de três alturas, com alça acessível", () => {
+    const { container } = render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    const folha = container.querySelector(".folha-inferior.mapa-painel-linha")!;
+    expect(folha).toHaveClass("snap-medio");
+
+    fireEvent.click(screen.getByRole("button", { name: "Recolher detalhes da linha" }));
+
+    expect(folha).toHaveClass("snap-minimo");
+    expect(screen.getByRole("button", { name: "Abrir detalhes da linha" })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+  });
+
+  it("issue #217: avisa a página quando o painel da parada abre e fecha", async () => {
+    buscarDetalhesParadaMock.mockResolvedValue(DETALHE_PARADA_TESTE);
+    const onPainelParadaChange = jest.fn();
+
+    render(
+      <MapaInterativo linha={LINHA_TESTE} onPainelParadaChange={onPainelParadaChange} />
+    );
+    expect(onPainelParadaChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+    await waitFor(() => expect(onPainelParadaChange).toHaveBeenLastCalledWith(true));
+
+    fireEvent.click(screen.getByTitle("Fechar"));
+    expect(onPainelParadaChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("exibe a mensagem de erro de busca sem quebrar o mapa", () => {
     render(<MapaInterativo erroBusca='Linha "999" não encontrada.' />);
 

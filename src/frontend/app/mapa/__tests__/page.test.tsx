@@ -30,7 +30,11 @@ jest.mock("../MapaInterativo", () => ({
     onLocalizacao,
     viagem,
     paradasBuscadas,
+    linha,
+    onPainelParadaChange,
   }: {
+    linha?: { numero: string } | null;
+    onPainelParadaChange?: (aberto: boolean) => void;
     onLocalizacao?: (c: { lat: number; lng: number } | null) => void;
     viagem?: { pernas: { numero: string }[] } | null;
     paradasBuscadas?: { paradas: unknown[] } | null;
@@ -39,7 +43,14 @@ jest.mock("../MapaInterativo", () => ({
       data-testid="mapa-interativo"
       data-viagem={viagem ? "sim" : "nao"}
       data-paradas-buscadas={paradasBuscadas?.paradas.length ?? 0}
+      data-linha={linha?.numero ?? ""}
     >
+      <button type="button" onClick={() => onPainelParadaChange?.(true)}>
+        simular-parada-aberta
+      </button>
+      <button type="button" onClick={() => onPainelParadaChange?.(false)}>
+        simular-parada-fechada
+      </button>
       <button
         type="button"
         onClick={() => onLocalizacao?.({ lat: -15.83, lng: -48.04 })}
@@ -588,5 +599,88 @@ describe("MapaPage — buscar parada (US #21)", () => {
 
     expect(screen.getByText("Para onde você vai?")).toBeInTheDocument();
     expect(screen.getByTestId("mapa-interativo")).toHaveAttribute("data-paradas-buscadas", "0");
+  });
+});
+
+describe("MapaPage — uma folha por vez no celular (issue #217)", () => {
+  const original = window.matchMedia;
+
+  function simularTela(mobile: boolean) {
+    window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+      matches: mobile,
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  beforeEach(() => {
+    parametrosDaUrl = "";
+    (listarFavoritos as jest.Mock).mockReset().mockResolvedValue([]);
+    (buscarLinha as jest.Mock).mockReset().mockResolvedValue({
+      ...LINHA,
+      paradas: [],
+      trajeto: [],
+    });
+  });
+
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  async function abrirPlanejadorEBuscarLinha() {
+    render(<MapaPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Para onde você vai?"));
+    });
+    fireEvent.change(screen.getByPlaceholderText(PLACEHOLDER), {
+      target: { value: "0.110" },
+    });
+    await act(async () => {
+      fireEvent.submit(screen.getByPlaceholderText(PLACEHOLDER).closest("form")!);
+    });
+  }
+
+  it("no celular, abrir uma linha esconde o planejador sem desmontá-lo", async () => {
+    simularTela(true);
+    await abrirPlanejadorEBuscarLinha();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mapa-interativo")).toHaveAttribute(
+        "data-linha",
+        "0.110"
+      );
+    });
+    const planejador = document.querySelector(".plan-painel")!;
+    expect(planejador).toBeInTheDocument();
+    expect(planejador).toHaveAttribute("hidden");
+  });
+
+  it("no celular, abrir uma parada esconde o planejador e fechar o devolve", async () => {
+    simularTela(true);
+    render(<MapaPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Para onde você vai?"));
+    });
+    const planejador = document.querySelector(".plan-painel")!;
+    expect(planejador).not.toHaveAttribute("hidden");
+
+    fireEvent.click(screen.getByText("simular-parada-aberta"));
+    expect(planejador).toHaveAttribute("hidden");
+
+    fireEvent.click(screen.getByText("simular-parada-fechada"));
+    expect(planejador).not.toHaveAttribute("hidden");
+  });
+
+  it("no desktop as colunas coexistem: o planejador segue visível", async () => {
+    simularTela(false);
+    render(<MapaPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Para onde você vai?"));
+    });
+
+    fireEvent.click(screen.getByText("simular-parada-aberta"));
+
+    expect(document.querySelector(".plan-painel")).not.toHaveAttribute("hidden");
   });
 });

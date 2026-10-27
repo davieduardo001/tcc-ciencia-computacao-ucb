@@ -9,6 +9,7 @@ import BuscaParada from "./BuscaParada";
 import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import { useChegadasDaRota } from "./useChegadasDaRota";
+import { useEhMobile } from "./useEhMobile";
 import {
   buscarLinha,
   BuscarLinhaError,
@@ -79,6 +80,9 @@ function MapaConteudo() {
 
   // US #20 — planejamento de viagem origem → destino.
   const [planejadorAberto, setPlanejadorAberto] = useState(false);
+  // Issue #217 — o painel da parada vive no MapaInterativo; ele avisa aqui.
+  const [paradaAberta, setParadaAberta] = useState(false);
+  const ehMobile = useEhMobile();
   const [origem, setOrigem] = useState<PontoEscolhido | null>(null);
   const [destino, setDestino] = useState<PontoEscolhido | null>(null);
   const [opcoes, setOpcoes] = useState<OpcaoViagem[] | null>(null);
@@ -394,6 +398,19 @@ function MapaConteudo() {
 
   const buscaVisivel = buscaParadaAberta && !planejadorAberto;
 
+  // Issue #217 — no celular só uma folha aparece por vez. Parada e linha têm
+  // prioridade sobre o planejador, que continua montado (origem, destino e
+  // rotas vivem aqui) e reaparece quando elas fecham. No desktop as colunas
+  // coexistem, como sempre.
+  const folhaAtiva: "planejador" | "parada" | "linha" | null = paradaAberta
+    ? "parada"
+    : linha
+      ? "linha"
+      : planejadorAberto
+        ? "planejador"
+        : null;
+  const planejadorOculto = ehMobile && folhaAtiva !== "planejador";
+
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
@@ -425,6 +442,7 @@ function MapaConteudo() {
         linha={linha}
         erroBusca={erroBusca}
         onFecharLinha={handleFecharLinha}
+        onPainelParadaChange={setParadaAberta}
         viagem={viagem}
         chegadasDaRota={chegadasDaRota}
         origemViagem={origem}
@@ -468,6 +486,7 @@ function MapaConteudo() {
           onFavoritoSalvo={handleFavoritoSalvo}
           chegadasDaRota={chegadasDaRota}
           localizacao={localizacao}
+          oculta={planejadorOculto}
         />
       ) : (
         !buscaVisivel && (
