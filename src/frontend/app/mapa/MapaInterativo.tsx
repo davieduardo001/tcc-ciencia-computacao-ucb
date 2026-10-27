@@ -439,7 +439,7 @@ export default function MapaInterativo({
   // Card #179 (⑤b) — quando cada linha chega NESTA parada. Só liga quando o
   // painel tem o código de uma parada física (o hook cuida do polling e de
   // descartar resposta de parada anterior).
-  const { chegadas: chegadasDaParada } = useChegadasDaParada(
+  const { chegadas: chegadasDaParada, carregando: carregandoChegadas } = useChegadasDaParada(
     detalheParada?.detalhes?.codigo ?? null
   );
 
@@ -1036,11 +1036,21 @@ export default function MapaInterativo({
                     ônibus a caminho, o horário previsto de passagem. Cada
                     linha diz de onde veio o número (RN-10). Sem dado, diz
                     isso: não inventa (RN-09). */}
-                {!emViagem && chegadasDaParada && chegadasDaParada.chegadas.length > 0 && (
+                {!emViagem && (
                   <>
                     <div className="mapa-painel-titulo" style={{ marginTop: 16 }}>
                       Chegando nesta parada
                     </div>
+                    {/* Issue #214: a seção não some quando a consulta falha ou
+                        ainda não voltou — antes o título desaparecia sem
+                        explicação. Sem dado, diz isso (RN-09). */}
+                    {!chegadasDaParada || chegadasDaParada.chegadas.length === 0 ? (
+                      <p className="mapa-painel-dica" aria-live="polite">
+                        {carregandoChegadas
+                          ? "Buscando as chegadas…"
+                          : "Sem previsão no momento."}
+                      </p>
+                    ) : (
                     <ul className="mapa-chegadas" aria-live="polite">
                       {chegadasDaParada.chegadas.map((c) => (
                         <li key={`${c.numero}-${c.rotaSentido}`} className="mapa-chegada">
@@ -1068,6 +1078,7 @@ export default function MapaInterativo({
                         </li>
                       ))}
                     </ul>
+                    )}
                   </>
                 )}
 
