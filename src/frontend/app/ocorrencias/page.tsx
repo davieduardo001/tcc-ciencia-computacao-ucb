@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Plus, TriangleAlert, X } from "lucide-react";
+import { LoaderCircle, MapPin, Plus, ThumbsUp, TriangleAlert, X } from "lucide-react";
 import AppShell from "../mapa/AppShell";
 import {
+  confirmarOcorrencia,
+  ConfirmarOcorrenciaError,
   listarOcorrencias,
   ListarOcorrenciasError,
   OcorrenciaListada,
@@ -47,13 +49,9 @@ export default function OcorrenciasPage() {
 
 function OcorrenciasConteudo() {
   const router = useRouter();
-  // `useRouter` do Next é estável, mas guardar em ref mantém o efeito de
-  // carga dependendo só do filtro — sem refetch se a identidade mudar.
   const routerRef = useRef(router);
   routerRef.current = router;
 
-  // US #24 — vindo do detalhe da linha ("Ver ocorrências desta linha"),
-  // a lista já chega filtrada; quem abre direto vê todas as ativas.
   const searchParams = useSearchParams();
   const [linhaFiltro, setLinhaFiltro] = useState(searchParams.get("linha") ?? "");
 
@@ -62,9 +60,15 @@ function OcorrenciasConteudo() {
   const [erro, setErro] = useState<string | null>(null);
   const primeiraCarga = useRef(true);
 
+  // US #26 — ID da ocorrência em processo de confirmação (evita duplo clique)
+  // e mensagens por ocorrência.
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [mensagensConfirmacao, setMensagensConfirmacao] = useState<
+    Record<string, { texto: string; tipo: "sucesso" | "erro" }>
+  >({});
+
   useEffect(() => {
     let cancelado = false;
-    // A 1ª carga é imediata; só a digitação no filtro espera o debounce.
     const atraso = primeiraCarga.current ? 0 : DEBOUNCE_FILTRO_MS;
     primeiraCarga.current = false;
 
@@ -95,6 +99,56 @@ function OcorrenciasConteudo() {
       clearTimeout(timer);
     };
   }, [linhaFiltro]);
+
+  // US #26 — confirmar ocorrência de outro passageiro.
+  const handleConfirmar = useCallback(async (ocorrenciaId: string) => {
+    if (confirmando) return; // evita duplo clique
+
+    setConfirmando(ocorrenciaId);
+    setMensagensConfirmacao((prev) => {
+      const copia = { ...prev };
+      delete copia[ocorrenciaId];
+      return copia;
+    });
+
+    try {
+      const resultado = await confirmarOcorrencia(ocorrenciaId);
+      // Atualiza o estado local da ocorrência com os dados retornados.
+      setOcorrencias((prev) =>
+        prev.map((oc) =>
+          oc.id === ocorrenciaId
+            ? {
+                ...oc,
+                status: resultado.status,
+                contadorConfirmacoes: resultado.contador_confirmacoes,
+              }
+            : oc
+        )
+      );
+      setMensagensConfirmacao((prev) => ({
+        ...prev,
+        [ocorrenciaId]: { texto: resultado.mensagem, tipo: "sucesso" },
+      }));
+    } catch (falha) {
+      const msg =
+        falha instanceof ConfirmarOcorrenciaError
+          ? falha.message
+          : "Não foi possível confirmar. Tente novamente.";
+      const status = falha instanceof ConfirmarOcorrenciaError ? falha.status : 0;
+
+      if (status === 401) {
+        routerRef.current.push("/login");
+        return;
+      }
+
+      setMensagensConfirmacao((prev) => ({
+        ...prev,
+        [ocorrenciaId]: { texto: msg, tipo: "erro" },
+      }));
+    } finally {
+      setConfirmando(null);
+    }
+  }, [confirmando]);
 
   const filtro = linhaFiltro.trim();
   const hrefReportar = filtro
@@ -158,6 +212,8 @@ function OcorrenciasConteudo() {
               {ocorrencias.map((ocorrencia) => {
                 const tipo = TIPOS.find((t) => t.id === ocorrencia.tipo);
                 const Icone = tipo?.Icone ?? TriangleAlert;
+                const msgConfirmacao = mensagensConfirmacao[ocorrencia.id];
+
                 return (
                   <li key={ocorrencia.id} className={`ocor-card ${ocorrencia.status}`}>
                     <div className="ocor-card-icone">
@@ -184,6 +240,51 @@ function OcorrenciasConteudo() {
                       <span className={`ocor-badge ${ocorrencia.status}`}>
                         {rotuloConfirmacoes(ocorrencia)}
                       </span>
+
+                      {/* US #26 — botão de confirmação.
+                          Cenário 2: escondido para o autor da ocorrência (campo
+                          `ehAutor` retornado pelo backend — nunca expõe userId).
+                          Não exibido quando a ocorrência já está confirmada. */}
+                      {!ocorrencia.ehAutor && ocorrencia.status === "pendente" && (
+                        <div className="ocor-confirmar-area">
+                          <button
+                            type="button"
+                            className="ocor-btn-confirmar"
+                            onClick={() => handleConfirmar(ocorrencia.id)}
+                            disabled={confirmando === ocorrencia.id}
+                            aria-label={`Confirmar ocorrência: ${tipo?.label ?? ocorrencia.tipo} na linha ${ocorrencia.linhaNumero}`}
+                          >
+                            {confirmando === ocorrencia.id ? (
+                              <>
+                                <LoaderCircle size={14} className="ocor-girando" />
+                                Confirmando...
+                              </>
+                            ) : (
+                              <>
+                                <ThumbsUp size={14} />
+                                Eu também vi isso
+                              </>
+                            )}
+                          </button>
+                          {msgConfirmacao && (
+                            <p
+                              className={`ocor-confirmacao-msg ${msgConfirmacao.tipo}`}
+                              role="status"
+                            >
+                              {msgConfirmacao.texto}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Feedback após confirmação bem-sucedida (status mudou) */}
+                      {!ocorrencia.ehAutor &&
+                        ocorrencia.status === "confirmada" &&
+                        msgConfirmacao?.tipo === "sucesso" && (
+                          <p className="ocor-confirmacao-msg sucesso" role="status">
+                            {msgConfirmacao.texto}
+                          </p>
+                        )}
                     </div>
                   </li>
                 );

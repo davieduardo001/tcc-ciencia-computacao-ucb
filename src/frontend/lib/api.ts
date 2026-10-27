@@ -1126,6 +1126,9 @@ export interface OcorrenciaListada {
   contadorConfirmacoes: number;
   criadoEm: string;
   expiraEm: string;
+  /** US #26: true quando o usuário autenticado é o autor desta ocorrência.
+   * Usado para esconder o botão de confirmação (Cenário 2). */
+  ehAutor: boolean;
 }
 
 export class ListarOcorrenciasError extends Error {
@@ -1171,7 +1174,80 @@ export async function listarOcorrencias(linha?: string): Promise<OcorrenciaLista
     contadorConfirmacoes: item.contador_confirmacoes,
     criadoEm: item.criado_em,
     expiraEm: item.expira_em,
+    ehAutor: item.eh_autor ?? false,
   })) as OcorrenciaListada[];
+}
+
+
+// ---------------------------------------------------------------------------
+// US #26 — Confirmar Ocorrência Reportada por Outro Passageiro
+// ---------------------------------------------------------------------------
+
+export interface ConfirmacaoOcorrenciaResponse {
+  ocorrencia_id: string;
+  status: StatusOcorrencia;
+  contador_confirmacoes: number;
+  mensagem: string;
+}
+
+export class ConfirmarOcorrenciaError extends Error {
+  /** HTTP status retornado pelo servidor. */
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * US #26 — Confirma uma ocorrência reportada por outro passageiro.
+ *
+ * Lança `ConfirmarOcorrenciaError` em qualquer falha, com o status HTTP
+ * para que o frontend possa exibir a mensagem correta:
+ *   401 — não autenticado
+ *   403 — autor tentando confirmar a própria ocorrência
+ *   404 — ocorrência não encontrada
+ *   409 — já confirmou esta ocorrência
+ *   422 — ocorrência expirada ou inativa
+ */
+export async function confirmarOcorrencia(
+  ocorrenciaId: string
+): Promise<ConfirmacaoOcorrenciaResponse> {
+  const response = await fetch(
+    `${API_URL}/api/colaboracao/ocorrencias/${encodeURIComponent(ocorrenciaId)}/confirmar`,
+    {
+      method: "POST",
+      credentials: "include",
+    }
+  );
+
+  if (response.status === 401) {
+    throw new ConfirmarOcorrenciaError("Faça login para confirmar ocorrências.", 401);
+  }
+  if (response.status === 403) {
+    throw new ConfirmarOcorrenciaError(
+      "Você não pode confirmar uma ocorrência que reportou.",
+      403
+    );
+  }
+  if (response.status === 404) {
+    throw new ConfirmarOcorrenciaError("Ocorrência não encontrada.", 404);
+  }
+  if (response.status === 409) {
+    throw new ConfirmarOcorrenciaError("Você já confirmou esta ocorrência.", 409);
+  }
+  if (response.status === 422) {
+    throw new ConfirmarOcorrenciaError("Este alerta não está mais ativo.", 422);
+  }
+  if (!response.ok) {
+    throw new ConfirmarOcorrenciaError(
+      "Não foi possível confirmar a ocorrência. Tente novamente.",
+      response.status
+    );
+  }
+
+  return response.json();
 }
 
 
