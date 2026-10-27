@@ -114,7 +114,23 @@ def processar_ciclo_notificacoes():
 # US #29 — Preferências de Notificação
 # ---------------------------------------------------------------------------
 
-def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNotificacao:
+def _usuario_dono_das_preferencias(
+    usuario_id: uuid.UUID,
+    usuario_autenticado: uuid.UUID = Depends(get_usuario_atual_id),
+) -> uuid.UUID:
+    """
+    O `usuario_id` da URL precisa ser o do usuário autenticado (X-User-Id,
+    injetado pelo Gateway). Impede ler ou alterar preferências alheias.
+    """
+    if usuario_id != usuario_autenticado:
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado: as preferências pertencem a outro usuário.",
+        )
+    return usuario_id
+
+
+def _obter_ou_criar_preferencias(usuario_id, db: Session) -> PreferenciaNotificacao:
     preferencia = (
         db.query(PreferenciaNotificacao)
         .filter(PreferenciaNotificacao.usuario_id == usuario_id)
@@ -123,7 +139,7 @@ def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNot
     if not preferencia:
         preferencia = PreferenciaNotificacao(
             id=uuid.uuid4(),
-            usuario_id=uuid.UUID(usuario_id) if isinstance(usuario_id, str) else usuario_id,
+            usuario_id=usuario_id,
             antecedencia_minutos=30,
             notificacoes_ativas=True,
             alerta_chegada=True,
@@ -132,13 +148,22 @@ def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNot
             atualizado_em=datetime.utcnow(),
         )
         db.add(preferencia)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # preferencias_notificacao.usuario_id tem FK para usuarios.id:
+            # usuário inexistente violava a FK no commit e virava 500.
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         db.refresh(preferencia)
     return preferencia
 
 
 @router.get("/preferencias/{usuario_id}", response_model=PreferenciaNotificacaoResponse)
-def carregar_preferencias(usuario_id: str, db: Session = Depends(get_db)):
+def carregar_preferencias(
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     preferencia = _obter_ou_criar_preferencias(usuario_id, db)
     return PreferenciaNotificacaoResponse(
         id=str(preferencia.id),
@@ -151,7 +176,11 @@ def carregar_preferencias(usuario_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/preferencias/{usuario_id}/antecedencia", response_model=PreferenciaNotificacaoResponse)
-def salvar_antecedencia(usuario_id: str, dados: AntecedenciaInput, db: Session = Depends(get_db)):
+def salvar_antecedencia(
+    dados: AntecedenciaInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     if dados.antecedencia_minutos not in PreferenciaNotificacao.ANTECEDENCIAS_PERMITIDAS:
         raise HTTPException(
             status_code=400,
@@ -175,7 +204,12 @@ def salvar_antecedencia(usuario_id: str, dados: AntecedenciaInput, db: Session =
 
 
 @router.put("/preferencias/{usuario_id}/tipo/{tipo}", response_model=PreferenciaNotificacaoResponse)
-def atualizar_tipo_notificacao(usuario_id: str, tipo: str, dados: TipoNotificacaoInput, db: Session = Depends(get_db)):
+def atualizar_tipo_notificacao(
+    tipo: str,
+    dados: TipoNotificacaoInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     if tipo not in ("chegada", "cancelamento"):
         raise HTTPException(
             status_code=400,
@@ -204,7 +238,11 @@ def atualizar_tipo_notificacao(usuario_id: str, tipo: str, dados: TipoNotificaca
 
 
 @router.put("/preferencias/{usuario_id}/desativar-todas", response_model=PreferenciaNotificacaoResponse)
-def desativar_todas_notificacoes(usuario_id: str, dados: ToggleNotificacoesInput, db: Session = Depends(get_db)):
+def desativar_todas_notificacoes(
+    dados: ToggleNotificacoesInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     preferencia = _obter_ou_criar_preferencias(usuario_id, db)
     preferencia.notificacoes_ativas = dados.ativas
     preferencia.atualizado_em = datetime.utcnow()

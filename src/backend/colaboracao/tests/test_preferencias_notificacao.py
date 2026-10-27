@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from colaboracao.main import app
 from colaboracao.models.preferencia_notificacao import PreferenciaNotificacao
@@ -40,7 +41,7 @@ def test_carregar_preferenciasexistentes():
 
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = client.get("/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000")
+        response = client.get("/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000", headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"})
         assert response.status_code == 200
         data = response.json()
         assert data["antecedencia_minutos"] == 30
@@ -57,7 +58,7 @@ def test_carregar_preferencias_novo_usuario():
 
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = client.get("/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440001")
+        response = client.get("/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440001", headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440001"})
         assert response.status_code == 200
         data = response.json()
         assert data["antecedencia_minutos"] == 30
@@ -81,6 +82,7 @@ def test_salvar_antecedencia_sucesso():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/antecedencia",
             json={"antecedencia_minutos": 10},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -100,6 +102,7 @@ def test_salvar_antecedencia_invalida():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/antecedencia",
             json={"antecedencia_minutos": 7},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 400
         assert "inválida" in response.json()["detail"].lower() or "inválida" in response.json()["detail"]
@@ -121,6 +124,7 @@ def test_desativar_tipo_cancelamento():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/tipo/cancelamento",
             json={"ativo": False},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -141,6 +145,7 @@ def test_desativar_tipo_chegada():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/tipo/chegada",
             json={"ativo": False},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -159,6 +164,7 @@ def test_tipo_notificacao_invalido():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/tipo/invalido",
             json={"ativo": False},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 400
         assert "inválido" in response.json()["detail"].lower() or "inválido" in response.json()["detail"]
@@ -180,6 +186,7 @@ def test_desativar_todas_notificacoes():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/desativar-todas",
             json={"ativas": False},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -200,9 +207,86 @@ def test_reativar_notificacoes():
         response = client.put(
             "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/desativar-todas",
             json={"ativas": True},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
         )
         assert response.status_code == 200
         data = response.json()
         assert data["notificacoes_ativas"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Identidade e usuário inexistente (#213)
+# ---------------------------------------------------------------------------
+
+def test_carregar_preferencias_sem_identidade_retorna_401():
+    mock_db = MagicMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = client.get("/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000")
+        assert response.status_code == 401
+        mock_db.add.assert_not_called()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_carregar_preferencias_de_outro_usuario_retorna_403():
+    mock_db = MagicMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = client.get(
+            "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000",
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440001"},
+        )
+        assert response.status_code == 403
+        mock_db.add.assert_not_called()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_alterar_preferencias_de_outro_usuario_retorna_403():
+    mock_db = MagicMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = client.put(
+            "/colaboracao/preferencias/550e8400-e29b-41d4-a716-446655440000/antecedencia",
+            json={"antecedencia_minutos": 10},
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440001"},
+        )
+        assert response.status_code == 403
+        mock_db.commit.assert_not_called()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_carregar_preferencias_com_id_malformado_retorna_422():
+    mock_db = MagicMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = client.get(
+            "/colaboracao/preferencias/nao-e-uuid",
+            headers={"X-User-Id": "550e8400-e29b-41d4-a716-446655440000"},
+        )
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_carregar_preferencias_usuario_inexistente_retorna_404():
+    usuario_id = "00000000-0000-0000-0000-000000000000"
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    # FK preferencias_notificacao.usuario_id -> usuarios.id violada no commit
+    mock_db.commit.side_effect = IntegrityError("INSERT", {}, Exception("fk"))
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = client.get(
+            f"/colaboracao/preferencias/{usuario_id}",
+            headers={"X-User-Id": usuario_id},
+        )
+        assert response.status_code == 404
+        mock_db.rollback.assert_called_once()
     finally:
         app.dependency_overrides.clear()
