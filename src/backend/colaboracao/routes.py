@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
@@ -16,7 +17,7 @@ from colaboracao.monitoring_worker import MonitoramentoWorker
 from colaboracao.providers.eta_mock import ETAMockProvider
 from colaboracao.providers.favoritos_mock import FavoritosMockProvider
 from colaboracao.push_service import PushService
-from colaboracao.models import PreferenciaNotificacao, Ocorrencia, RotaFavorita
+from colaboracao.models import PreferenciaNotificacao, Ocorrencia, RotaFavorita, ConfirmacaoOcorrencia
 from colaboracao.schemas import (
     PreferenciaNotificacaoResponse,
     AntecedenciaInput,
@@ -28,6 +29,7 @@ from colaboracao.schemas import (
     OcorrenciaListaResponse,
     RotaFavoritaInput,
     RotaFavoritaResponse,
+    ConfirmacaoOcorrenciaResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -346,6 +348,7 @@ def listar_ocorrencias(
             contador_confirmacoes=o.contador_confirmacoes,
             criado_em=o.criado_em,
             expira_em=o.expira_em,
+            eh_autor=(o.usuario_id == _usuario_id),
         )
         for o in ocorrencias
     ]
@@ -504,3 +507,103 @@ def remover_favorito(
 
     db.delete(favorito)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# US #26 — Confirmar Ocorrência Reportada por Outro Passageiro
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/ocorrencias/{ocorrencia_id}/confirmar",
+    response_model=ConfirmacaoOcorrenciaResponse,
+    status_code=200,
+)
+def confirmar_ocorrencia(
+    ocorrencia_id: uuid.UUID,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Confirma uma ocorrência reportada por outro passageiro (US #26).
+
+    Regras:
+    - Requer autenticação (X-User-Id validado pelo Gateway).
+    - O autor original não pode confirmar a própria ocorrência (403).
+    - Cada usuário confirma uma ocorrência no máximo uma vez (409).
+      A UNIQUE constraint do banco garante isso mesmo sob concorrência.
+    - Ocorrências inexistentes retornam 404.
+    - Ocorrências expiradas ou inativas retornam 422.
+    - Ao atingir Ocorrencia.LIMITE_CONFIRMACOES (3), o status muda para
+      "confirmada". A transição é atômica (mesma transação do INSERT).
+
+    O caminho externo é:
+      POST /api/colaboracao/ocorrencias/{ocorrencia_id}/confirmar
+    (o Gateway proxy /colaboracao/* já encaminha com X-User-Id injetado)
+    """
+    agora = datetime.utcnow()
+
+    # 1. Verifica existência.
+    ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == ocorrencia_id).first()
+    if ocorrencia is None:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada.")
+
+    # 2. Verifica se ainda está ativa.
+    if ocorrencia.status == "expirada" or ocorrencia.expira_em <= agora:
+        raise HTTPException(
+            status_code=422,
+            detail="ocorrencia_inativa",
+        )
+
+    # 3. Impede que o autor confirme a própria ocorrência.
+    if ocorrencia.usuario_id == usuario_id:
+        raise HTTPException(
+            status_code=403,
+            detail="autor_nao_pode_confirmar",
+        )
+
+    # 4. Tenta inserir a confirmação. A UNIQUE constraint (ocorrencia_id,
+    #    usuario_id) garante que confirmações duplicadas — mesmo concorrentes
+    #    — sejam rejeitadas pelo banco antes de qualquer incremento.
+    confirmacao = ConfirmacaoOcorrencia(
+        id=uuid.uuid4(),
+        ocorrencia_id=ocorrencia_id,
+        usuario_id=usuario_id,
+        criado_em=agora,
+    )
+    db.add(confirmacao)
+
+    try:
+        db.flush()  # dispara a constraint sem commitar — detecta duplicata cedo
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="confirmacao_duplicada",
+        )
+
+    # 5. Incrementa o contador e, se necessário, muda o status.
+    # Os valores são capturados em variáveis Python antes do commit
+    # para evitar acesso a atributo ORM após a sessão fechar
+    # (StaticPool do SQLite desvincula instâncias após commit).
+    novo_contador = ocorrencia.contador_confirmacoes + 1
+    novo_status = ocorrencia.status
+    if novo_contador >= Ocorrencia.LIMITE_CONFIRMACOES:
+        novo_status = "confirmada"
+    ocorrencia_id_str = str(ocorrencia_id)  # UUID já está disponível como param
+
+    ocorrencia.contador_confirmacoes = novo_contador
+    ocorrencia.status = novo_status
+
+    db.commit()
+
+    return ConfirmacaoOcorrenciaResponse(
+        ocorrencia_id=ocorrencia_id_str,
+        status=novo_status,
+        contador_confirmacoes=novo_contador,
+        mensagem=(
+            "Ocorrência confirmada pela comunidade."
+            if novo_status == "confirmada"
+            else "Confirmação registrada."
+        ),
+    )

@@ -45,6 +45,10 @@ class Ocorrencia(Base):
 
     LIMITE_REPORTES_POR_HORA = 3
 
+    # Quantas confirmações de outros usuários são necessárias para
+    # mudar o status de "pendente" para "confirmada" (US #26).
+    LIMITE_CONFIRMACOES = 3
+
     id = Column(Uuid, primary_key=True, default=uuid.uuid4, nullable=False)
     usuario_id = Column(Uuid, nullable=False, index=True)
     linha_numero = Column(String(20), nullable=False, index=True)

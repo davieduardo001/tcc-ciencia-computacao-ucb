@@ -1351,3 +1351,120 @@ describe("api.ts — buscarDetalhesParada (US #18 / issue #174)", () => {
     await expect(buscarDetalhesParada(0, 0)).resolves.toBeNull();
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// US #26 — Confirmar Ocorrência
+// ---------------------------------------------------------------------------
+
+import {
+  confirmarOcorrencia,
+  ConfirmarOcorrenciaError,
+} from "../api";
+
+const OCORRENCIA_ID = "550e8400-e29b-41d4-a716-446655440001";
+
+const CONFIRMACAO_RESPONSE = {
+  ocorrencia_id: OCORRENCIA_ID,
+  status: "pendente",
+  contador_confirmacoes: 1,
+  mensagem: "Confirmação registrada.",
+};
+
+describe("api.ts — confirmarOcorrencia (US #26)", () => {
+  afterEach(() => jest.resetAllMocks());
+
+  it("chama POST /api/colaboracao/ocorrencias/{id}/confirmar com credentials include", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => CONFIRMACAO_RESPONSE,
+    }) as jest.Mock;
+
+    const resultado = await confirmarOcorrencia(OCORRENCIA_ID);
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain(`/api/colaboracao/ocorrencias/${OCORRENCIA_ID}/confirmar`);
+    expect(options.method).toBe("POST");
+    expect(options.credentials).toBe("include");
+    expect(resultado.ocorrencia_id).toBe(OCORRENCIA_ID);
+    expect(resultado.contador_confirmacoes).toBe(1);
+  });
+
+  it("retorna dados corretos quando status muda para confirmada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ...CONFIRMACAO_RESPONSE,
+        status: "confirmada",
+        contador_confirmacoes: 3,
+        mensagem: "Ocorrência confirmada pela comunidade.",
+      }),
+    }) as jest.Mock;
+
+    const resultado = await confirmarOcorrencia(OCORRENCIA_ID);
+
+    expect(resultado.status).toBe("confirmada");
+    expect(resultado.contador_confirmacoes).toBe(3);
+    expect(resultado.mensagem).toContain("comunidade");
+  });
+
+  it("lança ConfirmarOcorrenciaError 401 quando não autenticado", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 401,
+      json: async () => ({ detail: "Não autenticado" }),
+    }) as jest.Mock;
+
+    await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
+      status: 401,
+      message: expect.stringContaining("login"),
+    });
+  });
+
+  it("lança ConfirmarOcorrenciaError 403 para autor tentando confirmar a própria", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 403,
+      json: async () => ({ detail: "autor_nao_pode_confirmar" }),
+    }) as jest.Mock;
+
+    await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("lança ConfirmarOcorrenciaError 404 para ocorrência inexistente", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 404,
+      json: async () => ({ detail: "Ocorrência não encontrada." }),
+    }) as jest.Mock;
+
+    await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it("lança ConfirmarOcorrenciaError 409 para confirmação duplicada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 409,
+      json: async () => ({ detail: "confirmacao_duplicada" }),
+    }) as jest.Mock;
+
+    await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("já confirmou"),
+    });
+  });
+
+  it("lança ConfirmarOcorrenciaError 422 para ocorrência inativa/expirada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 422,
+      json: async () => ({ detail: "ocorrencia_inativa" }),
+    }) as jest.Mock;
+
+    await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringContaining("ativo"),
+    });
+  });
+});
