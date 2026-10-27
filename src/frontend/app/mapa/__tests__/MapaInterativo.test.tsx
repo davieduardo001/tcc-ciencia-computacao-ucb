@@ -1546,6 +1546,7 @@ describe("MapaInterativo — viagem em andamento (US #171)", () => {
           numeroLinha: "0.110",
           lat: POSICAO.latitude,
           lng: POSICAO.longitude,
+          veiculoPrefixo: VEICULO.prefixo,
         })
       );
       const faixa = await screen.findByRole("region", { name: "Viagem em andamento" });

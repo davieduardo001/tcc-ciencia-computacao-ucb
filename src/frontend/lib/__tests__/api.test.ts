@@ -1045,6 +1045,15 @@ describe("api.ts — pegar o ônibus (US #171)", () => {
       });
     });
 
+    it("com prefixo (popup do ônibus), manda veiculo_prefixo (issue #216)", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
+
+      await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2, veiculoPrefixo: "440001" });
+
+      const [, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(JSON.parse(opcoes.body).veiculo_prefixo).toBe("440001");
+    });
+
     it("sem destino, não manda o campo", async () => {
       global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
 

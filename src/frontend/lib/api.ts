@@ -1598,6 +1598,8 @@ export interface EmbarquePayload {
   lat: number;
   lng: number;
   paradaDestinoCodigo?: string;
+  /** Popup de um ônibus: só esse veículo confirma o embarque (issue #216). */
+  veiculoPrefixo?: string;
 }
 
 /**
@@ -1616,6 +1618,7 @@ export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
         lat: dados.lat,
         lng: dados.lng,
         parada_destino_codigo: dados.paradaDestinoCodigo,
+        ...(dados.veiculoPrefixo ? { veiculo_prefixo: dados.veiculoPrefixo } : {}),
       }),
     });
   } catch {
