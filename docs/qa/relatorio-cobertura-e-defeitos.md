@@ -3,7 +3,7 @@
 
 > 📎 Ver este arquivo no GitHub: <https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/blob/main/docs/qa/relatorio-cobertura-e-defeitos.md>
 
-Cobertura medida, defeitos encontrados e corrigidos nas Sprints 2 e 3 (e como cada um foi detectado), histórico do CI e dívida de testes. Medições em 16/10/2026, `homolog` @ `07c9edc`. Contexto: [`README.md`](README.md).
+Cobertura medida, defeitos encontrados e corrigidos nas Sprints 2 e 3 (e como cada um foi detectado), histórico do CI e dívida de testes. Medições em 16/10/2026, `homolog` @ `07c9edc`; defeitos 14 a 18 acrescentados em 27/10/2026 pela [execução dos casos P1](execucao-casos-p1.md). Contexto: [`README.md`](README.md).
 
 ## 1. Cobertura
 
@@ -64,18 +64,25 @@ Selecionados nas issues e PRs das Sprints 1 a 3, com a forma de detecção **reg
 | 11 | Gateway repassava o `X-User-Id` do cliente | #188 → PR #189 | Dois cabeçalhos `X-User-Id` chegavam ao serviço (o `dict` distingue maiúsculas) e o serviço lia o primeiro | **Não registrado** na issue | 14/10 |
 | 12 | Import de ícone perdido num merge quebrava o chip de viagem | PR #187 (commit `a3d03e5`) | Merge sem conflito do Git removeu o import usado por outro PR | **CI** (Jest), antes de chegar ao usuário | 16/10 |
 | 13 | Embarque recusado a mais de 100 m do ônibus | PR #191 (issue #190) | Raio fixo | **Teste real** da equipe (de longe do ônibus) | 16/10 |
+| 14 | Cadastro aceita `termos_aceitos: false` e cria a conta | [execucao-casos-p1.md](execucao-casos-p1.md) (CT-AUT-01); issue #211 | Campo lido mas não validado no backend; a regra pode existir só na tela | **Execução de casos P1** (API, produção) | 27/10 |
+| 15 | `/auth/refresh` responde 404: o Auth Service não tem a rota que o Gateway chama; a sessão expira em 1 h sem renovação | CT-AUT-03; issue #212 | Rota prevista (#31) e proxied no Gateway (`routes.py:142`), nunca implementada no serviço; testes do Gateway usam `httpx` mockado | **Execução de casos P1** (API, produção) | 27/10 |
+| 16 | `GET /colaboracao/preferencias/{usuario_id}` com usuário inexistente responde 500 | observação do relatório de execução; issue #213 | Não investigada | **Execução de casos P1** (API, produção) | 27/10 |
+| 17 | Painel da parada não mostra "Chegando nesta parada" quando não há chegadas | CT-PAR-01 e CT-PAR-04; issue #214 | **Comportamento da #179, não defeito de código**: a seção fica escondida durante uma viagem em andamento, quando a consulta falha ou dá 404 e quando a lista vem vazia. O caso CT-PAR-01 esperava a seção sempre; o texto do caso deve ser ajustado | **Execução de casos P1** (navegador, produção) | 27/10 |
+| 18 | "Próximas saídas do terminal" lista horários já passados (06:00 às 07:58) | observação do relatório de execução; issue #215 | Não investigada | **Execução de casos P1** (navegador, produção) | 27/10 |
+| 19 | Com a sessão expirada o app mostra "Nenhum ônibus em operação" e "Não foi possível carregar os detalhes da parada" em vez de pedir novo login | [execucao-casos-p1.md](execucao-casos-p1.md), seção "Sessão expirada na prática"; issue #221 | O frontend não trata 401 das chamadas de linhas/posições/paradas como sessão expirada; agrava o #212 (sem refresh, a sessão cai em 1 h) | **Execução de casos P1** (navegador, produção, rede da aba) | 27/10 |
+| 20 | `GET /colaboracao/preferencias/{id}` responde 500 para qualquer usuário: `NoReferencedTableError` (FK `usuarios.id` sem o modelo `Usuario` carregado no processo da Colaboração) | #213; PR #224; [execucao-casos-p1.md](execucao-casos-p1.md), seção "Tela de Alertas" | O container da Colaboração carrega só `models`, `shared` e `colaboracao`; o `conftest` dos testes carrega todos os modelos, então o teste não reproduz. Corrige o diagnóstico anterior da #213 (violação de FK no commit) | **Uso real** (tela `/alertas` em produção) e **log do Fly.io** | 27/10 |
 
-### Resumo da detecção (13 defeitos)
+### Resumo da detecção (20 defeitos)
 
 | Detectado por | Quantidade | Defeitos |
 |---|---|---|
 | Produção, antes do usuário final reportar | 4 | 1, 2, 3, 4 |
 | CI, antes do merge | 2 | 5, 12 |
-| Teste manual ou uso com dados reais | 3 | 7, 8, 13 |
+| Teste manual, execução de casos ou uso com dados reais | 10 | 7, 8, 13, 14, 15, 16, 17, 18, 19, 20 |
 | Auditoria ou medição | 3 | 6, 9, 10 |
 | Não registrado | 1 | 11 |
 
-> **Leitura.** Dos 13 defeitos, **8 são de conexão entre as peças** (1, 2, 3, 4, 5, 6, 11, 12: dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge), e 5 são de regra, dado ou interface (7, 8, 9, 10, 13). Isso reforça a prioridade dos testes de integração do [relatório de integração](relatorio-testes-integracao.md). Os defeitos 1 a 4 foram relatados como ocorridos em produção. Os demais foram achados por outros meios, mas como `homolog` publica direto no ambiente visível (ver o [plano de testes](plano-de-testes.md)), os defeitos 6, 7, 10 e 11 também estiveram no código publicado até a correção; os registros consultados não dizem se algum usuário foi afetado.
+> **Leitura.** Dos 20 defeitos, **10 são de conexão entre as peças** (1, 2, 3, 4, 5, 6, 11, 12, 15, 20: dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge), e 10 são de regra, dado ou interface (7, 8, 9, 10, 13, 14, 16, 17, 18, 19). Isso reforça a prioridade dos testes de integração do [relatório de integração](relatorio-testes-integracao.md). Os defeitos 1 a 4 foram relatados como ocorridos em produção. Os demais foram achados por outros meios, mas como `homolog` publica direto no ambiente visível (ver o [plano de testes](plano-de-testes.md)), os defeitos 6, 7, 10 e 11 também estiveram no código publicado até a correção; os registros consultados não dizem se algum usuário foi afetado.
 
 ## 3. Histórico do CI
 

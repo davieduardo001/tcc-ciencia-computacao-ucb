@@ -16,6 +16,7 @@ Esta pasta reúne o esquema de testes no estilo QA do Movecity: o plano, os caso
 | [`casos-de-teste.md`](casos-de-teste.md) | Os casos manuais, com pré-condição, passos, resultado esperado, severidade e estado |
 | [`relatorio-testes-unitarios.md`](relatorio-testes-unitarios.md) | Execução real das suítes e os testes de cada PR mergeado desde a Sprint 2 |
 | [`relatorio-testes-integracao.md`](relatorio-testes-integracao.md) | O que existe de teste de integração, as lacunas e um plano priorizado |
+| [`execucao-casos-p1.md`](execucao-casos-p1.md) | Execução dos casos de teste manuais em produção (27/10/2026): passos, resultado, evidência em [`evidencias/`](evidencias/) e defeitos encontrados |
 | [`relatorio-cobertura-e-defeitos.md`](relatorio-cobertura-e-defeitos.md) | Cobertura medida, defeitos encontrados e como foram detectados, histórico de CI e dívida de testes |
 | [`resumo-executivo.md`](resumo-executivo.md) | Uma página, para a review e para a defesa |
 
