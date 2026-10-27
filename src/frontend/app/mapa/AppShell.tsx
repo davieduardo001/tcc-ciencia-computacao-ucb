@@ -52,7 +52,7 @@ const NAV_ITEMS = [
     // desktop/web.
     disponivel: true,
   },
-  { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: false },
+  { id: "alertas", href: "/alertas", label: "Alertas", Icone: Bell, disponivel: true },
 ] as const;
 
 // Navegação inferior (mobile): um destino de cada lado do botão de ação no
@@ -69,12 +69,12 @@ const NAV_INFERIOR = [
 ] as const;
 
 // O arco que abre no botão central: as seções que não cabem na barra
-// inferior. "Ocorrências" (US #23/#24) e "Rotas salvas" (US #25) já têm
-// tela — "Alertas" ainda abre o aviso de "em breve".
+// inferior. "Ocorrências" (US #23/#24), "Rotas salvas" (US #25) e
+// "Alertas" (US #29) já têm tela.
 const ACOES_RAPIDAS = [
   { id: "salvas", label: "Rotas salvas", Icone: Star, dx: -74, dy: -54, href: "/favoritos" },
   { id: "ocorrencias", label: "Ocorrências", Icone: TriangleAlert, dx: 0, dy: -84, href: "/ocorrencias" },
-  { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54, href: undefined },
+  { id: "alertas", label: "Alertas", Icone: Bell, dx: 74, dy: -54, href: "/alertas" },
 ] as const;
 
 interface AppShellProps {
@@ -355,9 +355,9 @@ function AppShellConteudo({
               <strong>{viagem.numeroLinha}</strong>
             </Link>
           )}
-          <button type="button" className="ms-icon-btn" title="Alertas">
+          <Link href="/alertas" className="ms-icon-btn" title="Alertas">
             <Bell size={17} />
-          </button>
+          </Link>
           <Link href="/configuracoes" className="ms-icon-btn" title="Configurações">
             <Settings size={17} />
           </Link>
