@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional
 
 import bcrypt
@@ -20,7 +21,7 @@ def criar_access_token(data: dict) -> str:
     expire_minutes = settings.JWT_EXPIRATION_MINUTES
     from datetime import datetime, timedelta
     expire = datetime.utcnow() + timedelta(minutes=expire_minutes)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
@@ -29,7 +30,7 @@ def criar_refresh_token(data: dict) -> str:
     expire_days = 7
     from datetime import datetime, timedelta
     expire = datetime.utcnow() + timedelta(days=expire_days)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
@@ -48,3 +49,13 @@ def decodificar_access_token(token: str) -> Optional[dict]:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
     except JWTError:
         return None
+
+
+def decodificar_refresh_token(token: str) -> Optional[dict]:
+    """
+    Decodifica e valida assinatura e expiração de um refresh token.
+
+    Retorna None para token ausente, expirado ou inválido. A conferência
+    contra a tabela `sessoes` é feita pela rota.
+    """
+    return decodificar_access_token(token)

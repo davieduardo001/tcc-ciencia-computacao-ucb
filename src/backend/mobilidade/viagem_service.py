@@ -250,6 +250,7 @@ def embarcar(
     veiculos: list[PosicaoVeiculo],
     agora: datetime,
     rota_service: RotaService | None = None,
+    veiculo_prefixo: str | None = None,
 ) -> Viagem:
     """
     Registra o embarque. `lat`/`lng` entram só na validação (RN-06).
@@ -262,12 +263,19 @@ def embarcar(
     do usuário (RN-16) ou, com `rota_service`, chegando à parada dele
     (`veiculo_chegando_na_parada_do_usuario`). Sem `rota_service` só vale o
     primeiro, que é o comportamento de antes.
+
+    Issue #216: com `veiculo_prefixo` (popup de um ônibus), só esse veículo
+    pode confirmar — outro ônibus da mesma linha perto do usuário não vale
+    como o ônibus que ele tocou, que pode estar a dezenas de km.
     """
     if viagem_ativa(db, usuario_id, agora) is not None:
         raise JaEmViagem()
 
     if parada_destino_codigo is not None:
         _validar_destino(db, numero_linha, parada_destino_codigo)
+
+    if veiculo_prefixo is not None:
+        veiculos = [v for v in veiculos if v.prefixo == veiculo_prefixo]
 
     agora_com_fuso = agora.replace(tzinfo=timezone.utc)
     veiculo = veiculo_mais_proximo(veiculos, lat, lng, agora=agora_com_fuso)
