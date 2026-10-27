@@ -17,7 +17,7 @@ from auth.schemas import (
 )
 from auth.security import (
     hash_senha, verificar_senha, criar_access_token, criar_refresh_token,
-    decodificar_access_token,
+    decodificar_access_token, decodificar_refresh_token,
 )
 from auth.email_service import enviar_email_reset_senha
 from auth.google_auth import validar_token_google
@@ -91,6 +91,51 @@ def logout(request: Request, db: Session = Depends(get_db)):
         db.commit()
 
     return RespostaGenerica(mensagem="Logout realizado com sucesso.")
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh(request: Request, db: Session = Depends(get_db)):
+    """
+    Renova o par de tokens a partir do cookie refresh_token.
+
+    Valida assinatura e expiração do JWT e confere que o refresh token
+    ainda existe em `sessoes` (logout apaga a sessão, invalidando-o).
+    Rotaciona: a sessão recebe novos tokens e o refresh antigo deixa de
+    valer. O Gateway grava os novos cookies a partir da resposta.
+    """
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Não autenticado.")
+
+    payload = decodificar_refresh_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    try:
+        usuario_id = uuid.UUID(payload["sub"])
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    sessao = (
+        db.query(Sessao)
+        .filter(Sessao.refresh_token == token, Sessao.usuario_id == usuario_id)
+        .first()
+    )
+    if not sessao:
+        raise HTTPException(status_code=401, detail="Sessão encerrada.")
+
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario or usuario.status != "ativo":
+        raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo.")
+
+    novo_access = criar_access_token({"sub": str(usuario.id)})
+    novo_refresh = criar_refresh_token({"sub": str(usuario.id)})
+    sessao.access_token = novo_access
+    sessao.refresh_token = novo_refresh
+    sessao.expires_at = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    db.commit()
+
+    return LoginResponse(access_token=novo_access, refresh_token=novo_refresh)
 
 
 @router.get("/me", response_model=MeResponse)
