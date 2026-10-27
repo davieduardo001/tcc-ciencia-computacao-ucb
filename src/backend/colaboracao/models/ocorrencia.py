@@ -18,7 +18,7 @@ class Ocorrencia(Base):
 
     __tablename__ = "ocorrencia"
 
-    # Tipos crowd-validados: nascem "pendente", precisam de 2 confirmações
+    # Tipos crowd-validados: nascem "pendente", precisam de 3 confirmações
     # independentes (US #26) pra virar "confirmada".
     TIPOS_CROWD_VALIDADOS = ["atraso", "nao_passou", "lotacao", "obra_via", "onibus_quebrou"]
 
