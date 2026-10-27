@@ -87,11 +87,21 @@ function arrastar(alca: HTMLElement, dy: number) {
   );
 }
 
-describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
-  it("começa aberta", () => {
+describe("PlanejadorViagem — folha de três alturas (issues #132 e #217)", () => {
+  beforeEach(() => {
+    mockViagem = null;
+    // Sem relógio real, o gesto sintético não gera velocidade.
+    jest.spyOn(performance, "now").mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("começa na altura média", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
 
-    expect(container.querySelector(".plan-painel")).not.toHaveClass("recolhida");
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-medio");
     expect(screen.getByRole("button", { name: /Recolher opções/ })).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -103,19 +113,19 @@ describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
     const painel = container.querySelector(".plan-painel")!;
 
     fireEvent.click(screen.getByRole("button", { name: /Recolher opções/ }));
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
 
     fireEvent.click(screen.getByRole("button", { name: /Abrir opções/ }));
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-medio");
   });
 
-  it("arrastar para baixo além do limiar recolhe a folha", () => {
+  it("arrastar para baixo além do limiar leva ao mínimo e fica lá", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
     const painel = container.querySelector(".plan-painel")!;
 
-    arrastar(container.querySelector(".plan-alca") as HTMLElement, 120);
+    arrastar(container.querySelector(".plan-alca") as HTMLElement, 700);
 
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
   });
 
   it("arrasto curto não muda o estado", () => {
@@ -124,20 +134,53 @@ describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
 
     arrastar(container.querySelector(".plan-alca") as HTMLElement, 20);
 
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-medio");
   });
 
-  it("arrastar para cima reabre a folha recolhida", () => {
+  it("arrastar para cima, a partir do mínimo, vai ao máximo e permanece", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
     const painel = container.querySelector(".plan-painel")!;
     const alca = container.querySelector(".plan-alca") as HTMLElement;
 
     fireEvent.click(screen.getByRole("button", { name: /Recolher opções/ }));
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
 
-    arrastar(alca, -120);
+    arrastar(alca, -900);
 
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-maximo");
+  });
+
+  it("ao embarcar a folha vai para o mínimo", () => {
+    const { container, rerender } = render(<PlanejadorViagem {...props} />);
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-medio");
+
+    mockViagem = { numeroLinha: "0.110" };
+    rerender(<PlanejadorViagem {...props} />);
+
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-minimo");
+  });
+
+  it("em viagem deixa Cheguei e Reportar ocorrência em foco", () => {
+    mockViagem = { numeroLinha: "0.110" };
+    render(<PlanejadorViagem {...props} />);
+
+    expect(screen.getByRole("button", { name: /Cheguei/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Reportar ocorrência/ })).toHaveAttribute(
+      "href",
+      "/ocorrencias/reportar?linha=0.110"
+    );
+  });
+
+  it("sem viagem não mostra o rodapé", () => {
+    render(<PlanejadorViagem {...props} />);
+
+    expect(screen.queryByRole("button", { name: /Cheguei/ })).not.toBeInTheDocument();
+  });
+
+  it("oculta fica montada mas escondida", () => {
+    const { container } = render(<PlanejadorViagem {...props} oculta />);
+
+    expect(container.querySelector(".plan-painel")).toHaveAttribute("hidden");
   });
 });
 
