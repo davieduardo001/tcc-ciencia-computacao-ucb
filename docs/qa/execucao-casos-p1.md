@@ -162,6 +162,14 @@ O login com Google, a recuperação de senha e o cadastro envolvem a conta Googl
 |---|---|---|
 | **CT-MAP-09 cenário 1** (tutorial no primeiro acesso) | Aprovado | Ao entrar com a conta recém-criada pelo cadastro, o app levou direto ao **tutorial** (primeiro acesso), como esperado. Os cenários de pular/rever já haviam sido vistos pelo botão "Ver tutorial" em Configurações. |
 
+## CT-VIA-05 — uma viagem por vez (27/10, produção, conta nova do usuário, desktop)
+
+| ID | Estado | Passos | Resultado e evidência |
+|---|---|---|---|
+| **CT-VIA-05** | Aprovado (no nível da tela) | Planejador: de "Terminal de Taguatinga Sul" a "Rodoviária do Plano Piloto" (10 opções, 6 diretas e 4 com baldeação) > "Peguei este ônibus" na opção `0.306` > olhar as demais opções > "Cheguei" | Com a viagem ativa (faixa "Em viagem · linha 0.306"), o botão **"Peguei este ônibus" some de todas as opções**, e o card da `0.306` mostra "Você está nesta linha." Não há como iniciar uma segunda viagem pela tela. Ao encerrar, a faixa some e os botões voltam. **Não testado:** tentar uma segunda viagem direto pela API (a regra no servidor). [`opções`](evidencias/CT-VIA-05-rota-ate-rodoviaria-opcoes.jpg), [`em viagem`](evidencias/CT-VIA-05-em-viagem-sem-botoes-de-embarque.jpg), [`encerrada`](evidencias/CT-VIA-05-viagem-encerrada.jpg) |
+
+**Observação:** logo ao embarcar, a faixa disse "O ônibus já passou de Eixo Rodoviário, Setor Bancário Sul" (a parada de descer), porque o embarque foi aceito com o ônibus já no destino, efeito do raio de 100 km (`RAIO_EMBARQUE_M`) mantido para a demonstração.
+
 ## CT-COL-02 — reporte sem autenticação (27/10, produção, via API)
 
 | ID | Estado | Passos | Resultado |
