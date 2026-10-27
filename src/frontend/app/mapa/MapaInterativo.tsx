@@ -27,6 +27,7 @@ import {
   buscarDetalhesParada,
   buscarPosicoesDaLinha,
   BuscarParadaError,
+  SessaoExpiradaError,
   ChegadaNoPonto,
   ChegadasDaPerna,
   DetalhesParada,
@@ -570,13 +571,21 @@ export default function MapaInterativo({
     async function atualizar() {
       // Uma chamada por linha, em paralelo. O backend cacheia o feed do
       // SEMOB, então isso não multiplica o download da origem.
-      const porLinha = await Promise.all(
-        // Arrow explícita: passar a função direto pro map mandaria
-        // índice e array como argumentos extras.
-        numeros.map((numero) =>
-          buscarPosicoesDaLinha(numero, coordenadasRef.current)
-        )
-      );
+      let porLinha: Awaited<ReturnType<typeof buscarPosicoesDaLinha>>[];
+      try {
+        porLinha = await Promise.all(
+          // Arrow explícita: passar a função direto pro map mandaria
+          // índice e array como argumentos extras.
+          numeros.map((numero) =>
+            buscarPosicoesDaLinha(numero, coordenadasRef.current)
+          )
+        );
+      } catch (err) {
+        // Issue #221 — sessão encerrada (o login já foi acionado): não
+        // transforma 401 em "nenhum ônibus em operação".
+        if (err instanceof SessaoExpiradaError) return;
+        throw err;
+      }
       if (!ativo) return;
       setVeiculos(porLinha.flatMap((resultado) => resultado.veiculos));
       setProximoHorarioPrevisto(
@@ -620,6 +629,12 @@ export default function MapaInterativo({
       });
     } catch (err) {
       if (consulta !== consultaDetalheRef.current) return;
+      // Issue #221 — sessão encerrada: o login já foi acionado; não mostra
+      // erro genérico de parada.
+      if (err instanceof SessaoExpiradaError) {
+        setDetalheParada(null);
+        return;
+      }
       setDetalheParada({
         parada,
         detalhes: null,

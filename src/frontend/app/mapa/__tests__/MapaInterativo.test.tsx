@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import MapaInterativo, { escolherBaseDoMapa } from "../MapaInterativo";
 import { ChegadaNoPonto, ChegadasDaParada, ChegadasDaPerna, DetalhesParada, LinhaDetalhada, OpcaoViagem, VeiculoAoVivo } from "@/lib/api";
-import { buscarChegadasParada, buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError } from "@/lib/api";
+import { buscarChegadasParada, buscarDetalhesParada, buscarPosicoesDaLinha, BuscarParadaError, SessaoExpiradaError } from "@/lib/api";
 import { buscarViagemAtiva, embarcarNoOnibus, ViagemAtiva } from "@/lib/api";
 import { ViagemProvider } from "../ViagemContext";
 
@@ -17,6 +17,8 @@ jest.mock("@/lib/api", () => ({
   buscarDetalhesParada: jest.fn().mockResolvedValue(null),
   buscarChegadasParada: jest.fn().mockResolvedValue(null),
   BuscarParadaError: class BuscarParadaError extends Error {},
+  // Issue #221 — usada em `instanceof` no catch, igual à BuscarParadaError.
+  SessaoExpiradaError: class SessaoExpiradaError extends Error {},
   // US #171 — usadas só pelos testes que montam o ViagemProvider.
   buscarViagemAtiva: jest.fn().mockResolvedValue({ falhou: false, viagem: null }),
   embarcarNoOnibus: jest.fn(),
@@ -540,6 +542,19 @@ describe("MapaInterativo", () => {
     expect(screen.getByText(LINHA_TESTE.nome)).toBeInTheDocument();
   });
 
+  it("sessão expirada nos detalhes da parada não mostra o erro genérico (#221)", async () => {
+    buscarDetalhesParadaMock.mockRejectedValue(new SessaoExpiradaError());
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+    fireEvent.click(screen.getAllByTestId("marcador-mapa-icone-parada")[0]);
+
+    await act(async () => {});
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Não foi possível carregar os detalhes da parada/)
+    ).not.toBeInTheDocument();
+  });
+
   it("exibe aviso quando a busca de detalhes da parada falha", async () => {
     buscarDetalhesParadaMock.mockRejectedValue(
       new BuscarParadaError(
@@ -1041,6 +1056,17 @@ describe("MapaInterativo — rastreamento ao vivo (US #16)", () => {
       jest.advanceTimersByTime(20000);
     });
     expect(buscarPosicoesMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("sessão expirada nas posições não vira 'nenhum ônibus em operação' (#221)", async () => {
+    buscarPosicoesMock.mockRejectedValue(new SessaoExpiradaError());
+
+    render(<MapaInterativo linha={LINHA_TESTE} />);
+
+    await act(async () => {});
+    expect(
+      screen.queryByText(/Nenhum ônibus desta linha em operação/)
+    ).not.toBeInTheDocument();
   });
 
   it("cenário 3: avisa quando nenhum ônibus está em operação", async () => {
