@@ -302,6 +302,97 @@ export function clearTokens(): void {
   localStorage.removeItem("refresh_token");
 }
 
+// ---------------------------------------------------------------------------
+// Issue #221 — Renovação transparente da sessão
+// ---------------------------------------------------------------------------
+
+/** A sessão acabou (refresh também falhou) e o usuário já foi mandado ao login. */
+export class SessaoExpiradaError extends Error {
+  constructor() {
+    super("Sua sessão expirou, entre novamente.");
+    this.name = "SessaoExpiradaError";
+  }
+}
+
+export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou, entre novamente";
+export const LOGIN_SESSAO_EXPIRADA = "/login?sessao=expirada";
+
+// Rotas de auth públicas ou que já tratam a própria sessão: um 401 aqui
+// significa "credencial errada" ou "sem refresh", nunca "renove e repita".
+// Sem esta exclusão, um refresh 401 dispararia outro refresh (loop).
+const ROTAS_SEM_RENOVACAO =
+  /\/api\/auth\/(login|registrar|refresh|logout|esqueci-senha|redefinir-senha|link-google)/;
+
+const PAGINAS_PUBLICAS = ["/login", "/cadastro", "/recuperar-senha", "/redefinir-senha"];
+
+// Uma única renovação em andamento. O refresh ROTACIONA o par de tokens:
+// duas renovações concorrentes fariam a segunda usar um refresh_token já
+// invalidado pela primeira e derrubariam a sessão.
+let renovacaoEmAndamento: Promise<boolean> | null = null;
+
+async function renovarSessao(): Promise<boolean> {
+  try {
+    const resposta = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return resposta.ok;
+  } catch {
+    return false;
+  }
+}
+
+function renovarSessaoUmaVez(): Promise<boolean> {
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = renovarSessao().finally(() => {
+      renovacaoEmAndamento = null;
+    });
+  }
+  return renovacaoEmAndamento;
+}
+
+function encerrarSessaoNoCliente(): void {
+  clearTokens();
+  try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
+  if (typeof window === "undefined") return;
+  const caminho = window.location.pathname;
+  if (PAGINAS_PUBLICAS.some((p) => caminho.startsWith(p))) return;
+  try {
+    window.location.assign(LOGIN_SESSAO_EXPIRADA);
+  } catch { /* best-effort */ }
+}
+
+function urlDe(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+/**
+ * fetch para chamadas autenticadas ao Gateway. Em 401 (fora das rotas de
+ * auth) tenta UMA renovação via POST /api/auth/refresh e repete a
+ * requisição. Se a renovação falhar, limpa a sessão do cliente e manda ao
+ * login com aviso (a menos que `redirecionar: false`), devolvendo a
+ * resposta 401 original — cada chamador decide como reportar.
+ */
+export async function fetchAutenticado(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  opcoes: { redirecionar?: boolean } = {}
+): Promise<Response> {
+  const resposta = await fetch(input, init);
+  if (resposta.status !== 401 || ROTAS_SEM_RENOVACAO.test(urlDe(input))) {
+    return resposta;
+  }
+
+  if (await renovarSessaoUmaVez()) {
+    return fetch(input, init);
+  }
+
+  if (opcoes.redirecionar !== false) encerrarSessaoNoCliente();
+  return resposta;
+}
+
 export interface UsuarioAtual {
   id: string;
   nome: string;
@@ -318,10 +409,11 @@ export interface UsuarioAtual {
  */
 export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
   try {
-    const response = await fetch(`${API_URL}/api/auth/me`, {
-      credentials: "include",
-      cache: "no-store",
-    });
+    const response = await fetchAutenticado(
+      `${API_URL}/api/auth/me`,
+      { credentials: "include", cache: "no-store" },
+      { redirecionar: false }
+    );
 
     if (!response.ok) {
       return null;
@@ -377,7 +469,7 @@ export async function logoutUsuario(): Promise<void> {
  * Usado para pular ou rever o tutorial de onboarding.
  */
 export async function atualizarFirstAccess(firstAccess: boolean): Promise<void> {
-  const response = await fetch(`${API_URL}/api/auth/me/first-access`, {
+  const response = await fetchAutenticado(`${API_URL}/api/auth/me/first-access`, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -424,7 +516,7 @@ export interface LinhaResumo {
  */
 export async function sugerirLinhas(termo: string): Promise<LinhaResumo[]> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/linhas?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -504,7 +596,7 @@ export interface OpcaoViagem {
  */
 export async function buscarLugares(termo: string): Promise<Lugar[]> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/lugares?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -525,7 +617,7 @@ export async function nomearLugar(
   lng: number
 ): Promise<Lugar | null> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/lugares/reverso?lat=${lat}&lng=${lng}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -558,7 +650,7 @@ export async function calcularRotas(
     destino_lng: String(destino.lng),
   });
 
-  const response = await fetch(`${API_URL}/api/mobilidade/rotas?${params}`, {
+  const response = await fetchAutenticado(`${API_URL}/api/mobilidade/rotas?${params}`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -584,7 +676,7 @@ export async function calcularRotas(
 export async function buscarLinha(
   numero: string
 ): Promise<LinhaDetalhada | null> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}`,
     { credentials: "include", cache: "no-store" }
   );
@@ -646,13 +738,16 @@ export async function buscarDetalhesParada(
   lat: number,
   lng: number
 ): Promise<DetalhesParada | null> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/mobilidade/paradas?lat=${lat}&lng=${lng}`,
     { credentials: "include", cache: "no-store" }
   );
 
   if (response.status === 404) {
     return null;
+  }
+  if (response.status === 401) {
+    throw new SessaoExpiradaError();
   }
   if (!response.ok) {
     throw new BuscarParadaError(
@@ -712,7 +807,7 @@ export class BuscarParadasError extends Error {}
 export async function buscarParadas(termo: string): Promise<ResultadoBuscaParada> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/paradas/busca?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -788,7 +883,7 @@ export async function buscarChegadasParada(
   codigo: string
 ): Promise<ChegadasDaParada | null> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/paradas/${encodeURIComponent(codigo)}/chegadas`,
       { credentials: "include", cache: "no-store" }
     );
@@ -889,7 +984,7 @@ export async function buscarChegadasDaRota(
   pernas: PernaParaChegadas[]
 ): Promise<ChegadasDaRota | null> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/rotas/chegadas`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/rotas/chegadas`, {
       method: "POST",
       credentials: "include",
       cache: "no-store",
@@ -981,10 +1076,13 @@ export async function buscarPosicoesDaLinha(
     const params = coordenadasUsuario
       ? `?lat=${coordenadasUsuario.lat}&lng=${coordenadasUsuario.lng}`
       : "";
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes${params}`,
       { credentials: "include", cache: "no-store" }
     );
+    // 401 não é "linha sem ônibus": a sessão acabou (já houve tentativa de
+    // renovação). Sobe o erro para a tela não mostrar um vazio enganoso.
+    if (response.status === 401) throw new SessaoExpiradaError();
     if (!response.ok) return vazio;
 
     const data = await response.json();
@@ -1021,7 +1119,8 @@ export async function buscarPosicoesDaLinha(
       veiculos,
       proximoHorarioPrevisto: data.proximo_horario_previsto ?? null,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof SessaoExpiradaError) throw err;
     return vazio;
   }
 }
@@ -1070,7 +1169,7 @@ export class ReportarOcorrenciaError extends Error {
 export async function reportarOcorrencia(
   dados: OcorrenciaPayload
 ): Promise<OcorrenciaRegistrada> {
-  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/ocorrencias`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -1151,7 +1250,7 @@ export async function listarOcorrencias(linha?: string): Promise<OcorrenciaLista
   const termo = linha?.trim();
   const query = termo ? `?linha=${encodeURIComponent(termo)}` : "";
 
-  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -1214,7 +1313,7 @@ export class ConfirmarOcorrenciaError extends Error {
 export async function confirmarOcorrencia(
   ocorrenciaId: string
 ): Promise<ConfirmacaoOcorrenciaResponse> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/colaboracao/ocorrencias/${encodeURIComponent(ocorrenciaId)}/confirmar`,
     {
       method: "POST",
@@ -1330,7 +1429,7 @@ export function limparCacheFavoritos(): void {
 export async function salvarFavorito(
   dados: RotaFavoritaPayload
 ): Promise<RotaFavorita> {
-  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/favoritos`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -1379,7 +1478,7 @@ export async function salvarFavorito(
  * não é por usuário — mostrá-lo exporia as rotas de quem usou o aparelho antes.
  */
 export async function listarFavoritosRemoto(): Promise<RotaFavorita[]> {
-  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/favoritos`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -1415,7 +1514,7 @@ export async function listarFavoritos(): Promise<RotaFavorita[]> {
  * Lança erro em caso de falha (403, 404, rede).
  */
 export async function removerFavorito(id: string): Promise<void> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/colaboracao/favoritos/${encodeURIComponent(id)}`,
     {
       method: "DELETE",
@@ -1522,7 +1621,7 @@ function paradaDaViagem(p: {
  */
 export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/viagens/ativa`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/viagens/ativa`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -1609,7 +1708,7 @@ export interface EmbarquePayload {
 export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/viagens`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/viagens`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1636,7 +1735,7 @@ export async function definirDestinoDaViagem(
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/destino`,
       {
         method: "PUT",
@@ -1657,7 +1756,7 @@ export async function definirDestinoDaViagem(
 export async function encerrarViagem(viagemId: string): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/encerrar`,
       { method: "POST", credentials: "include" }
     );
@@ -1680,7 +1779,7 @@ export async function encerrarViagem(viagemId: string): Promise<void> {
  */
 export async function confirmarAvisoDeProximidade(viagemId: string): Promise<void> {
   try {
-    await fetch(
+    await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/alerta-proximidade/visto`,
       { method: "POST", credentials: "include" }
     );
@@ -1709,7 +1808,7 @@ export interface ConfiguracaoPush {
  */
 export async function obterConfiguracaoPush(): Promise<ConfiguracaoPush> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/push/chave`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/chave`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -1734,7 +1833,7 @@ export async function obterConfiguracaoPush(): Promise<ConfiguracaoPush> {
 export async function registrarInscricaoPush(inscricao: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/inscricao`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1763,7 +1862,7 @@ export async function registrarInscricaoPush(inscricao: unknown): Promise<void> 
 export async function removerInscricaoPush(endpoint: string): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/inscricao`, {
       method: "DELETE",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import LayoutAuth from "../LayoutAuth";
@@ -14,6 +14,7 @@ import {
   decodificarIdTokenGoogle,
   GoogleLoginError,
   buscarUsuarioAtual,
+  MENSAGEM_SESSAO_EXPIRADA,
 } from "@/lib/api";
 import GoogleLoginButton from "./GoogleLoginButton";
 
@@ -40,9 +41,17 @@ export default function Login() {
   const [enviando, setEnviando] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [enviandoGoogle, setEnviandoGoogle] = useState(false);
+  const [sessaoExpirada, setSessaoExpirada] = useState(false);
   const [lembrar, setLembrar] = useState(true);
   const [vinculoPendente, setVinculoPendente] =
     useState<VinculoPendente | null>(null);
+
+  // Issue #221 — aviso quando o app mandou pra cá por sessão expirada.
+  useEffect(() => {
+    setSessaoExpirada(
+      new URLSearchParams(window.location.search).get("sessao") === "expirada"
+    );
+  }, []);
 
   function validar(): Erros {
     const novosErros: Erros = {};
@@ -205,6 +214,11 @@ export default function Login() {
           </Link>
         </div>
 
+        {sessaoExpirada && (
+          <p className="status-error" role="alert">
+            {MENSAGEM_SESSAO_EXPIRADA}
+          </p>
+        )}
         {erros.geral && <p className="status-error">{erros.geral}</p>}
         {mensagemSucesso && (
           <p className="status-ok mensagem-sucesso">{mensagemSucesso}</p>
