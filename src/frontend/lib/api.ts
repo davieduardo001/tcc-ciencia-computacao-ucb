@@ -1,3 +1,5 @@
+import { caminhoAtual, irPara } from "./navegacao";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ServiceStatus {
@@ -354,11 +356,10 @@ function renovarSessaoUmaVez(): Promise<boolean> {
 function encerrarSessaoNoCliente(): void {
   clearTokens();
   try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
-  if (typeof window === "undefined") return;
-  const caminho = window.location.pathname;
+  const caminho = caminhoAtual();
   if (PAGINAS_PUBLICAS.some((p) => caminho.startsWith(p))) return;
   try {
-    window.location.assign(LOGIN_SESSAO_EXPIRADA);
+    irPara(LOGIN_SESSAO_EXPIRADA);
   } catch { /* best-effort */ }
 }
 

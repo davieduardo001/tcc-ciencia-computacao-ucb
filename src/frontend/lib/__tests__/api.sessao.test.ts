@@ -7,6 +7,7 @@ import {
   SessaoExpiradaError,
   LOGIN_SESSAO_EXPIRADA,
 } from "../api";
+import { caminhoAtual, irPara } from "../navegacao";
 
 /**
  * Issue #221 — renovação transparente da sessão: 401 -> um POST
@@ -17,24 +18,23 @@ function resposta(status: number, corpo: unknown = {}) {
   return { ok: status >= 200 && status < 300, status, json: async () => corpo };
 }
 
+// jsdom não deixa redefinir window.location: o redirecionamento passa por
+// lib/navegacao.ts, que aqui é substituído por dublês.
+jest.mock("../navegacao", () => ({
+  caminhoAtual: jest.fn(),
+  irPara: jest.fn(),
+}));
+
 describe("api.ts — renovação de sessão (issue #221)", () => {
-  const locationOriginal = window.location;
-  let assign: jest.Mock;
+  const assign = irPara as jest.Mock;
 
   beforeEach(() => {
-    assign = jest.fn();
-    // jsdom não deixa espiar window.location.assign: troca o objeto.
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { pathname: "/mapa", search: "", assign },
-    });
+    assign.mockReset();
+    (caminhoAtual as jest.Mock).mockReset().mockReturnValue("/mapa");
+    localStorage.clear();
   });
 
   afterEach(() => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: locationOriginal,
-    });
     jest.resetAllMocks();
   });
 
@@ -92,7 +92,7 @@ describe("api.ts — renovação de sessão (issue #221)", () => {
   });
 
   it("não redireciona quando já está numa página pública", async () => {
-    (window.location as { pathname: string }).pathname = "/login";
+    (caminhoAtual as jest.Mock).mockReturnValue("/login");
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce(resposta(401))
