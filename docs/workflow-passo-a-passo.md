@@ -13,7 +13,7 @@ git clone https://github.com/davieduardo001/tcc-ciencia-computacao-ucb.git
 cd tcc-ciencia-computacao-ucb
 ```
 
-Abra o agente **de dentro dessa pasta** — o contexto do projeto (`CLAUDE.md`/`AGENT.md` pro Claude Code, `opencode.json`/`.opencode/` pro OpenCode) é carregado automaticamente porque ele lê os arquivos do repositório.
+Abra o agente **de dentro dessa pasta** — o contexto do projeto é carregado a partir de `CLAUDE.md` → `AGENT.md` → `ai/` (Claude Code). Para o OpenCode e o Gemini, rode antes `./ai/instalar.sh`, que cria os atalhos `opencode.json`, `.opencode/` e `.gemini/` apontando para `ai/`.
 
 | Ferramenta | Como abrir |
 |---|---|
