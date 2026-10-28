@@ -80,7 +80,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 | PRs `feat`/`fix` com teste | **27 de 27** desde 22/09 |
 | CI de PR verde | 74% no total → 79% (Sprint 2) → **94%** (Sprint 3) |
 | Defeitos catalogados | **25** (13 até 16/10 + 12 achados em 27 e 28/10): 10 de conexão entre as peças e 15 de regra, dado ou interface. Fonte: `docs/qa/relatorio-cobertura-e-defeitos.md` |
-| Onde foram detectados | produção 4 · CI 2 · teste manual, execução de casos ou uso real 14, conferência de documento 1 (dentro de auditoria/medição 4) · auditoria/medição 3 · não registrado 1 |
+| Onde foram detectados | produção 4 · CI 2 · teste manual, execução de casos ou uso real 14 · auditoria, medição ou conferência de documento 4 · não registrado 1 |
 | Deploys | backend e frontend sem falha desde 22/09 |
 
 **Frase-síntese do bloco 6:** *"os defeitos relevantes são de conexão, não de regra de negócio, e o CI pegou os que estavam ao seu alcance; os que escaparam só apareceram com dado real."*
