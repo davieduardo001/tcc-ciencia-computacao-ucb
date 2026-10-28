@@ -1,0 +1,20 @@
+digraph G {
+ graph [rankdir=LR, nodesep=0.4, ranksep=0.9, fontname="Liberation Sans", pad=0.3];
+ node [shape=box3d, style=filled, fillcolor="#FFFFFF", fontname="Liberation Sans", fontsize=10];
+ edge [fontname="Liberation Sans", fontsize=9, arrowhead=vee];
+ cli [label="«dispositivo»\nNavegador / PWA\n(Android, iOS, desktop)", fillcolor="#F2F2F2"];
+ subgraph cluster_v { label="Vercel"; style=filled; fillcolor="#E8F1FB"; color="#6C8EBF";
+   fe [label="«ambiente de execução»\nFrontend Next.js\nmovecity-frontend.vercel.app", fillcolor="#FFFFFF"]; }
+ subgraph cluster_f { label="Fly.io · região gru (São Paulo)"; style=filled; fillcolor="#E6F4E6"; color="#82B366";
+   gw [label="movecity-gateway\n(API Gateway)"]; au [label="movecity-auth"]; mo [label="movecity-mobilidade"]; co [label="movecity-colaboracao"]; }
+ subgraph cluster_n { label="Neon"; style=filled; fillcolor="#F3E5F5"; color="#9673A6";
+   pg [label="PostgreSQL serverless\n(um banco compartilhado)", shape=cylinder]; }
+ subgraph cluster_g { label="GitHub"; style=filled; fillcolor="#FFF4D6"; color="#D6B656";
+   gha [label="GitHub Actions\nci · deploy-fly · deploy-vercel\ningestao-semob (mensal)"]; gp [label="GitHub Pages\nprotótipo de alta fidelidade"]; }
+ ext [label="Serviços externos\nSEMOB/GDF · OSRM · Nominatim\nGoogle OAuth · Gmail · Web Push · CARTO", fillcolor="#F2F2F2"];
+ cli -> fe [label="HTTPS"]; cli -> gw [label="HTTPS · cookies httpOnly"];
+ gw -> au [label="HTTPS"]; gw -> mo; gw -> co;
+ au -> pg [label="TCP/TLS"]; mo -> pg; co -> pg;
+ mo -> ext; au -> ext [style=dashed];
+ gha -> fe [label="deploy (push em homolog)", style=dashed]; gha -> gw [label="deploy (push em homolog e main)", style=dashed];
+}
