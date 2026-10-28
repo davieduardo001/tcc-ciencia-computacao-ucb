@@ -1,6 +1,8 @@
 # Pesquisa: Integração com dados de linhas e GPS de ônibus do DF
 
-**Status:** Decidido (Vitória + Davi)
+> **Documento histórico (12/09/2026, corrigido em 13/09/2026).** O texto abaixo registra o raciocínio da época e **não descreve o produto atual**. A conclusão "não existe API oficial" e a decisão de usar o Google Maps como base estática foram **superadas** pela seção "Correção (2026-09-13)", ao final: os endpoints públicos do SEMOB (`dados.semob.df.gov.br`) existem e são a fonte de linhas, paradas, trajetos e posição ao vivo. Estado atual: ver `docs/documento_arquitetura.md` (ADR-03: dados do SEMOB copiados para o banco por ingestão em lote; ADR-04: posição lida ao vivo, com cache de 20 s, e nunca persistida; ADR-02: sem PostGIS). O schema `mobilidade` citado abaixo também não existe: o banco usa o schema `public`.
+
+**Status:** Histórico. Decisão original (Vitória + Davi) superada pela correção de 13/09/2026
 **Contexto:** US #15 (Buscar Linha por Número), #16 (Rastrear Posição em Tempo Real), #17 (Visualizar Trajeto e Paradas) — as três dependem da mesma fonte de dados de linhas/GPS, por isso a decisão precisa ser tomada em conjunto.
 
 ---
@@ -44,9 +46,9 @@ Ideia trazida pela Vitória, em alinhamento com o Davi:
 - **Abordagem para o ToS**: em vez de só ler o termo de uso a frio, faremos um teste empírico com uma linha real primeiro (baixo risco, uso acadêmico/TCC) — mas isso não substitui checar o texto do ToS antes de decidir manter isso em produção a longo prazo.
 - **LGPD**: confirmado — consentimento tem que ficar 100% explícito na UX (tela de confirmação antes de compartilhar posição), sem exceção.
 
-## Decisão
+## Decisão (superada pela correção de 13/09/2026)
 
-**Aprovado por Vitória e Davi.** Abordagem híbrida para as US #15, #16 e #17:
+**Aprovado por Vitória e Davi, na época.** Abordagem híbrida para as US #15, #16 e #17:
 
 1. **Linhas, paradas, trajeto e horários (estático)** — cache sob demanda no schema `mobilidade` a partir da API de rotas do Google Maps, consultada apenas quando um usuário busca uma linha ainda não cacheada (ou desatualizada). Terminais das linhas piloto (Taguatinga/Ceilândia) cadastrados manualmente para viabilizar a consulta terminal-a-terminal.
 2. **Posição em tempo real (#16)** — sem feed externo. Vem exclusivamente da localização real de usuários do Movecity que confirmarem estar embarcados numa linha (opt-in explícito), seguindo o modelo de bootstrap do Moovit. Sem reportes ativos, aplica-se o Cenário 3 da própria US ("nenhum veículo em operação").

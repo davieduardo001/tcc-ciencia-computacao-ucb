@@ -26,7 +26,8 @@ chore/configuracao             ──────► main  (direto)
 | `docs/*` | `main` | `main` (direto) |
 | `chore/*` | `main` | `main` (direto) |
 
-- **`feat/` e `fix/`** passam por `homolog` antes de `main` — qualquer coisa que altere comportamento funcional precisa de validação no ambiente de staging.
+- **`feat/` e `fix/`** passam por `homolog` antes de `main` — qualquer coisa que altere comportamento funcional precisa de validação em `homolog`.
+- **Atenção:** hoje `homolog` **não é um ambiente isolado**. O push em `homolog` publica o frontend na Vercel (`--prod`) e o backend nos mesmos 4 apps do Fly.io usados em produção (risco aceito, issue #42; ver `docs/deploy-plan.md`). Trate o merge em `homolog` como uma publicação.
 - **`docs/` e `chore/`** vão direto para `main` — sem risco de quebrar o sistema.
 - **Nunca** fazer merge de `feat/` ou `fix/` direto em `main`.
 - **Nunca** commitar diretamente em `main` ou `homolog`.
@@ -123,6 +124,11 @@ Todas as mensagens de commit seguem o padrão [Conventional Commits](https://www
 | `chore` | Build, configs, dependências | `chore: atualizar versão do Next.js` |
 | `perf` | Otimização de performance | `perf: cachear resposta da API de paradas` |
 | `test` | Adicionar ou corrigir testes | `test: adicionar testes unitários do service de rotas` |
+| `ci` | Pipelines de CI/CD | `ci: adicionar job de verificação dos contêineres` |
+| `build` | Sistema de build e dependências | `build: fixar versão do SQLAlchemy` |
+| `revert` | Reverter um commit anterior | `revert: desfazer alteração do raio de embarque` |
+
+O job `Lint e Conventional Commits` do CI (`.github/workflows/ci.yml`) aceita exatamente estes tipos (`feat|fix|docs|style|refactor|chore|test|perf|ci|build|revert`), com escopo opcional (`feat(mapa): ...`) e descrição de até 72 caracteres, e valida **o título do PR e cada commit da branch**. Como o squash merge usa o título do PR como mensagem do commit, o título também precisa seguir o padrão. No PR de promoção `homolog` → `main` só o título é validado (os commits já passaram pela checagem ao entrar em `homolog`). Commits de merge são ignorados.
 
 ### Regras para a mensagem
 
@@ -136,7 +142,7 @@ Todas as mensagens de commit seguem o padrão [Conventional Commits](https://www
 ```bash
 # Bom ✅
 git commit -m "feat: exibir tempo estimado de chegada na parada"
-git commit -m "fix: tratar erro 404 na API do GDF"
+git commit -m "fix: tratar erro 404 no feed de posições do SEMOB"
 git commit -m "docs: adicionar diagrama de sequência do caso de uso UC14"
 git commit -m "chore: configurar eslint e prettier"
 
@@ -196,11 +202,11 @@ commit             →  tipo: descrição curta no imperativo (max 72 chars)
 
 | Regra | Detalhe |
 |-------|---------|
-| **1 approval mínimo** | Branch `main` e `homolog` requerem 1 aprovação |
-| **Status checks** | CI deve passar (testes + lint) |
-| **Squash merge** | Para `feat/*` e `fix/*` — mantém histórico limpo |
-| **Delete branch** | Branches feature são deletadas após merge |
-| **No force push** | Nunca fazer force push em branches protegidas |
+| **1 approval mínimo** | `main` e `homolog` requerem 1 aprovação; aprovações antigas são descartadas se entrar novo commit |
+| **Status checks** | Obrigatórios, com a branch atualizada em relação à base: `Testes Backend (pytest)`, `Testes Frontend (Jest)`, `Lint e Conventional Commits` e `Contêiner do serviço` (gateway, auth, mobilidade, colaboracao) |
+| **Squash merge** | Para `feat/*`, `fix/*`, `docs/*` e `chore/*`; `homolog` → `main` usa merge commit (ver acima) |
+| **Delete branch** | Branches de vida curta são apagadas após o merge (manualmente: o repositório não apaga sozinho) |
+| **No force push** | Force push e exclusão de branch estão desabilitados em `main` e `homolog` |
 
 > **Atenção:** um comentário de texto no PR (ex.: "revisado", "ok pra mim") **não é aprovação**. Só conta o que for submetido via botão **"Review changes" → "Approve"**, na aba "Files changed". Verifique com `gh pr view <N> --json reviewDecision` antes de considerar um PR aprovado.
 
@@ -215,9 +221,11 @@ commit             →  tipo: descrição curta no imperativo (max 72 chars)
 6. git push -u origin feat/issue-XX-nome
 7. Abrir PR: feat/XX → homolog
 8. Aguardar review + CI passar
-9. Merge (squash) → homolog
-10. Abrir PR: homolog → main
-11. Merge → main → deploy automático
+9. Merge (squash) → homolog → deploy automático (frontend e backend)
+10. Validar em homolog (DoD-Sprint)
+11. Abrir PR: homolog → main
+12. Merge (merge commit) → main → novo deploy do backend (o frontend só tem deploy a partir de homolog)
+13. Validar em produção e fechar a issue (DoD-Release)
 ```
 
 ### O que NÃO fazer
@@ -251,8 +259,8 @@ Toda Pull Request **deve** estar vinculada a uma Issue. Isso garante rastreabili
 |---------|------|
 | Nova feature (feat) | Criar issue com label `enhancement` |
 | Correção de bug (fix) | Criar issue com label `bug` |
-| Chore/configuração | Não precisa de issue |
-| Documentação | Não precisa de issue |
+| Chore/configuração | Criar issue (a regra vale para toda PR) e usar `Refs #N` ou `Closes #N` |
+| Documentação | Criar issue (a regra vale para toda PR) e usar `Refs #N` ou `Closes #N` |
 
 ### Como Vincular via GitHub UI
 

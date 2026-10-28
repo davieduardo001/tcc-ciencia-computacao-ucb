@@ -38,8 +38,10 @@ Documentação completa: `docs/documento_arquitetura.md` (modelo 4+1 de Kruchten
         └──► [Serviço de Colaboração]
                     │
                     ▼
-        [PostgreSQL + PostGIS / API SEMOB-GDF]
+        [PostgreSQL (Neon)]   [dados públicos do SEMOB]
 ```
+
+Os serviços de domínio acessam o banco diretamente (cada um as suas tabelas) e o SEMOB, quando necessário (a mobilidade lê a posição ao vivo e ingere as linhas em lote). Detalhes em `docs/documento_arquitetura.md`.
 
 Regra que **nunca** pode ser ignorada em nenhum diagrama de sequência ou implementação: o Gateway valida o token JWT **localmente**, sem round-trip ao serviço de autenticação a cada requisição. Os serviços de domínio não conhecem sessão — recebem `identidadeUsuario` já validado pelo Gateway. Essa decisão existe pra não transformar o serviço de autenticação num gargalo de toda requisição do sistema.
 
@@ -49,10 +51,10 @@ Regra que **nunca** pode ser ignorada em nenhum diagrama de sequência ou implem
 |---|---|---|
 | Frontend | Next.js 14 (App Router) + TypeScript | SSR/SSG reduz tempo de carregamento (requisito: ≤3s em 4G); tipagem estática reduz bugs |
 | Mapa | Leaflet JS + OpenStreetMap | Gratuito, sem risco de custo de API de mapa em produção |
-| Backend | FastAPI (Python 3.12) | Assíncrono, alta performance, OpenAPI automático, ecossistema geoespacial maduro (PostGIS) |
-| Banco | PostgreSQL + PostGIS (Neon serverless) | Free tier viável pro TCC, escala sozinho, suporta dado geoespacial nativamente |
-| Deploy backend | Fly.io (Docker) | Deploy simples, múltiplas regiões, sem lock-in de nuvem proprietária |
-| Deploy frontend | Vercel | Integração nativa com Next.js, preview automático por branch |
+| Backend | FastAPI (Python 3.12) | Assíncrono, alta performance, OpenAPI automático |
+| Banco | PostgreSQL (Neon serverless), sem PostGIS | Free tier viável pro TCC, escala sozinho; a geometria fica em colunas JSON (ADR-02 do documento de arquitetura) |
+| Deploy backend | Fly.io (Docker), 4 apps independentes | Deploy simples, múltiplas regiões, sem lock-in de nuvem proprietária |
+| Deploy frontend | Vercel | Integração nativa com Next.js; o push em `homolog` publica em produção (`--prod`) |
 | CI/CD | GitHub Actions | Nativo do repositório, sem custo adicional |
 | Autenticação | JWT stateless | Elimina estado de sessão no servidor; Gateway valida sem round-trip |
 
@@ -62,7 +64,7 @@ Tabela completa com justificativas: `docs/documento_arquitetura.md`, seção 4.2
 
 - Carregamento inicial ≤ 3s em 4G
 - Disponibilidade ≥ 99% nos horários de pico (5h–9h, 17h–20h)
-- Reporte colaborativo só confirma com ≥ 2 confirmações independentes (anti-spam/anti-fraude)
+- Reporte colaborativo só vira "confirmado" ao atingir `Ocorrencia.LIMITE_CONFIRMACOES` (3 confirmações de outros usuários; o autor não confirma a própria ocorrência), como proteção anti-spam/anti-fraude
 - Dado de geolocalização tratado conforme LGPD
 
 ---
@@ -127,7 +129,7 @@ feat/* e fix/*   →  homolog  →  main
 docs/* e chore/* →  main (direto)
 ```
 
-Por quê **3 níveis** e não 2 (branch → main direto)? Porque `feat/` e `fix/` alteram **comportamento funcional** — código que roda, que pode quebrar algo em produção. `homolog` existe como um ambiente real de staging onde essa mudança roda antes de qualquer usuário real (ou avaliador do TCC) ver — é a rede de segurança entre "compilou" e "está em produção".
+Por quê **3 níveis** e não 2 (branch → main direto)? Porque `feat/` e `fix/` alteram **comportamento funcional** — código que roda, que pode quebrar algo em produção. `homolog` é o ponto de validação onde a mudança é conferida (DoD-Sprint) antes da promoção para `main` — a rede de segurança entre "compilou" e "entregue". **Limite assumido:** não é um ambiente isolado. O push em `homolog` já publica o frontend e o backend na produção pública (mesmos apps do Fly.io, mesmo banco Neon; risco aceito, issue #42), então o merge em `homolog` precisa ser tratado como publicação e validado logo em seguida.
 
 Por quê `docs/` e `chore/` **pulam** esse ambiente e vão direto pra `main`? Porque não alteram comportamento do sistema em produção — não tem risco funcional que uma homologação capturaria. Forçar essas mudanças a passar por `homolog` só adicionaria fricção sem benefício.
 
@@ -152,11 +154,11 @@ Regras completas: `docs/boas-praticas-ia.md`. Os pontos que mais importam pra qu
 
 ## 8. CI/CD e Deploy
 
-- **CI** (`ci.yml`): dispara em todo PR pra `homolog`/`main` — lint de Conventional Commits, pytest, Jest. Ninguém mergeia com CI vermelho.
-- **CD** (`deploy-fly.yml` + Vercel): dispara automaticamente no push pra `homolog` ou `main` — não é passo manual, é consequência do merge.
-- **Homolog e produção usam o mesmo pipeline**, só muda a branch de destino — isso é bom (consistência) e tem uma lacuna conhecida (backend não tem apps/banco separados por ambiente ainda — ver issue [#42](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/42) e `docs/deploy-plan.md`).
+- **CI** (`ci.yml`): dispara em todo PR pra `homolog`/`main` — lint de Conventional Commits (título do PR e commits), pytest, verificação do contêiner de cada serviço (venv limpo + import) e Jest. São checks obrigatórios; ninguém mergeia com CI vermelho.
+- **CD** (`deploy-fly.yml` e `deploy-vercel.yml`): o backend publica no push pra `homolog` ou `main` (se tocou `src/backend/**`), rodando as migrations antes; o frontend publica **só** no push pra `homolog`. Não é passo manual, é consequência do merge.
+- **Homolog e produção compartilham os mesmos apps e o mesmo banco** — isso é uma lacuna conhecida e aceita. A issue [#42](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/42) (separar os ambientes) foi fechada em 14/10/2026 sem a separação ter sido implementada; ver `docs/deploy-plan.md`.
 
-Passo a passo prático de deploy: `docs/workflow-passo-a-passo.md`, seções 6–11.
+Passo a passo prático de deploy: `docs/workflow-passo-a-passo.md`, seções 6–11. Segredos e variáveis por plataforma: `docs/secrets-por-plataforma.md`.
 
 ---
 

@@ -1,5 +1,7 @@
 # Relato — Deploy do Hello World (Sprint 0 / Issue #35)
 
+> **Documento histórico (15/08/2026).** Estudo de caso do primeiro deploy, escrito como o trabalho aconteceu. Várias afirmações valiam só naquela data, em especial as lacunas da seção 16: hoje o Gateway **faz proxy de verdade** com validação de JWT, as **migrations rodam no CD** (job `migrate` do `deploy-fly.yml`) e o smoke test do deploy consulta `/health` de cada serviço (os `/hello` ainda existem, mas não são o contrato). Seguem verdadeiras a ausência de separação homolog/produção no backend e o banco único (issue #42, risco aceito) e os serviços públicos. Estado atual: ver `docs/deploy-plan.md` e `docs/secrets-por-plataforma.md`.
+
 **Data:** 15/08/2026
 **Issue:** [#35](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/35)
 **Objetivo da issue:** validar o workflow completo de desenvolvimento do Movecity — branch → PR → review → CI → CD → deploy — usando um "hello world" real como cobaia, não uma feature de produto.
@@ -161,7 +163,7 @@ Merge em `main` disparou o `deploy-fly.yml` de novo, agora publicando os 4 servi
 
 ## 16. Lacunas conhecidas (documentadas, não corrigidas)
 
-Simplificações conscientes, registradas em `docs/deploy-plan.md` e rastreadas na issue [#42](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/42):
+Simplificações conscientes, registradas em `docs/deploy-plan.md` e rastreadas na issue [#42](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/42) (fechada em 14/10/2026 sem que a separação fosse implementada):
 
 - **Sem separação de ambiente no backend.** Homolog e produção usam os *mesmos* 4 apps Fly.io — um push em `homolog` sobrescreve o que está em produção. O frontend não tem esse problema (Vercel já separa preview de produção por branch).
 - Sem separação de banco por ambiente (1 projeto Neon só).

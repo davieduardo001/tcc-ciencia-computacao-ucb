@@ -55,12 +55,12 @@ Use este template ao criar cards no GitHub Projects para cada sprint.
 - [ ] Branch naming correta
 
 ### DoD-Sprint (conta como feita na sprint)
-- [ ] Merge para `homolog` → deploy automático
+- [ ] Merge para `homolog` → deploy automático (frontend e backend; `homolog` publica na produção)
 - [ ] Critérios de aceite (BDD) validados em homolog
 - [ ] Comentário na issue registrando o DoD-Sprint
 
 ### DoD-Release (conta como entregue de verdade)
-- [ ] PR `homolog` → `main` aprovado e mergeado → deploy (Vercel + Fly.io)
+- [ ] PR `homolog` → `main` aprovado e mergeado (merge commit) → novo deploy do backend (o frontend só é publicado a partir de `homolog`)
 - [ ] Validado em produção (endpoint/tela real)
 - [ ] Issue fechada
 - [ ] Documentação atualizada (se aplicável)
