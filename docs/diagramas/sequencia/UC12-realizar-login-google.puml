@@ -39,13 +39,64 @@ alt token obtido com sucesso
 
         Auth -> Auth : verificarStatusAtivo(status)
 
-        alt conta ativa
+        alt conta ativa com senha local (e-mail ja cadastrado sem Google)
+            Auth -> User : marcarVinculacaoPendente(usuarioId)
+            activate User
+            User --> Auth : vinculacaoPendente
+            deactivate User
+            note right of Auth : Nenhuma sessao e criada: o vinculo\nso e feito apos a confirmacao do passageiro.
+            Auth --> Gateway : vinculacaoNecessaria()
+            deactivate Auth
+            Gateway --> View : retornarResposta(vinculacaoNecessaria)
+            View -> View : exibirConfirmacaoDeVinculoComGoogle()
+
+            alt Passageiro confirma o vinculo
+                Passageiro -> View : confirmarVinculo()
+                View -> Gateway : requisicaoConfirmarVinculo(idToken, email, googleId)
+                Gateway -> Auth : confirmarVinculo(idToken, email, googleId)
+                activate Auth
+                Auth -> Google : validarIdToken(idToken)
+                activate Google
+                Google --> Auth : dadosGoogle(email, googleId)
+                deactivate Google
+
+                alt dados conferem e ha vinculacao pendente
+                    Auth -> User : vincularContaAoGoogle(usuarioId, googleId)
+                    activate User
+                    User --> Auth : contaVinculada
+                    deactivate User
+                    note right of Auth : A conta passa a entrar somente pelo Google.\nA senha local deixa de existir.
+                    Auth -> Sessao : criarSessao(usuarioId)
+                    activate Sessao
+                    Sessao --> Auth : tokens(accessToken, refreshToken)
+                    deactivate Sessao
+                    Auth --> Gateway : autenticado(tokens)
+                    deactivate Auth
+                    Gateway -> Gateway : definirCookiesDeSessao(tokens)
+                    Gateway --> View : retornarResposta(tokens)
+                    View -> View : armazenarTokensLocalmente(tokens)
+                    View -> View : redirecionarParaMapa()
+
+                else dados nao conferem ou sem vinculacao pendente
+                    Auth --> Gateway : erroVinculo()
+                    deactivate Auth
+                    Gateway --> View : retornarResposta(erroVinculo)
+                    View -> View : exibirErroGoogle()
+                end
+
+            else Passageiro cancela
+                View -> View : voltarParaLogin()
+            end
+
+        else conta ativa sem senha local
             Auth -> Sessao : criarSessao(usuarioId)
             activate Sessao
             Sessao --> Auth : tokens(accessToken, refreshToken)
             deactivate Sessao
 
             Auth --> Gateway : autenticado(tokens)
+            deactivate Auth
+            Gateway -> Gateway : definirCookiesDeSessao(tokens)
             Gateway --> View : retornarResposta(tokens)
 
             View -> View : armazenarTokensLocalmente(tokens)
@@ -53,6 +104,7 @@ alt token obtido com sucesso
 
         else conta inativa ou suspensa
             Auth --> Gateway : erroAutenticacao(contaInativa)
+            deactivate Auth
             Gateway --> View : retornarResposta(contaInativa)
             View -> View : exibirMensagemErro("Conta inativa. Verifique seu e-mail.")
         end
@@ -62,7 +114,6 @@ alt token obtido com sucesso
         deactivate User
 
         Auth -> Auth : criarUsuarioAutomatico(nome, email)
-        activate Auth
 
         Auth -> User : salvarNovoUsuario(nome, email, googleId)
         activate User
@@ -75,6 +126,7 @@ alt token obtido com sucesso
         deactivate Sessao
 
         Auth --> Gateway : autenticado(tokens)
+        Gateway -> Gateway : definirCookiesDeSessao(tokens)
         Gateway --> View : retornarResposta(tokens)
 
         View -> View : armazenarTokensLocalmente(tokens)
