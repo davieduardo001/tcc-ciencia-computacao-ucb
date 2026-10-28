@@ -252,7 +252,7 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 - **MAP-03 e ETA-03** (à mão, com DevTools Sensors): ver o passo a passo na seção de 28/10.
 - **VIA-08 e VIA-07**: só em campo; **entram no ensaio da defesa**. Para o VIA-07, antes voltar o raio a 100 m.
 - **COL-05**: conferir de novo a lista de ocorrências depois de 60 min dos reportes de teste de 28/10 (criados ~08:13).
-- **#222 (renovação de sessão)**: validar depois de mais de 1 h de sessão aberta.
+- **#222 (renovação de sessão)**: **não validada.** Em 28/10 o usuário precisou entrar de novo, então a sessão não se manteve de um dia para o outro. Não há como saber, pelas evidências coletadas, se a renovação automática falhou ou se o app pediu login como previsto; não foi possível observar a chamada de renovação. Fica declarada como não verificada.
 - **#217 (folha de rota)**: conferir em celular real.
 - **Usabilidade (heurísticas de Nielsen)**: avaliação não feita (ver o roteiro da disciplina).
 
