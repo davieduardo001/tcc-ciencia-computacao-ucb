@@ -29,9 +29,9 @@ Cada pessoa fala do que **entregou**, para saber responder às perguntas.
 |---|---|---|---|---|---|
 | 1 | **Nathália** (@gualbertonathalia) | **Problema e visão** | 2 min | Ônibus fantasma, insegurança nas paradas, assimetria de informação; Taguatinga/Ceilândia; 33,3% usam ônibus (IPEDF 2022); benchmarking (DF no Ponto, Moovit); termos de uso e LGPD (#32) | `docs/documento_visao.md` |
 | 2 | **Davi** (@davieduardo001) | **Solução, arquitetura e stack** | 3 min | GPS oficial SEMOB + reporte colaborativo; Gateway único com JWT em cookie httpOnly, 3 serviços (auth, mobilidade, colaboração); Next.js + Leaflet, FastAPI no Fly.io, Neon, Vercel, GitHub Actions; decisões que **contrariaram** o plano inicial (sem PostGIS, ingestão em lote do SEMOB, 4 apps no Fly) | `docs/documento_arquitetura.md` §10 |
-| 3 | **Kelvin** (@Kelvin963) | **Demo 1: mapa, ônibus e ETA** | 3 min | Localização (#14), busca de linha (#15), ônibus em tempo real (#16), ETA até a minha parada (#19); alerta de cancelamento / ônibus fantasma (#28, se entregue) | App ao vivo |
-| 4 | **Luis** (@louisassis) | **Demo 2: parada, rota e viagem** | 3 min | Detalhes da parada (#18), rota com baldeação (#20), busca por endereço (#21), pegar o ônibus e alerta de proximidade (#171/#172), push (#207, se entregue) | App ao vivo |
-| 5 | **Vitória** (@Vitoria-Albuquerque) | **Colaboração e experiência** | 2 min | Reportar e ver ocorrências (#23/#24), rota favorita (#25), tutorial (#30), protótipo de alta fidelidade (#33) e alinhamento de UX (#208). Coordena os slides (#205) | `prototipo-alta-fid/` |
+| 3 | **Kelvin** (@Kelvin963) | **Demo 1: mapa, ônibus e ETA** (Davi navega, Kelvin explica) | 3 min | Localização (#14), busca de linha (#15), ônibus em tempo real (#16), ETA até a minha parada (#19); alerta de cancelamento / ônibus fantasma (#28, se entregue) | App ao vivo |
+| 4 | **Luis** (@louisassis) | **Demo 2: parada, rota e viagem** (Davi navega, Luis explica) | 3 min | Detalhes da parada (#18), rota com baldeação (#20), busca por endereço (#21), pegar o ônibus e alerta de proximidade (#171/#172), push (#207, se entregue) | App ao vivo |
+| 5 | **Vitória** (@Vitoria-Albuquerque) | **Colaboração e experiência** (Davi navega a demo, Vitória explica) | 2 min | Reportar e ver ocorrências (#23/#24), rota favorita (#25), tutorial (#30), protótipo de alta fidelidade (#33) e alinhamento de UX (#208). Coordena os slides (#205) | `prototipo-alta-fid/` |
 | 6 | **Breno** (@brenouchihar) | **Segurança e qualidade** | 3 min | Login, cadastro, recuperação de senha (#10, #11, #13); sessão e Gateway; bug do `X-User-Id` (#188) como caso de segurança; 1.260 testes, cobertura, CI; os 23 defeitos e como foram achados | `docs/qa/` |
 | 7 | **Davi** | **A tese: desenvolvimento com agentes de IA** | 5 min | Como trabalhamos (skills, comandos, regras), as travas, métricas de issues/PRs/bugs, o que a IA errou, lições | seção 3 deste guia |
 | 8 | **Nathália** (fecha) | **Limites, trabalho futuro e conclusão** | 2 min | O que ficou fora (#115 motor GTFS/RAPTOR, #118 horários), validação em campo, ambiente de homologação separado; agradecimento | seção 5 |
@@ -113,11 +113,13 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 
 ## 5. Demonstração ao vivo (blocos 3, 4 e 5)
 
-Fluxo único e contínuo, passando o "bastão" entre os três:
+Fluxo único e contínuo. **Quem navega o app é o Davi em todos os três trechos**; Kelvin, Luis e Vitória explicam o que aparece, cada um no seu:
 
-1. **Kelvin:** abrir o app → mapa com minha localização → buscar linha `0.110` → ver ônibus se movendo → tocar no ônibus e ver o ETA com selo "ao vivo".
-2. **Luis:** tocar numa parada → "Chegando nesta parada" → "Para onde você vai?" → rota → pegar o ônibus → alerta de proximidade.
-3. **Vitória:** reportar ocorrência → ver a ocorrência → salvar rota favorita; mostrar o protótipo ao lado para a comparação.
+1. **Davi navega, Kelvin explica:** abrir o app → mapa com minha localização → buscar linha `0.110` → ver ônibus se movendo → tocar no ônibus e ver o ETA com selo "ao vivo".
+2. **Davi navega, Luis explica:** tocar numa parada → "Chegando nesta parada" → "Para onde você vai?" → rota → pegar o ônibus → alerta de proximidade.
+3. **Davi navega, Vitória explica:** reportar ocorrência → ver a ocorrência → salvar rota favorita; mostrar o protótipo ao lado para a comparação.
+
+Com uma pessoa só no teclado, combinar a deixa de cada passo ("próximo: abrir a parada") e ensaiar a troca de quem fala; deixar o app já logado e na linha certa antes de começar.
 
 **Plano B obrigatório (cenário 2 da #205):** gravar o mesmo fluxo em vídeo, com a localização simulada via DevTools → *Sensors*. A demo depende de rede, GPS e de um ônibus real em operação (madrugada = sem ônibus). Combinar a hora do ensaio de modo a conferir a linha usada.
 
