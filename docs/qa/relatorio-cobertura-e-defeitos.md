@@ -75,6 +75,8 @@ Selecionados nas issues e PRs das Sprints 1 a 3, com a forma de detecção **reg
 | 22 | "Ir" no planejador coloca as coordenadas do usuário (`origem_lat`, `origem_lng`) na URL | #231 | A posição fica no histórico, em links copiados e em logs; contraria o RNF de LGPD e a RN-06 da viagem | **Execução de casos** (navegador, produção) | 27/10 |
 | 23 | "Parada sem nome" no embarque e no desembarque dos cards de rota; o embarque não mostra o tempo em minutos, só o selo "ao vivo" | #232; CT-ROT-06 | Parada sem nome no dado de origem e o card não tem referência de reserva | **Execução de casos** (navegador, produção) | 27/10 e 28/10 |
 
+> **Situação em 28/10:** o defeito 22 (#231) foi corrigido pelo PR #239 e o 23 (#232) pelo PR #240, ambos **validados em produção** ([execucao-casos-p1.md](execucao-casos-p1.md)). O defeito 21 (#230) teve o texto do cadastro trocado pelo PR #238; o e-mail de recuperação de senha por SMTP (#237) está no ar e aguarda a confirmação de entrega.
+
 > **Observações sem contagem:** a #233 (a rota respondeu "Nenhuma linha liga esses dois pontos" uma vez para um par que depois deu 5 opções; não reproduzido, pode ser o defeito 19) e a #234 (o build do frontend depende do Google Fonts; falha transitória no deploy do PR #219) são riscos a investigar, não defeitos confirmados de código.
 
 ### Resumo da detecção (23 defeitos)
