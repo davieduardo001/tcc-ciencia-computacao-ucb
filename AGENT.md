@@ -87,7 +87,7 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - Gateway valida JWT localmente — sem round-trip ao Auth Service
 - Gateway seta cookies httpOnly (access + refresh) — proteção contra XSS
 - Gateway roteia requests para serviços backend via proxy
-- Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
+- Tokens em httpOnly cookies (access + refresh) — proteção contra XSS. Limitação conhecida (#253): o frontend também grava os tokens no `localStorage`, o que reduz essa proteção até a correção
 - Cookies com `SameSite=None` + `Secure`: frontend (Vercel) e Gateway (Fly) são cross-site
 - Leaflet com base CARTO Voyager, recuando pro tile padrão do OSM sem a chave
 - Fly.io com **4 apps independentes** (gateway, auth, mobilidade, colaboracao)

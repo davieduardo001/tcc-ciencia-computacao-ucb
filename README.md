@@ -42,6 +42,7 @@ Segundo a Pesquisa Distrital por Amostra de Domicílios (IPEDF, 2022), 33,3% da 
 
 - **Alertas não chegam ao aparelho:** a tela de preferências salva, mas o push (#207) e o alerta de cancelamento (#28) não foram entregues.
 - **Embarque com raio de 100 km** em produção: aberto só para demonstrar o "Peguei este ônibus" sem precisar estar dentro de um ônibus. A regra de uso real é 100 m.
+- **Tokens de sessão também no `localStorage`** (#253): o frontend os grava ali sem usá-los, o que expõe a XSS e reduz a proteção dos cookies httpOnly. Correção pendente.
 - **Sem confirmação de conta por e-mail:** o e-mail só é usado para recuperar a senha.
 - **Sem ambiente de homologação separado** (decisão de custo): `homolog` publica na produção da Vercel.
 
@@ -92,7 +93,7 @@ issue → cenários BDD → diagrama de sequência → PR → CI → revisão �
 | Testes automatizados | **1.640** passando (844 backend, 796 frontend) | log do CI, 28/10/2026 |
 | Cobertura | backend **93,7%**, frontend **89,1%** | medida em 16/10/2026 (o CI não mede cobertura) |
 | Casos de teste manuais | **49 de 49 executados em produção**: 32 aprovados, 11 com ressalva, 1 reprovado por configuração, 3 só em campo, 2 pendentes | [`docs/qa/execucao-casos-p1.md`](docs/qa/execucao-casos-p1.md), 28/10/2026 |
-| Defeitos catalogados | **25**, com causa e como foram detectados | [`docs/qa/relatorio-cobertura-e-defeitos.md`](docs/qa/relatorio-cobertura-e-defeitos.md) |
+| Defeitos catalogados | **26**, com causa e como foram detectados | [`docs/qa/relatorio-cobertura-e-defeitos.md`](docs/qa/relatorio-cobertura-e-defeitos.md) |
 | Usabilidade | 10 heurísticas de Nielsen avaliadas por um avaliador, de forma agêntica | [`docs/qa/avaliacao-usabilidade-nielsen.md`](docs/qa/avaliacao-usabilidade-nielsen.md) |
 
 Resumo de uma página em [`docs/qa/resumo-executivo.md`](docs/qa/resumo-executivo.md). O que não foi medido ou testado está dito como tal nesses documentos.
