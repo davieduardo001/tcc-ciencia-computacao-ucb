@@ -25,7 +25,7 @@ Esta pasta reúne o esquema de testes no estilo QA do Movecity: o plano, os caso
 
 | Medida | Valor | Fonte |
 |---|---|---|
-| Testes automatizados (backend + frontend) | **1.260**, 0 falhas | execução em 16/10/2026, `07c9edc` |
+| Testes automatizados (backend + frontend) | **1.640**, 0 falhas (844 backend, 796 frontend) | log do CI em 28/10/2026, execução `40689632241`, `48483be`. Em 16/10 eram **1.260** (`07c9edc`) |
 | Backend (pytest, Postgres 16 + migrations) | 671 testes em 56 arquivos, 65 s | idem |
 | Frontend (Jest) | 589 testes em 33 suítes, 36 s | idem |
 | Cobertura do código de produção do backend | 93,7% das instruções | `pytest --cov`, ver o relatório |

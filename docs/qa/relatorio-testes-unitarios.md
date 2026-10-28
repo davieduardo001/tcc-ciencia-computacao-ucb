@@ -42,6 +42,18 @@ Por serviço do backend (`pytest --collect-only`, que coincide com os 671 execut
 
 Evolução: o corpo original da #151 registrava **297 testes** (185 backend, 112 frontend). A medição de hoje, **1.260**, é 963 testes a mais.
 
+### Atualização de 28/10/2026 (CI da `homolog`)
+
+Os números acima são de 16/10 (`07c9edc`). Em 28/10 a contagem foi refeita **a partir do log do CI**, sem rodar nada localmente: execução [`40689632241`](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/actions/runs/40689632241) do workflow `ci.yml`, commit `48483be` (`homolog` com os PRs #238, #239 e #240), todos os jobs verdes.
+
+| Suíte | Arquivos | Testes | Passando | Falhando | Tempo |
+|---|---|---|---|---|---|
+| Backend (pytest) | não recontado | 844 | **844** | 0 | 29,5 s |
+| Frontend (Jest) | 43 suítes | 796 | **796** | 0 | n/d |
+| **Total** | | **1.640** | **1.640** | **0** | |
+
+São **380 testes a mais** que em 16/10 (173 no backend, 207 no frontend). A cobertura **não foi remedida**: o CI não a mede, então os 93,7% (backend) e 89,1% (frontend) continuam sendo os de 16/10. O número de arquivos de teste por serviço do backend também não foi recontado.
+
 ### Ressalvas sobre a execução
 
 - **Ambiente diferente do CI.** O CI usa Python 3.12, Node 20 e a imagem `postgis/postgis:16-3.4`; a medição local usou Python 3.14.7, Node 24 e PostgreSQL 16.15 sem PostGIS. Os 7 checks do CI do PR #194 passaram (ver a tabela da seção 2); esta execução confirma o mesmo resultado fora do CI, e não o substitui.
