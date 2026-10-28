@@ -7,7 +7,7 @@
 
 ## Em uma frase
 
-O projeto tem uma base automatizada ampla e verde e, agora, **os 49 casos manuais foram executados em produção**: 32 aprovados, 11 aprovados com ressalva, 1 reprovado por configuração, 3 que só se provam em campo e 2 que dependem de simulação de posição. A execução e a conferência dos documentos acharam 12 defeitos novos, e a conexão entre as peças segue como o ponto mais frágil.
+O projeto tem uma base automatizada ampla e verde e, agora, **os 49 casos manuais foram executados em produção**: 32 aprovados, 11 aprovados com ressalva, 1 reprovado por configuração, 3 que só se provam em campo e 2 que dependem de simulação de posição. A execução e a conferência dos documentos acharam 13 defeitos novos, e a conexão entre as peças segue como o ponto mais frágil.
 
 ## Números
 
@@ -19,7 +19,7 @@ O projeto tem uma base automatizada ampla e verde e, agora, **os 49 casos manuai
 | CI de PR | 94% verde na Sprint 3 (33 de 35), contra 79% na Sprint 2 | `gh run list` |
 | **Casos manuais executados** | **49 de 49** | [`execucao-casos-p1.md`](execucao-casos-p1.md), "Quadro geral" |
 | Resultado dos 49 | **32 aprovados · 11 com ressalva · 1 reprovado por configuração · 3 não verificáveis · 2 pendentes** | idem |
-| Defeitos catalogados | **25** (13 até 16/10 e 12 achados em 27 e 28/10): 10 de conexão entre as peças e 15 de regra, dado ou interface | [`relatorio-cobertura-e-defeitos.md`](relatorio-cobertura-e-defeitos.md) |
+| Defeitos catalogados | **26** (13 até 16/10 e 13 achados em 27 e 28/10): 10 de conexão entre as peças e 16 de regra, dado ou interface | [`relatorio-cobertura-e-defeitos.md`](relatorio-cobertura-e-defeitos.md) |
 | Usabilidade (Nielsen) | 10 heurísticas avaliadas, por **um avaliador**; 4 delas com achado de severidade 3, todos com issue aberta ou já corrigidos | [`avaliacao-usabilidade-nielsen.md`](avaliacao-usabilidade-nielsen.md) |
 
 ## Os 49 casos manuais, por estado
@@ -36,7 +36,7 @@ Dos 18 casos P1, 4 reprovaram na primeira execução (AUT-01, AUT-03, PAR-01 e P
 
 ## O que a análise mostra
 
-1. **Os defeitos relevantes são de conexão, não de regra.** Dos 25 defeitos, 10 são de conexão entre as peças (dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge, FK sem o modelo carregado no serviço isolado). Quatro foram relatados como ocorridos em produção.
+1. **Os defeitos relevantes são de conexão, não de regra.** Dos 26 defeitos, 10 são de conexão entre as peças (dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge, FK sem o modelo carregado no serviço isolado). Quatro foram relatados como ocorridos em produção.
 2. **A execução manual achou o que o CI não achava.** Foram 11 defeitos novos em 27 e 28/10, entre eles o `/auth/refresh` inexistente, as preferências de notificação com erro 500 em produção, a sessão expirada que o app mostrava como "nenhum ônibus" e as coordenadas do usuário na URL. Todos passam pelo mesmo ponto: os testes automatizados mockam a vizinhança.
 3. **Correções validadas em produção em 27 e 28/10:** cadastro sem aceite dos termos (#211), rota de refresh e **renovação automática da sessão** (#212, #221; a rede da aba mostrou 401, `POST /auth/refresh` 200 e a consulta refeita com 200), tela e preferências de alertas (#29, #213), saídas do terminal com horário passado (#215), "Parada sem nome" (#232) e coordenadas na URL (#231).
 4. **E-mail de recuperação de senha:** passou a funcionar em 28/10 por SMTP (#237). O e-mail chegou à caixa de entrada, o link abriu no celular e a nova senha foi definida. A **confirmação de conta por e-mail não existe** (a conta entra direto) e o texto do cadastro foi corrigido (#230).
@@ -52,6 +52,7 @@ Dos 18 casos P1, 4 reprovaram na primeira execução (AUT-01, AUT-03, PAR-01 e P
 | Alertas sem entrega | A tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28) |
 | Avaliação de usabilidade com um avaliador | O método pede 3 a 5 avaliadores independentes; não houve teste com usuários reais |
 | Cobertura não é medida no CI | E o Jest mede só os arquivos importados (3 de 43 ficam de fora); os números são de 16/10 |
+| **Tokens de sessão também no `localStorage`** | O frontend grava `access_token` e `refresh_token` em `localStorage` (código sem uso), o que expõe os tokens a XSS e reduz a proteção do cookie httpOnly. Issue #253 aberta; declarar na defesa |
 | Issues abertas | #216 (embarque: causa de configuração), #233 (investigar "nenhuma linha liga esses dois pontos"), #234 (build depende do Google Fonts), #236 (dica do "Buscar parada"), #243 (mensagens sem acento) |
 
 ## Próximos passos

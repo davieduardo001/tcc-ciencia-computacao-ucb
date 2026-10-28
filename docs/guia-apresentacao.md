@@ -32,7 +32,7 @@ Cada pessoa fala do que **entregou**, para saber responder às perguntas.
 | 3 | **Kelvin** (@Kelvin963) | **Demo 1: mapa, ônibus e ETA** (Davi navega, Kelvin explica) | 3 min | Localização (#14), busca de linha (#15), ônibus em tempo real (#16), ETA até a minha parada (#19); alerta de cancelamento / ônibus fantasma (#28, se entregue) | App ao vivo |
 | 4 | **Luis** (@louisassis) | **Demo 2: parada, rota e viagem** (Davi navega, Luis explica) | 3 min | Detalhes da parada (#18), rota com baldeação (#20), busca por endereço (#21), pegar o ônibus e alerta de proximidade (#171/#172), push (#207, se entregue) | App ao vivo |
 | 5 | **Vitória** (@Vitoria-Albuquerque) | **Colaboração e experiência** (Davi navega a demo, Vitória explica) | 2 min | Reportar e ver ocorrências (#23/#24), rota favorita (#25), tutorial (#30), protótipo de alta fidelidade (#33) e alinhamento de UX (#208). Coordena os slides (#205) | `prototipo-alta-fid/` |
-| 6 | **Breno** (@brenouchihar) | **Segurança e qualidade** | 3 min | Login, cadastro, recuperação de senha (#10, #11, #13); sessão e Gateway; bug do `X-User-Id` (#188) como caso de segurança; 1.640 testes, cobertura, CI; os 25 defeitos e como foram achados | `docs/qa/` |
+| 6 | **Breno** (@brenouchihar) | **Segurança e qualidade** | 3 min | Login, cadastro, recuperação de senha (#10, #11, #13); sessão e Gateway; bug do `X-User-Id` (#188) como caso de segurança; 1.640 testes, cobertura, CI; os 26 defeitos e como foram achados | `docs/qa/` |
 | 7 | **Davi** | **A tese: desenvolvimento com agentes de IA** | 5 min | Como trabalhamos (skills, comandos, regras), as travas, métricas de issues/PRs/bugs, o que a IA errou, lições | seção 3 deste guia |
 | 8 | **Nathália** (fecha) | **Limites, trabalho futuro e conclusão** | 2 min | O que ficou fora (#115 motor GTFS/RAPTOR, #118 horários), validação em campo, ambiente de homologação separado; agradecimento | seção 5 |
 
@@ -79,8 +79,8 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 | Cobertura | backend **93,7%**, frontend **89,1%** (piso otimista: 3 arquivos fora da medição) |
 | PRs `feat`/`fix` com teste | **27 de 27** desde 22/09 |
 | CI de PR verde | 74% no total → 79% (Sprint 2) → **94%** (Sprint 3) |
-| Defeitos catalogados | **25** (13 até 16/10 + 12 achados em 27 e 28/10): 10 de conexão entre as peças e 15 de regra, dado ou interface. Fonte: `docs/qa/relatorio-cobertura-e-defeitos.md` |
-| Onde foram detectados | produção 4 · CI 2 · teste manual, execução de casos ou uso real 14 · auditoria, medição ou conferência de documento 4 · não registrado 1 |
+| Defeitos catalogados | **26** (13 até 16/10 + 13 achados em 27 e 28/10): 10 de conexão entre as peças e 16 de regra, dado ou interface. Fonte: `docs/qa/relatorio-cobertura-e-defeitos.md` |
+| Onde foram detectados | produção 4 · CI 2 · teste manual, execução de casos ou uso real 14 · auditoria, medição ou conferência de documento ou código 5 · não registrado 1 |
 | Deploys | backend e frontend sem falha desde 22/09 |
 
 **Frase-síntese do bloco 6:** *"os defeitos relevantes são de conexão, não de regra de negócio, e o CI pegou os que estavam ao seu alcance; os que escaparam só apareceram com dado real."*
@@ -94,6 +94,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 | "Mediana de 17 min até o merge não é revisão superficial?" | Por tipo: `feat` **25 min**, `fix` **8 min**, `docs` 14 min, `chore` 4 min. PRs pequenos e o CI cobre o mecânico, mas é um risco real: um único revisor. | Reconhecer o risco do revisor único como limite. |
 | "Os casos de teste manuais foram executados?" | Em 27/10 executamos os 18 casos P1 (API e navegador, desktop e celular; `docs/qa/execucao-casos-p1.md`): **4 reprovados**, que viraram defeitos (cadastro sem aceite dos termos, `/auth/refresh` inexistente, seção "Chegando nesta parada" ausente). Os P2/P3 foram executados até 28/10 (32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração); 3 não são verificáveis hoje (NOT-02, VIA-07, VIA-08) e 2 ficam para execução à mão (MAP-03, ETA-03). Quadro em `docs/qa/execucao-casos-p1.md`. | Fazer à mão MAP-03 e ETA-03 (DevTools Sensors); levar VIA-07 e VIA-08 para o ensaio. |
 | "Existe ambiente de homologação?" | **Não separado, por decisão de custo**: `homolog` publica na produção da Vercel; backend e banco compartilham apps e Neon (free tier). Risco aceito e documentado. | Mostrar como trabalho futuro. |
+| "Os cookies httpOnly protegem contra XSS?" | Era o desenho: o Gateway grava os tokens em cookies httpOnly, `SameSite=None` e `Secure`. Mas o frontend também grava os tokens no `localStorage` (sem usá-los), o que expõe a XSS e reduz essa proteção. Achado em 28/10 por leitura de código, issue #253. | Corrigir antes da defesa, se houver tempo; senão, declarar como limite conhecido. |
 | "O ETA está correto?" | Tolerância proposta (2 min até 10 min) **não foi medida em campo**. | Validar em campo se houver tempo, ou declarar como limite. |
 | "A IA já errou?" | Sim, e está documentado: incidente da #35 (aprovação por comentário confundida com review formal), plano de 4 apps vs. código monolítico exposto em vez de escolhido em silêncio. | Escolher 2 exemplos (um de processo, um de código) para o slide. |
 
@@ -104,10 +105,10 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 1. **Como trabalhamos (1 min):** skills e comandos versionados (`.claude/commands`, `.opencode/skills`, `.gemini`: criar issue, gerenciar branches e commits, gerar diagrama de sequência, desenvolver US backend/frontend, review de PR). Manual do ciclo em `docs/manual-sprint.md`.
 2. **As travas (1 min):** `main` e `homolog` protegidas, CI obrigatório, aprovação formal, DoD em dois níveis (sprint e release), "IA não faz merge nem bypass sem pedir". Fonte: `docs/boas-praticas-ia.md`.
 3. **O que os números dizem (1 min):** 84 issues → 126 PRs → 1.640 testes; 27/27 PRs com teste; CI de 79% para 94% verde.
-4. **Onde a IA/o processo falhou (1,5 min):** 25 defeitos, 4 em produção, 10 de conexão entre as peças; o `X-User-Id` (#188) como defeito de segurança; a lição de "verificar antes de declarar pronto".
+4. **Onde a IA/o processo falhou (1,5 min):** 26 defeitos, 4 em produção, 10 de conexão entre as peças; o `X-User-Id` (#188) como defeito de segurança; a lição de "verificar antes de declarar pronto".
 5. **Conclusão (0,5 min):** a IA mudou **onde o esforço humano vai**: menos digitação, mais especificação (BDD, diagramas), revisão e verificação.
 
-**Slide sugerido (um só, denso):** linha do tempo de 10 semanas com PRs por semana (barras), e ao lado os 4 números que importam: 1.640 testes · 93,7% / 89,1% · 25 defeitos (4 em produção) · 11 PRs fechados sem merge (retrabalho, não rejeição).
+**Slide sugerido (um só, denso):** linha do tempo de 10 semanas com PRs por semana (barras), e ao lado os 4 números que importam: 1.640 testes · 93,7% / 89,1% · 26 defeitos (4 em produção) · 11 PRs fechados sem merge (retrabalho, não rejeição).
 
 ---
 
@@ -148,6 +149,7 @@ Com uma pessoa só no teclado, combinar a deixa de cada passo ("próximo: abrir 
 - **Embarque com raio de 100 km** (`RAIO_EMBARQUE_M=100000`), de propósito, para demonstrar de qualquer lugar. A regra documentada é 100 m.
 - **Alertas sem entrega:** a tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28).
 - **Sem ambiente de homologação separado** (decisão de custo).
+- **Tokens de sessão também no `localStorage`** (#253): o frontend os grava ali sem usá-los, o que expõe a XSS e reduz a proteção que os cookies httpOnly dariam. Correção pendente.
 
 ## 7. Documentação final (próximo passo)
 
