@@ -34,6 +34,7 @@ import {
   Lugar,
   OpcaoViagem,
   PernaViagem,
+  PontoEmbarque,
   RotaFavorita,
   SalvarFavoritoError,
   salvarFavorito,
@@ -303,18 +304,37 @@ function CampoLugar({
 /**
  * 582 dos 7.142 abrigos do SEMOB vêm sem nome utilizável na fonte (só o
  * CEP). Nesses casos o backend manda string vazia de propósito. Coordenada
- * crua ("Ponto em -15.8131, -48.0123") não diz nada a quem vai embarcar, e
- * o metro de caminhada já está ao lado — por isso o rótulo é um texto
- * humano; a coordenada fica só no `title`, pra quem precisar conferir.
+ * crua não diz nada a quem vai embarcar, e "Parada sem nome" também não
+ * ajuda a achar o ponto. Então, sem nome, a referência é o que o card já
+ * sabe de verdade: o código da parada e a distância de caminhada. Nunca se
+ * inventa um nome; só sobra "Parada sem nome" quando não há nem código nem
+ * distância.
  */
 const ROTULO_PARADA_SEM_NOME = "Parada sem nome";
 
-function rotuloDoPonto(nome: string): string {
-  return nome || ROTULO_PARADA_SEM_NOME;
+/** `de` completa "a N m ...": de você (embarque inicial) ou do destino. */
+export function rotuloDoPonto(
+  ponto: Pick<PontoEmbarque, "parada_nome" | "parada_codigo" | "caminhada_metros">,
+  de: "voce" | "destino" | null = null
+): string {
+  if (ponto.parada_nome) return ponto.parada_nome;
+  const codigo = ponto.parada_codigo ? ` ${ponto.parada_codigo}` : "";
+  const distancia =
+    de && ponto.caminhada_metros > 0
+      ? ` a ${ponto.caminhada_metros} m ${de === "voce" ? "de você" : "do destino"}`
+      : "";
+  if (!codigo && !distancia) return ROTULO_PARADA_SEM_NOME;
+  // Com código e distância: "Parada PR-12243, a 14 m de você".
+  return `Parada${codigo}${codigo && distancia ? "," : ""}${distancia}`;
 }
 
-function dicaDoPonto(nome: string, lat: number, lng: number): string | undefined {
-  return nome ? undefined : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+/** Texto de acessibilidade (title): o rótulo e, sem nome, as coordenadas só como complemento. */
+function dicaDoPonto(
+  ponto: PontoEmbarque,
+  de: "voce" | "destino" | null
+): string | undefined {
+  if (ponto.parada_nome) return undefined;
+  return `${rotuloDoPonto(ponto, de)} (coordenadas ${ponto.lat.toFixed(5)}, ${ponto.lng.toFixed(5)})`;
 }
 
 function ResumoOpcao({ opcao, destaques }: { opcao: OpcaoViagem; destaques: Destaque[] }) {
@@ -518,6 +538,13 @@ function LinhaDoTempo({
   // faixa de viagem do mapa.
   const { viagem } = useViagem();
   const emViagem = viagem !== null;
+  // A distância só é "de você" no embarque da 1ª perna e "do destino" no
+  // desembarque da última; nas baldeações o metro é de outro trecho.
+  const deQuem = (perna: PernaViagem, ponto: "embarque" | "desembarque") => {
+    const indice = pernas.indexOf(perna);
+    if (ponto === "embarque") return indice === 0 ? ("voce" as const) : null;
+    return indice === pernas.length - 1 ? ("destino" as const) : null;
+  };
   const chegadaDaPerna = (perna: PernaViagem) => chegadas?.[pernas.indexOf(perna)] ?? null;
 
   return (
@@ -545,13 +572,9 @@ function LinhaDoTempo({
                 <p className="plan-tempo-titulo">
                   Embarque em{" "}
                   <strong
-                    title={dicaDoPonto(
-                      passo.perna.embarque.parada_nome,
-                      passo.perna.embarque.lat,
-                      passo.perna.embarque.lng
-                    )}
+                    title={dicaDoPonto(passo.perna.embarque, deQuem(passo.perna, "embarque"))}
                   >
-                    {rotuloDoPonto(passo.perna.embarque.parada_nome)}
+                    {rotuloDoPonto(passo.perna.embarque, deQuem(passo.perna, "embarque"))}
                   </strong>
                 </p>
                 <p className="plan-tempo-linha">
@@ -588,13 +611,9 @@ function LinhaDoTempo({
               <p className="plan-tempo-titulo">
                 Desça em{" "}
                 <strong
-                  title={dicaDoPonto(
-                    passo.perna.desembarque.parada_nome,
-                    passo.perna.desembarque.lat,
-                    passo.perna.desembarque.lng
-                  )}
+                  title={dicaDoPonto(passo.perna.desembarque, deQuem(passo.perna, "desembarque"))}
                 >
-                  {rotuloDoPonto(passo.perna.desembarque.parada_nome)}
+                  {rotuloDoPonto(passo.perna.desembarque, deQuem(passo.perna, "desembarque"))}
                 </strong>
               </p>
             )}

@@ -397,57 +397,90 @@ describe("PlanejadorViagem — botão de favorito (US #25)", () => {
 // Card #179 (④a) — rótulos legíveis e estados do resultado
 // ---------------------------------------------------------------------------
 
-function opcaoComParadas(embarqueNome: string, desembarqueNome: string) {
+function opcaoComPontos(
+  embarque: { nome: string; codigo?: string | null; metros?: number },
+  desembarque: { nome: string; codigo?: string | null; metros?: number }
+) {
   const perna = pernaMockCompleta("0.110");
-  perna.embarque.parada_nome = embarqueNome;
-  perna.desembarque.parada_nome = desembarqueNome;
+  perna.embarque = {
+    ...perna.embarque,
+    parada_nome: embarque.nome,
+    parada_codigo: embarque.codigo ?? null,
+    caminhada_metros: embarque.metros ?? 0,
+  } as typeof perna.embarque;
+  perna.desembarque = {
+    ...perna.desembarque,
+    parada_nome: desembarque.nome,
+    parada_codigo: desembarque.codigo ?? null,
+    caminhada_metros: desembarque.metros ?? 0,
+  } as typeof perna.desembarque;
   return { ...opcaoMock, pernas: [perna] };
 }
 
-describe("PlanejadorViagem — rótulo de parada sem nome (card #179)", () => {
-  it("parada sem nome na fonte vira 'Parada sem nome', e não coordenada crua", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("", "")]}
-        opcaoSelecionada={0}
-      />
+function renderizarComPontos(opcao: ReturnType<typeof opcaoComPontos>) {
+  render(
+    <PlanejadorViagem
+      {...props}
+      origem={origemMock}
+      destino={destinoMock}
+      opcoes={[opcao]}
+      opcaoSelecionada={0}
+    />
+  );
+}
+
+describe("PlanejadorViagem — referência da parada sem nome (card #179, #232)", () => {
+  it("sem nome, com código e distância: mostra código e metros, não 'Parada sem nome'", () => {
+    renderizarComPontos(
+      opcaoComPontos(
+        { nome: "", codigo: "PR-12243", metros: 14 },
+        { nome: "", codigo: "PR-99", metros: 30 }
+      )
     );
 
-    expect(screen.getAllByText("Parada sem nome")).toHaveLength(2);
-    expect(screen.queryByText(/Ponto em/)).not.toBeInTheDocument();
+    expect(screen.getByText("Parada PR-12243, a 14 m de você")).toBeInTheDocument();
+    expect(screen.getByText("Parada PR-99, a 30 m do destino")).toBeInTheDocument();
+    expect(screen.queryByText("Parada sem nome")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/-15.8300|-48.0400/);
   });
 
-  it("a coordenada continua disponível no title, pra quem precisar conferir", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("", "Parada B")]}
-        opcaoSelecionada={0}
-      />
+  it("sem nome e sem código: usa só a distância de caminhada", () => {
+    renderizarComPontos(opcaoComPontos({ nome: "", metros: 14 }, { nome: "Parada B" }));
+
+    expect(screen.getByText("Parada a 14 m de você")).toBeInTheDocument();
+  });
+
+  it("sem nome, só com código: mostra o código", () => {
+    renderizarComPontos(
+      opcaoComPontos({ nome: "", codigo: "PR-12243" }, { nome: "Parada B" })
     );
 
-    expect(screen.getByText("Parada sem nome")).toHaveAttribute("title", "-15.83000, -48.04000");
+    expect(screen.getByText("Parada PR-12243")).toBeInTheDocument();
+  });
+
+  it("sem nome, sem código e sem distância: cai em 'Parada sem nome', sem inventar nome", () => {
+    renderizarComPontos(opcaoComPontos({ nome: "" }, { nome: "" }));
+
+    expect(screen.getAllByText("Parada sem nome")).toHaveLength(2);
+    expect(screen.queryByText(/Ponto em/)).not.toBeInTheDocument();
+  });
+
+  it("o texto de acessibilidade traz a referência, e a coordenada só como complemento", () => {
+    renderizarComPontos(
+      opcaoComPontos({ nome: "", codigo: "PR-12243", metros: 14 }, { nome: "Parada B" })
+    );
+
+    expect(screen.getByText("Parada PR-12243, a 14 m de você")).toHaveAttribute(
+      "title",
+      "Parada PR-12243, a 14 m de você (coordenadas -15.83000, -48.04000)"
+    );
   });
 
   it("parada com nome mostra o nome, sem title", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("W3 Sul 502", "Rodoviária")]}
-        opcaoSelecionada={0}
-      />
-    );
+    renderizarComPontos(opcaoComPontos({ nome: "W3 Sul 502", metros: 14 }, { nome: "Rodoviária" }));
 
     expect(screen.getByText("W3 Sul 502")).not.toHaveAttribute("title");
-    expect(screen.queryByText("Parada sem nome")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Parada sem nome|a 14 m de você/)).not.toBeInTheDocument();
   });
 });
 
