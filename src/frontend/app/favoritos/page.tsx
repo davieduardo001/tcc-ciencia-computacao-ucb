@@ -12,6 +12,7 @@ import {
   RotaFavorita,
   SalvarFavoritoError,
 } from "@/lib/api";
+import { guardarRotaPendente } from "@/lib/rotaPendente";
 import "./favoritos.css";
 
 /**
@@ -76,25 +77,27 @@ export default function FavoritosPage() {
   }
 
   function handleIrParaRota(favorito: RotaFavorita) {
-    // Navega para o mapa com o planejador aberto e os pontos pré-preenchidos.
-    // O mapa/page.tsx lê esses query params e preenche origem/destino
-    // automaticamente, disparando o cálculo da rota.
-    const params = new URLSearchParams({
-      painel: "rotas",
-      origem_lat: String(favorito.origem_lat),
-      origem_lng: String(favorito.origem_lng),
-      destino_lat: String(favorito.destino_lat),
-      destino_lng: String(favorito.destino_lng),
-    });
-    // Inclui o label como nome legível dos pontos.
+    // Navega para o mapa com o planejador aberto. Origem e destino vão por
+    // sessionStorage (lido e apagado pelo mapa), nunca pela URL: coordenadas
+    // no endereço ficariam no histórico e em links copiados (LGPD, RN-06).
     // O label é montado como "origem → destino" (com espaços) ao salvar.
     const separador = favorito.label.indexOf(" → ");
-    if (separador > 0) {
-      params.set("origem_nome", favorito.label.slice(0, separador).trim());
-      params.set("destino_nome", favorito.label.slice(separador + 3).trim());
-    }
+    guardarRotaPendente({
+      origem: {
+        nome:
+          separador > 0 ? favorito.label.slice(0, separador).trim() : "Origem",
+        lat: favorito.origem_lat,
+        lng: favorito.origem_lng,
+      },
+      destino: {
+        nome:
+          separador > 0 ? favorito.label.slice(separador + 3).trim() : "Destino",
+        lat: favorito.destino_lat,
+        lng: favorito.destino_lng,
+      },
+    });
 
-    router.push(`/mapa?${params.toString()}`);
+    router.push("/mapa?painel=rotas");
   }
 
   return (

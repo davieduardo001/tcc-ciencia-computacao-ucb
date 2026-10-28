@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MapaPage from "../page";
+import { consumirRotaPendente, guardarRotaPendente } from "@/lib/rotaPendente";
 import {
   buscarChegadasDaRota,
   buscarLinha,
@@ -483,6 +484,7 @@ describe("MapaPage — rotas favoritas (US #25)", () => {
 
   beforeEach(() => {
     parametrosDaUrl = "";
+    sessionStorage.clear();
     (listarFavoritos as jest.Mock).mockReset().mockResolvedValue([]);
     (buscarLinha as jest.Mock).mockReset().mockResolvedValue(null);
     calcularRotasMock.mockReset().mockResolvedValue([]);
@@ -531,19 +533,44 @@ describe("MapaPage — rotas favoritas (US #25)", () => {
     });
   });
 
-  it("calcula a rota ao chegar de /favoritos com query params válidos", async () => {
-    parametrosDaUrl =
-      "painel=rotas&origem_lat=-15.83&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88&origem_nome=Casa&destino_nome=Trabalho";
+  it("calcula a rota ao chegar de /favoritos com a rota pendente (sem coordenadas na URL)", async () => {
+    parametrosDaUrl = "painel=rotas";
+    guardarRotaPendente({
+      origem: { nome: "Casa", lat: -15.83, lng: -48.04 },
+      destino: { nome: "Trabalho", lat: -15.79, lng: -47.88 },
+    });
     render(<MapaPage />);
 
     await waitFor(() => {
-      expect(calcularRotasMock).toHaveBeenCalledTimes(1);
+      expect(calcularRotasMock).toHaveBeenCalledWith(
+        { nome: "Casa", lat: -15.83, lng: -48.04 },
+        { nome: "Trabalho", lat: -15.79, lng: -47.88 }
+      );
     });
+    // A rota pendente é apagada após a leitura.
+    expect(consumirRotaPendente()).toBeNull();
   });
 
-  it("ignora query params que não são números", async () => {
+  it("não calcula nada se não há rota pendente", async () => {
+    parametrosDaUrl = "painel=rotas";
+    render(<MapaPage />);
+    await act(async () => {});
+
+    expect(calcularRotasMock).not.toHaveBeenCalled();
+  });
+
+  it("ignora coordenadas passadas pela URL", async () => {
     parametrosDaUrl =
-      "painel=rotas&origem_lat=abc&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88";
+      "painel=rotas&origem_lat=-15.83&origem_lng=-48.04&destino_lat=-15.79&destino_lng=-47.88";
+    render(<MapaPage />);
+    await act(async () => {});
+
+    expect(calcularRotasMock).not.toHaveBeenCalled();
+  });
+
+  it("ignora rota pendente corrompida", async () => {
+    parametrosDaUrl = "painel=rotas";
+    sessionStorage.setItem("movecity:rota-pendente", "{lixo");
     render(<MapaPage />);
     await act(async () => {});
 
