@@ -243,17 +243,27 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 | CT-COL-05 | **Aprovado** | Os 3 reportes de teste do CT-COL-03 (linha 0.960, "Aguardando confirmação") foram criados às ~08:13 e apareciam na lista às ~08:15. Às ~09:17, depois de 60 min sem confirmação, "Ocorrências" mostra **"Nenhuma ocorrência ativa no momento."** Evidência: [`lista vazia`](evidencias/CT-COL-05-lista-vazia-apos-60-min.jpg); [`ontem`](evidencias/CT-COL-05-lista-sem-ocorrencia-de-ontem.jpg) é a conferência anterior. |
 | **#222** (renovação da sessão) | **Validada em produção** | Ao abrir `/ocorrencias` com o token de acesso vencido, a rede da aba registrou: `GET /api/auth/me` **401**, `GET /api/mobilidade/viagens/ativa` **401**, `GET /api/colaboracao/ocorrencias` **401**, depois `POST /api/auth/refresh` **200**, `GET /api/colaboracao/ocorrencias` **200** (refeita) e `GET /api/auth/me` **200**. A tela mostrou "Carregando…" por alguns segundos e terminou logada, **sem pedir login**. Isto fecha o caminho de sucesso que o CT-AUT-03 deixou pendente. |
 
+## Validação das correções #231 e #232 e CT-ROT-05 completo (28/10, ~09:50, produção, conta do usuário, desktop)
+
+Depois do merge dos PRs #239 (#231) e #240 (#232) e do deploy da Vercel.
+
+| Item | Estado | O que foi feito e visto |
+|---|---|---|
+| **#232** ("Parada sem nome") | **Corrigido e validado** | Rota Terminal de Taguatinga Sul → Rodoviária do Plano Piloto: o embarque passou de "Parada sem nome" para "Embarque em **Parada a 14 m de você**". O desembarque continua com o nome ("Eixo Rodoviário, Setor Bancário Sul"). O embarque ainda não mostra o tempo de espera em minutos, só o selo "ao vivo" (a ressalva do CT-ROT-06 sobre o tempo continua; o provável é o backend devolver ETA vazio nessa rota). Evidência: [`parada a 14 m`](evidencias/CT-ROT-06-parada-a-14-m-de-voce.jpg). |
+| **#231** (coordenadas na URL) | **Corrigido e validado** | Em "Rotas Salvas", toque em "Ir" na rota salva. O endereço da página ficou **`/mapa?painel=rotas`**, sem `origem_lat`, `origem_lng` nem outro parâmetro de coordenada. Origem e destino vieram preenchidos e a rota foi recalculada (10 opções). Evidência: [`ir sem coordenadas`](evidencias/CT-ROT-05-ir-sem-coordenadas-na-url.jpg). |
+| **CT-ROT-05** (c1, c2, c3) | **Aprovado** | Esta rodada executou também os passos que faltavam: **salvar** a rota nova ("Salvar como favorita", que apareceu em "Minhas Rotas") e **remover** pela lixeira (voltou a "Você ainda não salvou nenhuma rota"). A favorita de teste foi removida, e a conta ficou como estava. |
+
 ## Quadro geral dos 49 casos (atualizado em 28/10)
 
 | Estado | Qtd | Casos |
 |---|---|---|
-| Aprovado | 32 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05 |
-| Aprovado em parte ou com ressalva | 11 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-05, ROT-06, ROT-07, SEG-01, VIA-02 |
+| Aprovado | 33 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05, ROT-05 |
+| Aprovado em parte ou com ressalva | 10 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-06, ROT-07, SEG-01, VIA-02 |
 | **Reprovado por configuração** | 1 | VIA-01: o embarque é aceito longe do ônibus porque o secret `RAIO_EMBARQUE_M` está em 100 km em produção (decisão até a defesa); a regra de 100 m só vale quando o secret voltar a 100 |
 | Não verificável hoje | 3 | NOT-02 (sem canal de entrega), VIA-07 (a regra fica mascarada pelo raio), VIA-08 (precisa de ônibus se aproximando) |
 | Não executado | 2 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão) |
 
-> 32 + 11 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
+> 33 + 10 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
 
 ## Pendentes
 
