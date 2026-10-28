@@ -135,7 +135,7 @@ Com uma pessoa só no teclado, combinar a deixa de cada passo ("próximo: abrir 
 | Slides (#205), vídeo de plano B | Vitória + todos | |
 | Ensaio completo cronometrado, 2 vezes | Todos | Meta: terminar com folga para perguntas |
 | Promoção #203 (`homolog` → `main`) e validação em produção | Davi | A demo deve rodar no que está em produção |
-| **Voltar `RAIO_EMBARQUE_M` a 100** (hoje 100000 = 100 km, de propósito, para testar de qualquer lugar) e retestar a recusa a mais de 100 m: `flyctl secrets set RAIO_EMBARQUE_M=100 -a movecity-mobilidade` | Davi | **Dizer na defesa que o embarque está em modo de teste**; reverter depois, se a regra for demonstrada |
+| **Raio de embarque: decisão de 28/10, manter `RAIO_EMBARQUE_M` em 100 km só para demonstrar o "Peguei este ônibus"** | Davi | **Dizer na defesa** que o raio está aberto só para a demonstração; a regra de uso real é 100 m (`flyctl secrets set RAIO_EMBARQUE_M=100 -a movecity-mobilidade`), a aplicar depois da defesa. A regra "ônibus chegando" (#191) só se prova com o raio em 100 m |
 | Decidir o que entra no "fora de escopo" (#26, #28, #115, #118, #199, #207) | Grupo | Só apresentar como entregue o que está mergeado |
 
 **Regra de ouro (cenário 3 da #205):** todo número no slide tem fonte (comando, issue, PR ou relatório em `docs/qa/`); o que não foi medido não aparece como medido.

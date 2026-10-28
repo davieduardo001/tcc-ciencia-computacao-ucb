@@ -253,12 +253,23 @@ Depois do merge dos PRs #239 (#231) e #240 (#232) e do deploy da Vercel.
 | **#231** (coordenadas na URL) | **Corrigido e validado** | Em "Rotas Salvas", toque em "Ir" na rota salva. O endereço da página ficou **`/mapa?painel=rotas`**, sem `origem_lat`, `origem_lng` nem outro parâmetro de coordenada. Origem e destino vieram preenchidos e a rota foi recalculada (10 opções). Evidência: [`ir sem coordenadas`](evidencias/CT-ROT-05-ir-sem-coordenadas-na-url.jpg). |
 | **CT-ROT-05** (c1, c2, c3) | **Aprovado** | Esta rodada executou também os passos que faltavam: **salvar** a rota nova ("Salvar como favorita", que apareceu em "Minhas Rotas") e **remover** pela lixeira (voltou a "Você ainda não salvou nenhuma rota"). A favorita de teste foi removida, e a conta ficou como estava. |
 
+## CT-AUT-05 — recuperação de senha por e-mail, depois do SMTP (28/10, ~09:30 a 09:57, produção, executado pelo usuário no celular)
+
+Depois do merge do PR #238 (#237). Pedido de recuperação feito pela tela `/recuperar-senha` para `davi.emiranda@a.ucb.br`; o restante foi feito pelo usuário no celular.
+
+| Passo | Resultado |
+|---|---|
+| Pedir o link | A tela mostrou "Se o e-mail estiver cadastrado, você receberá um link de redefinição"; o servidor respondeu `POST /auth/esqueci-senha` 200, sem aviso de SMTP ausente nem erro de envio no log do Fly. |
+| Receber o e-mail | **Chegou às 09:29 na caixa de entrada** (não foi para o spam), com o assunto "Movecity - redefinição de senha", o link `https://movecity-frontend.vercel.app/redefinir-senha?token=...` (não `localhost`), a validade de 60 minutos, "só pode ser usado uma vez" e o aviso para ignorar quem não pediu. [`e-mail`](evidencias/CT-AUT-05-email-recebido.png) |
+| Abrir o link e definir a nova senha | A tela "Crie uma nova senha" mostrou o medidor ("Forte") e os 4 requisitos; "Redefinindo…"; depois **"Senha redefinida. Sua senha foi redefinida com sucesso."** com o botão "Ir para o login". [`nova senha`](evidencias/CT-AUT-05-celular-nova-senha.jpg), [`redefinindo`](evidencias/CT-AUT-05-celular-redefinindo.jpg), [`redefinida`](evidencias/CT-AUT-05-celular-senha-redefinida.jpg) |
+| Link usado, expirado ou inválido; confirmação divergente | **Não vistos na tela.** Pelo código (`redefinir_senha`): confirmação divergente devolve 400 "As senhas nao coincidem."; token inexistente, usado ou expirado devolve 400 "Este link nao e mais valido ou expirou."; ao redefinir, o token é marcado `usado`. O teste do link inválido com um token falso ficou pendente porque o navegador de teste deixou de responder. O token do e-mail acima já foi usado; **não foi reutilizado** para não arriscar trocar a senha da conta. |
+
 ## Quadro geral dos 49 casos (atualizado em 28/10)
 
 | Estado | Qtd | Casos |
 |---|---|---|
 | Aprovado | 33 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05, ROT-05 |
-| Aprovado em parte ou com ressalva | 10 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-06, ROT-07, SEG-01, VIA-02 |
+| Aprovado em parte ou com ressalva | 10 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (e-mail, link e nova senha comprovados; faltam link inválido, usado e confirmação divergente na tela), COL-04, ETA-04, PAR-03, ROT-06, ROT-07, SEG-01, VIA-02 |
 | **Reprovado por configuração** | 1 | VIA-01: o embarque é aceito longe do ônibus porque o secret `RAIO_EMBARQUE_M` está em 100 km em produção (decisão até a defesa); a regra de 100 m só vale quando o secret voltar a 100 |
 | Não verificável hoje | 3 | NOT-02 (sem canal de entrega), VIA-07 (a regra fica mascarada pelo raio), VIA-08 (precisa de ônibus se aproximando) |
 | Não executado | 2 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão) |
