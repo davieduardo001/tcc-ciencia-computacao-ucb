@@ -55,9 +55,14 @@ out/
 Thumbs.db
 
 # ============================
-# Gemini
+# Agentes de IA
+# A fonte é ai/. Estas pastas são links criados por ai/instalar.sh.
 # ============================
-.gemini/settings.json
+.claude/
+.opencode/
+.gemini/
+.maestri/
+opencode.json
 
 # ============================
 # Logs

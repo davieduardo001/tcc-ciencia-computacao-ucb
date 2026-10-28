@@ -26,8 +26,18 @@ description: Garante que os commits do projeto sejam atômicos, sigam o padrão 
 7. **Fluxo pós-commit:** Após os commits, oriente o merge conforme o tipo de branch:
    - `feat/` ou `fix/`: merge em `homolog` → depois `homolog` em `main`
    - `docs/` ou `chore/`: merge direto em `main`
+   - Se a branch fecha uma US, lembre de comentar DoD-Sprint e DoD-Release na issue após cada merge (`ai/workflow.md`, seção "Critérios DOD").
 8. **Idioma:** Mensagens de commit preferencialmente em inglês ou português (PT-BR), mas a interação com o usuário sempre em **Português (PT-BR)**.
 </instructions>
+
+## Comandos úteis
+
+```bash
+git status
+git diff
+git add <arquivo>
+git commit -m "tipo: mensagem"
+```
 
 ## <available_resources>
 - `git status`, `git diff`, `git log`: Ferramentas para análise do estado do repositório.

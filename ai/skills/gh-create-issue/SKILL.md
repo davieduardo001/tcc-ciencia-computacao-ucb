@@ -1,4 +1,9 @@
-# Criar Issue no GitHub (gh-create-issue)
+---
+name: gh-create-issue
+description: Formaliza uma User Story como issue do GitHub com o gh CLI. O corpo traz só a US e os cenários BDD; PRD e SPEC entram como comentários separados. Em português (PT-BR).
+---
+
+# Skill: Criar Issue no GitHub (gh-create-issue)
 
 Formaliza uma User Story (US) como GitHub Issue, mantendo o corpo principal focado no valor do usuário e detalhes técnicos/produto em comentários separados.
 
@@ -23,6 +28,7 @@ Formaliza uma User Story (US) como GitHub Issue, mantendo o corpo principal foca
 ## Referências
 
 - Template: `docs/templates/Template_User_Stories.md`
+- Modelo de issue: `assets/issue_template.md` (nesta pasta)
 - Documento de Visão: `docs/documento_visao.md`
 
 ---

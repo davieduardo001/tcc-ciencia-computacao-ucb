@@ -27,7 +27,7 @@ permissions:
     resource: "git *"
     effect: ask
   - action: edit
-    resource: ".opencode/**"
+    resource: "ai/**"
     effect: deny
   - action: edit
     resource: ".github/**"
