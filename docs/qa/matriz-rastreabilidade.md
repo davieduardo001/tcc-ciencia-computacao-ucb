@@ -31,7 +31,7 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 | #21 | Buscar parada por nome ou endereço | fechada · Done | ver a issue | sem caso dedicado (ver nota 3) | #197 | `mobilidade/tests/test_busca_parada_route.py`, `app/mapa/__tests__/BuscaParada.test.tsx`, `lib/__tests__/buscarParadas.test.ts` |
 | #22 | Notificações de rotas preferidas | fechada · Done | 3 | sem caso dedicado (ver nota 1) | #94 | `colaboracao/tests/test_notificacoes.py` |
 | #23 | Reportar ocorrência | fechada · Done | 3 | CT-COL-01 (A), CT-COL-02 (A), CT-COL-03 (A) | #162 | `colaboracao/tests/test_ocorrencias.py`, `app/ocorrencias/reportar/__tests__/page.test.tsx` |
-| #24 | Ver ocorrências de outros passageiros | fechada · Done | 3 | CT-COL-04 (A\*), CT-COL-05 (A) | #180 | `colaboracao/tests/test_ocorrencias.py`, `app/ocorrencias/__tests__/page.test.tsx` |
+| #24 | Ver ocorrências de outros passageiros | fechada · Done | 3 | CT-COL-04 (A\*), CT-COL-05 (A\*) | #180 | `colaboracao/tests/test_ocorrencias.py`, `app/ocorrencias/__tests__/page.test.tsx` |
 | #25 | Rota favorita | fechada · Done | 3 | CT-ROT-05 (A) | #176; correção #239 (coordenadas na URL, #231) | `colaboracao/tests/test_favoritos.py`, `app/favoritos/__tests__/page.test.tsx`, `app/mapa/__tests__/page.test.tsx` |
 | #26 | Confirmar ocorrência de outro passageiro | **aberta** · Homolog | ver a issue | sem caso dedicado (ver nota 3) | #209 | `colaboracao/tests/test_confirmar_ocorrencia.py`, `app/ocorrencias/__tests__/page.test.tsx` |
 | #27 | Alerta de atraso | fechada · Done | 3 | CT-NOT-02 (NV) | #152 | `mobilidade/tests/test_servico_rastreamento.py`, `test_servico_notificacoes.py`, `test_routes.py` |
@@ -55,7 +55,7 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 3. **#21 e #26** foram entregues depois da escrita dos casos e não têm caso manual dedicado; ficam cobertas pelos testes automatizados listados. Escrever os casos é trabalho futuro.
 4. **#195 / #200:** o Web Push foi entregue (PR #196), mas a validação em aparelho real depende da issue #200 (chaves VAPID pelo CI, PR #210 em `homolog`), ainda aberta. Não há caso manual; o CT-VIA-08 (aviso com o app aberto) ficou não verificável hoje.
 5. **US sem entrega, fora desta matriz:** #28 (alerta de cancelamento), #199 (fallback colaborativo) e #207 (push dos alertas) estão abertas e sem PR mergeado; #115 e #118 estão fora de escopo (trabalho futuro, segundo a issue #206).
-6. **Defeitos da execução de 27 e 28/10** e a correção que cada um recebeu: #211, #212 e #213 (PR #218; o #213 também no PR #224), #215 e #216 (PRs #219 e #225), #221 (PR #222), #227 (PR #228), #230 e #237 (PR #238), #231 (PR #239) e #232 (PR #240). O #214 foi reclassificado como comportamento intencional da #179. Seguem abertas sem PR: #233 (rota sem resultado a investigar), #234, #236 e #243. Os defeitos com correção em `homolog` aparecem na linha da US afetada.
+6. **Defeitos da execução de 27 e 28/10** e a correção que cada um recebeu: #211, #212 e #213 (PR #218; o #213 também no PR #224), #215 e #216 (PRs #219 e #225), #221 (PR #222), #227 (PR #228), #230 e #237 (PR #238), #231 (PR #239) e #232 (PR #240). O #214 foi reclassificado como comportamento intencional da #179. Seguem abertas sem PR: #233 (rota sem resultado a investigar), #234, #236 e #243. Os defeitos com correção em `homolog` aparecem na linha da US afetada. Defeito novo sem PR: #249 (a tela de reporte diz "mínimo 2 confirmações", mas o servidor exige 3), que afeta a validação cruzada das USs #23, #24 e #26. No CT-COL-05 (#24), a validade da ocorrência é por tipo no código (`Ocorrencia.TTL_MINUTOS`, 15 a 120 min), e não 60 min como na issue.
 7. Issues "aberta · Homolog" estão mergeadas em `homolog` e aguardam a promoção para `main` (DoD de dois níveis do `AGENT.md`); a última promoção (PR #203) é de 22/10. Os PRs #209, #210, #218 a #225, #228 e #238 a #240 estão só em `homolog`.
 
 ## 3. Cobertura dos cenários por casos manuais
@@ -66,7 +66,7 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 | Com ao menos um caso manual | 27 (as 5 exceções: #21, #22, #26, #195/#200 e #217, ver notas 1, 3 e 4) |
 | Casos manuais escritos | 49 (18 P1, 24 P2, 7 P3) |
 | Por severidade | 1 crítica, 28 altas, 20 médias |
-| Casos com resultado em 28/10/2026 | 44 (33 aprovados, 10 aprovados em parte ou com ressalva, 1 reprovado por configuração) |
+| Casos com resultado em 28/10/2026 | 44 (32 aprovados, 11 aprovados em parte ou com ressalva, 1 reprovado por configuração) |
 | Casos sem resultado | 5 (3 não verificáveis hoje: CT-NOT-02, CT-VIA-07, CT-VIA-08; 2 não executados: CT-MAP-03, CT-ETA-03) |
 
 > Contagens a partir de [`casos-de-teste.md`](casos-de-teste.md) e do [quadro geral](execucao-casos-p1.md#quadro-geral-dos-49-casos-atualizado-em-2810). O único reprovado (CT-VIA-01) falha por configuração (raio de embarque em 100 km em produção, mantido para a demonstração), não por defeito de código; ver o [plano de testes](plano-de-testes.md).
