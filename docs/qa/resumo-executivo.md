@@ -3,7 +3,7 @@
 
 > 📎 Ver este arquivo no GitHub: <https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/blob/main/docs/qa/resumo-executivo.md>
 
-**Atualizado em 28/10/2026 · testes manuais em produção (`homolog` publicada) · automatizados e cobertura medidos em 16/10/2026 (`07c9edc`) · detalhes e fontes em [`README.md`](README.md)**
+**Atualizado em 28/10/2026 · testes manuais em produção (`homolog` publicada) · testes automatizados contados no CI em 28/10 · cobertura e CI medidos em 16/10/2026 (`07c9edc`) · detalhes e fontes em [`README.md`](README.md)**
 
 ## Em uma frase
 

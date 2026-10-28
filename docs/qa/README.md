@@ -5,7 +5,7 @@
 
 Esta pasta reúne o esquema de testes no estilo QA do Movecity: o plano, os casos de teste manuais por User Story entregue e os relatórios de testes unitários, de integração, de cobertura e de defeitos. Nasce da issue [#151](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/151).
 
-> **Fotografia datada.** Todos os números foram medidos em **16/10/2026**, no commit `07c9edc` da branch `homolog` (merge do PR #194). Eles não se atualizam sozinhos: ao fim de cada sprint, o procedimento da seção "Como regerar" refaz as medições.
+> **Fotografia datada.** Os números de cobertura, de CI e de PRs foram medidos em **16/10/2026**, no commit `07c9edc` da branch `homolog` (merge do PR #194). A contagem de testes automatizados foi refeita em **28/10/2026** pelo log do CI; os casos manuais foram executados em 27 e 28/10. Eles não se atualizam sozinhos: ao fim de cada sprint, o procedimento da seção "Como regerar" refaz as medições.
 
 ## Documentos
 
