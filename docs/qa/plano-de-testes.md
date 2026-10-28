@@ -53,7 +53,7 @@ Plano de QA para validar, a cada sprint, as User Stories entregues. Os casos est
 ### 4.2 Saída (a US pode ser dada como validada em homologação)
 - 100% dos casos de severidade **Crítica** e **Alta** da US **Aprovados**.
 - Nenhum defeito aberto de severidade Crítica ou Alta; Média e Baixa registrados em issue.
-- Resultado comentado na issue (DoD-Sprint do `AGENT.md`).
+- Resultado comentado na issue (DoD-Sprint do `ai/workflow.md`).
 - Para entrar em produção (DoD-Release): regressão mínima aprovada após a promoção para `main`.
 
 ### 4.3 Severidade e prioridade
