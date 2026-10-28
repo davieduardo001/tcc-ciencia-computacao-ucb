@@ -89,8 +89,8 @@ issue → cenários BDD → diagrama de sequência → PR → CI → revisão �
 
 | Medida | Valor | Fonte |
 |---|---|---|
-| Testes automatizados | **1.260** passando (671 backend, 589 frontend) | medido em 16/10/2026 |
-| Cobertura | backend **93,7%**, frontend **89,1%** | idem |
+| Testes automatizados | **1.640** passando (844 backend, 796 frontend) | log do CI, 28/10/2026 |
+| Cobertura | backend **93,7%**, frontend **89,1%** | medida em 16/10/2026 (o CI não mede cobertura) |
 | Casos de teste manuais | **49 de 49 executados em produção**: 33 aprovados, 10 com ressalva, 1 reprovado por configuração, 3 só em campo, 2 pendentes | [`docs/qa/execucao-casos-p1.md`](docs/qa/execucao-casos-p1.md), 28/10/2026 |
 | Defeitos catalogados | **24**, com causa e como foram detectados | [`docs/qa/relatorio-cobertura-e-defeitos.md`](docs/qa/relatorio-cobertura-e-defeitos.md) |
 | Usabilidade | 10 heurísticas de Nielsen avaliadas por um avaliador, de forma agêntica | [`docs/qa/avaliacao-usabilidade-nielsen.md`](docs/qa/avaliacao-usabilidade-nielsen.md) |
