@@ -11,6 +11,8 @@ Registro da primeira execução dos casos P1 de [`casos-de-teste.md`](casos-de-t
 
 ## Resumo
 
+> Esta tabela é o resultado da **primeira execução dos 18 casos P1 (27/10)**. O estado atual dos 49 casos está no [quadro geral](#quadro-geral-dos-49-casos-atualizado-em-2810) mais abaixo.
+
 | Estado | Casos |
 |---|---|
 | Aprovado | AUT-02, AUT-06, MAP-01, MAP-02, MAP-04, MAP-05, ETA-01, ETA-02, ROT-01, ROT-02, VIA-03, SEG-01 (parcial) |
@@ -102,7 +104,7 @@ Cada linha traz os passos e a imagem. Hora aproximada; sessão renovada por novo
 
 **Reconfirmado:** o bug da #215 persiste na produção (09:25): a parada ainda lista "06:00 · 06:20 · 06:40" como próximas saídas.
 
-**Não executados e por quê:** CT-PAR-02 (não achei uma parada sem horários), CT-MAP-03 e CT-ETA-03 (precisam de posição simulada em DevTools → *Sensors*, que impede meus cliques), CT-MAP-08 (a linha tinha 10 ônibus; a vez em que "não havia ônibus" foi o 401 da sessão expirada).
+**[Superado em 28/10: CT-PAR-02 e CT-MAP-08 foram executados e aprovados; CT-MAP-03 e CT-ETA-03 seguem como descrito na seção de 28/10.]** Texto original: **Não executados e por quê:** CT-PAR-02 (não achei uma parada sem horários), CT-MAP-03 e CT-ETA-03 (precisam de posição simulada em DevTools → *Sensors*, que impede meus cliques), CT-MAP-08 (a linha tinha 10 ônibus; a vez em que "não havia ônibus" foi o 401 da sessão expirada).
 
 ## Revalidação após as correções (27/10, ~09:30, produção atualizada pelos PRs #218, #219 e #220)
 
@@ -222,9 +224,44 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 4. **"Parada sem nome":** embarque e desembarque de trechos das rotas 0.306 e 0.376/0.092 aparecem como "Parada sem nome" (falta o nome no cadastro da parada).
 5. `GET /api/mobilidade/linhas/0.110/posicoes` traz `eta_minutos: null` sem posição do usuário, como esperado; o ETA com localização é o CT-ETA-01 (pendente).
 
+## CT-COL-03, CT-ETA-02 e casos não verificáveis (28/10, ~08:15, produção, conta do usuário, desktop 1366 px)
+
+| Caso | Estado | O que foi feito e visto |
+|---|---|---|
+| CT-COL-03 | **Aprovado** | Na linha 0.960 enviei 4 reportes de teste ("Lotação", descrição "TESTE QA CT-COL-03 (n/4), ignorar") pela tela "Reportar". Foram aceitos exatamente **3** ("Reporte enviado! Obrigado por ajudar outros passageiros.", e a lista de ocorrências mostra os 3 como "Aguardando confirmação"). O **4º** foi barrado com "Você atingiu o limite de reportes. Tente novamente mais tarde." Bate com `LIMITE_REPORTES_POR_HORA = 3` e o 429 `limite_reportes_excedido` do código. Evidências: [`limite`](evidencias/CT-COL-03-limite-de-reportes.jpg), [`3 aceitos`](evidencias/CT-COL-03-tres-reportes-aceitos.jpg). Os 3 reportes ficam visíveis até expirarem. |
+| CT-ETA-02 | **Aprovado** | Popup do carro 445711 da linha 0.306: "Sentido volta · parado", "**Sem previsão no momento**" e "Posição de 59s atrás". Não mostra tempo inventado. Evidência: [`popup`](evidencias/CT-ETA-02-popup-parado-sem-previsao.jpg). |
+| CT-ROT-01 | **Aprovado** | Evidência de tela adicionada: a rota de Terminal de Taguatinga Sul até a Rodoviária mostra 10 opções (6 diretas, 4 com baldeação) em [`rota-ate-rodoviaria-opcoes`](evidencias/CT-VIA-05-rota-ate-rodoviaria-opcoes.jpg), e o card da opção direta em [`paradas`](evidencias/CT-ROT-06-paradas-embarque-desembarque.jpg). |
+| CT-SEG-03 | **Aprovado** | Embarquei no carro 445711 (0.306) pelo popup, abri `GET /api/mobilidade/viagens/ativa` no navegador com a sessão e li o JSON, depois encerrei com "Cheguei" (a resposta voltou a `ativa:false`). A resposta traz `viagem` (id, linha, sentido, prefixo do veículo, `embarcou_em`), `veiculo` (posição do **ônibus**), `sinal`, `destino`, `proxima_parada`, `paradas_restantes` e `alerta_proximidade`; **não há coordenada nem trilha do usuário**. Bate com a RN-06 (a posição do usuário serve só para validar o embarque). |
+| CT-VIA-08 | **Não verificável hoje** | Exige uma viagem com destino e um ônibus **se aproximando** da parada de descida, com o app aberto. Os ônibus da 0.306 estavam um parado (posição de 59 s atrás) e outro já no fim do trajeto; sem ônibus a caminho da parada de descida o aviso não tem como disparar. Como o aviso é entregue por consulta (só com o app aberto, `AvisoDeProximidade`), a única prova é em campo. **Deve ser parte do ensaio da defesa** (a demo do Luis inclui esse aviso). |
+| CT-NOT-02 | **Não verificável** | O alerta de atraso depende do ciclo do worker de monitoramento e **não tem canal de entrega** (o push, #207, não existe). A lógica (limiar de 5 min, sem repetir, reset com margem) é coberta pelos testes unitários do `deduplicador` e do `monitoring_worker`, mas não há como observar o alerta no app. |
+| CT-MAP-03 e CT-ETA-03 | **Não executados** | Precisam alterar a localização pelo DevTools (Sensors). Com o DevTools aberto a extensão do navegador perde o controle dos cliques, então só podem ser feitos à mão. Passo a passo para quem for fazer: DevTools, More tools, Sensors, Location, Other; escolher uma posição perto de uma parada de linha com ônibus em movimento; ver o marcador azul se mover (MAP-03) e manter o popup do ônibus aberto por ~1 min para ver o tempo mudar (ETA-03). |
+
+## CT-COL-05 e renovação de sessão (#222) (28/10, ~09:17, produção, conta do usuário, desktop)
+
+| Item | Estado | O que foi visto |
+|---|---|---|
+| CT-COL-05 | **Aprovado** | Os 3 reportes de teste do CT-COL-03 (linha 0.960, "Aguardando confirmação") foram criados às ~08:13 e apareciam na lista às ~08:15. Às ~09:17, depois de 60 min sem confirmação, "Ocorrências" mostra **"Nenhuma ocorrência ativa no momento."** Evidência: [`lista vazia`](evidencias/CT-COL-05-lista-vazia-apos-60-min.jpg); [`ontem`](evidencias/CT-COL-05-lista-sem-ocorrencia-de-ontem.jpg) é a conferência anterior. |
+| **#222** (renovação da sessão) | **Validada em produção** | Ao abrir `/ocorrencias` com o token de acesso vencido, a rede da aba registrou: `GET /api/auth/me` **401**, `GET /api/mobilidade/viagens/ativa` **401**, `GET /api/colaboracao/ocorrencias` **401**, depois `POST /api/auth/refresh` **200**, `GET /api/colaboracao/ocorrencias` **200** (refeita) e `GET /api/auth/me` **200**. A tela mostrou "Carregando…" por alguns segundos e terminou logada, **sem pedir login**. Isto fecha o caminho de sucesso que o CT-AUT-03 deixou pendente. |
+
+## Quadro geral dos 49 casos (atualizado em 28/10)
+
+| Estado | Qtd | Casos |
+|---|---|---|
+| Aprovado | 32 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05 |
+| Aprovado em parte ou com ressalva | 11 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-05, ROT-06, ROT-07, SEG-01, VIA-02 |
+| **Reprovado por configuração** | 1 | VIA-01: o embarque é aceito longe do ônibus porque o secret `RAIO_EMBARQUE_M` está em 100 km em produção (decisão até a defesa); a regra de 100 m só vale quando o secret voltar a 100 |
+| Não verificável hoje | 3 | NOT-02 (sem canal de entrega), VIA-07 (a regra fica mascarada pelo raio), VIA-08 (precisa de ônibus se aproximando) |
+| Não executado | 2 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão) |
+
+> 32 + 11 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
+
 ## Pendentes
 
-Nenhum caso P1. Seguem os 31 casos P2/P3 e a repetição do ETA-01 em largura de celular (390 px).
+- **MAP-03 e ETA-03** (à mão, com DevTools Sensors): ver o passo a passo na seção de 28/10.
+- **VIA-08 e VIA-07**: só em campo; **entram no ensaio da defesa**. Para o VIA-07, antes voltar o raio a 100 m.
+- **#222 (renovação de sessão)**: validada em 28/10, ver a seção acima.
+- **#217 (folha de rota)**: conferir em celular real.
+- **Usabilidade (heurísticas de Nielsen)**: avaliação não feita (ver o roteiro da disciplina).
 
 ## Defeitos novos e suas issues
 
