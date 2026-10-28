@@ -74,7 +74,7 @@ O Gateway é o **ponto único de entrada** para todas as requisições do fronte
 | Regra | Detalhe |
 |-------|---------|
 | **Ponto único de entrada** | Todas as requisições passam pelo Gateway |
-| **Nenhum serviço acessa o banco** | Tudo passa pelo Gateway |
+| **Frontend só fala com o Gateway** | Os serviços de domínio acessam o banco; o Gateway não |
 | **Cookies httpOnly** | Gateway seta/limpa cookies de autenticação |
 | **Roteamento por path** | `/api/auth/*` → Auth, `/api/mobilidade/*` → Mobilidade, `/api/colaboracao/*` → Colaboracao |
 

@@ -80,7 +80,7 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
     └──► [Colaboracao Service] ──► [PostgreSQL]
 ```
 
-**Regra:** Nenhum serviço acessa o banco diretamente. Tudo passa pelo Gateway.
+**Regra:** o frontend só fala com o Gateway. Os serviços de domínio acessam o PostgreSQL (Neon); o Gateway não acessa o banco.
 
 **Decisões registradas:**
 - Gateway é o **ponto único de entrada** para todas as requisições
