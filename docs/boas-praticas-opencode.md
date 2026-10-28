@@ -240,8 +240,8 @@ Use a skill review-pr para revisar este PR
 ## Referências
 
 - Documentação do opencode: https://opencode.ai/docs/
-- Configuração: `opencode.json`
-- Skills: `.opencode/skills/`
-- Agentes: `.opencode/agents/`
-- Workflow: `AGENT.md`
+- Configuração: `ai/opencode/opencode.json` (o `opencode.json` da raiz é criado por `./ai/instalar.sh`)
+- Skills: `ai/skills/`
+- Agentes: `ai/agents/`
+- Workflow: `ai/workflow.md`
 - Gitflow: `docs/guia-contribuicao.md`

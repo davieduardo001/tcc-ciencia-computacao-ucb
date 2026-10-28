@@ -1,6 +1,9 @@
-# Gerenciar Branches do Projeto
+---
+name: gerenciar-branches
+description: Garante que o projeto utilize o fluxo correto por tipo de branch — feat/fix passam por homolog antes de main; docs/chore vão direto para main.
+---
 
-Garante que o desenvolvimento siga o fluxo correto por tipo de branch.
+# Skill: Gerenciar Branches do Projeto
 
 ## Fluxo obrigatório
 
@@ -16,13 +19,12 @@ chore/configuracao             ──────► main  (direto)
 - Novas branches `feat/` e `fix/` são criadas a partir de `homolog`.
 - **NUNCA** mergear `feat/` ou `fix/` direto em `main`.
 
-## Instruções
-
+## <instructions>
 1. **Verificação de Estado:** Execute `git branch` para listar as branches existentes e identificar a branch atual.
 2. **Consulta ao Usuário:** Apresente a lista de branches ativas e pergunte:
    - "Deseja criar uma nova branch? Qual o tipo (feat/fix/docs/chore)?"
    - "Deseja commitar em uma das branches existentes? (Liste-as)"
-   - "Deseja continuar na branch atual `[nome da branch]`?"
+   - "Deseja continuar na branch atual [nome da branch]?"
 3. **Criação de Branch:** Sugira nome seguindo o padrão e crie a partir da base correta:
    - `feat/nome` ou `fix/nome` → base: `homolog`
    - `docs/nome` ou `chore/nome` → base: `main`
@@ -31,6 +33,7 @@ chore/configuracao             ──────► main  (direto)
    - `feat/` ou `fix/`: merge em `homolog`, depois `homolog` → `main`
    - `docs/` ou `chore/`: merge direto em `main`
 6. **Idioma:** Toda a interação com o usuário deve ser em **Português (PT-BR)**.
+</instructions>
 
 ## Comandos úteis
 
@@ -53,6 +56,14 @@ git checkout main && git merge homolog
 git checkout main && git merge docs/nome
 ```
 
----
+## <available_resources>
+- `git branch`: Para listar branches locais.
+- `git checkout homolog` / `git checkout main`: Base para criação de novas branches conforme o tipo.
+- `git checkout -b`: Para criar e mudar para uma nova branch.
+- `git merge`: Para integrar branches seguindo o fluxo definido.
+</available_resources>
 
-**Uso:** `/gerenciar-branches`
+## Exemplos de Uso
+- "Antes de commitar, verifique a estratégia de branch seguindo a skill."
+- "Crie uma branch para a feature de mapa em tempo real."
+- "Organize as branches para esta correção de bug."

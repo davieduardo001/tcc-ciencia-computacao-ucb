@@ -79,7 +79,7 @@ Antes de qualquer linha de código, toda US precisa estar **formalizada como iss
 
 Por que separado e não tudo num texto só: cada camada tem um público e um ritmo de mudança diferente. A US raramente muda depois de escrita; a SPEC pode mudar várias vezes durante o desenvolvimento sem precisar reescrever o valor de negócio.
 
-**Como formalizar:** skill `gh-create-issue` (`.claude/commands/gh-create-issue.md`) — peça pro agente:
+**Como formalizar:** skill `gh-create-issue` (`ai/skills/gh-create-issue/SKILL.md`) — peça pro agente:
 
 > "Formaliza a US de [descrição] como issue, seguindo o template."
 
@@ -175,7 +175,7 @@ Assim como existe DoR pra uma US **entrar** em desenvolvimento (seção 3), exis
 - [ ] Issue fechada
 - [ ] Documentação atualizada, se a US alterou algo documentado
 
-Isso é **obrigatório**, não opcional — está em `AGENT.md`, seção "Critérios DOD", e as skills `desenvolver-us-backend`/`desenvolver-us-frontend` (OpenCode) já incluem o passo de comentar cada nível na issue.
+Isso é **obrigatório**, não opcional — está em `ai/workflow.md`, seção "Critérios DOD", e as skills `desenvolver-us-backend`/`desenvolver-us-frontend` (OpenCode) já incluem o passo de comentar cada nível na issue.
 
 Outros pontos de fechamento:
 
@@ -192,7 +192,7 @@ Outros pontos de fechamento:
 | Por que a arquitetura é assim? | `docs/documento_arquitetura.md` |
 | Qual o produto e pra quem? | `docs/documento_visao.md` |
 | Quem é responsável por qual US? | `docs/distribuicao_us.md` |
-| Como formalizar uma US? | `.claude/commands/gh-create-issue.md`, `docs/templates/` |
+| Como formalizar uma US? | `ai/skills/gh-create-issue/SKILL.md`, `docs/templates/` |
 | Como executar o ciclo com o agente, na prática? | `docs/workflow-passo-a-passo.md` |
 | Quais as regras de branch/commit e por quê? | `docs/guia-contribuicao.md` |
 | O que a IA pode/não pode fazer sozinha? | `docs/boas-praticas-ia.md` |
