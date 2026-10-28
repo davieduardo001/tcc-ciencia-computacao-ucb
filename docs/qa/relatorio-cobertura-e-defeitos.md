@@ -3,7 +3,7 @@
 
 > 📎 Ver este arquivo no GitHub: <https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/blob/main/docs/qa/relatorio-cobertura-e-defeitos.md>
 
-Cobertura medida, defeitos encontrados e corrigidos nas Sprints 2 e 3 (e como cada um foi detectado), histórico do CI e dívida de testes. Medições em 16/10/2026, `homolog` @ `07c9edc`; defeitos 14 a 18 acrescentados em 27/10/2026 pela [execução dos casos P1](execucao-casos-p1.md). Contexto: [`README.md`](README.md).
+Cobertura medida, defeitos encontrados e corrigidos nas Sprints 2 e 3 (e como cada um foi detectado), histórico do CI e dívida de testes. Medições em 16/10/2026, `homolog` @ `07c9edc`; defeitos 14 a 23 acrescentados em 27 e 28/10/2026 pela [execução dos casos](execucao-casos-p1.md). Contexto: [`README.md`](README.md).
 
 ## 1. Cobertura
 
@@ -71,18 +71,23 @@ Selecionados nas issues e PRs das Sprints 1 a 3, com a forma de detecção **reg
 | 18 | "Próximas saídas do terminal" lista horários já passados (06:00 às 07:58) | observação do relatório de execução; issue #215 | Não investigada | **Execução de casos P1** (navegador, produção) | 27/10 |
 | 19 | Com a sessão expirada o app mostra "Nenhum ônibus em operação" e "Não foi possível carregar os detalhes da parada" em vez de pedir novo login | [execucao-casos-p1.md](execucao-casos-p1.md), seção "Sessão expirada na prática"; issue #221 | O frontend não trata 401 das chamadas de linhas/posições/paradas como sessão expirada; agrava o #212 (sem refresh, a sessão cai em 1 h) | **Execução de casos P1** (navegador, produção, rede da aba) | 27/10 |
 | 20 | `GET /colaboracao/preferencias/{id}` responde 500 para qualquer usuário: `NoReferencedTableError` (FK `usuarios.id` sem o modelo `Usuario` carregado no processo da Colaboração) | #213; PR #224; [execucao-casos-p1.md](execucao-casos-p1.md), seção "Tela de Alertas" | O container da Colaboração carrega só `models`, `shared` e `colaboracao`; o `conftest` dos testes carrega todos os modelos, então o teste não reproduz. Corrige o diagnóstico anterior da #213 (violação de FK no commit) | **Uso real** (tela `/alertas` em produção) e **log do Fly.io** | 27/10 |
+| 21 | Mensagens mandam verificar um e-mail que o sistema não envia ("Verifique seu e-mail para confirmar a conta", "receberá um link") | #230; CT-AUT-01 e CT-AUT-05 | Não há provedor de e-mail; o texto descreve um fluxo que não existe, e a conta de teste entrou sem confirmação | **Execução de casos** (navegador, produção, pelo usuário) | 27/10 |
+| 22 | "Ir" no planejador coloca as coordenadas do usuário (`origem_lat`, `origem_lng`) na URL | #231 | A posição fica no histórico, em links copiados e em logs; contraria o RNF de LGPD e a RN-06 da viagem | **Execução de casos** (navegador, produção) | 27/10 |
+| 23 | "Parada sem nome" no embarque e no desembarque dos cards de rota; o embarque não mostra o tempo em minutos, só o selo "ao vivo" | #232; CT-ROT-06 | Parada sem nome no dado de origem e o card não tem referência de reserva | **Execução de casos** (navegador, produção) | 27/10 e 28/10 |
 
-### Resumo da detecção (20 defeitos)
+> **Observações sem contagem:** a #233 (a rota respondeu "Nenhuma linha liga esses dois pontos" uma vez para um par que depois deu 5 opções; não reproduzido, pode ser o defeito 19) e a #234 (o build do frontend depende do Google Fonts; falha transitória no deploy do PR #219) são riscos a investigar, não defeitos confirmados de código.
+
+### Resumo da detecção (23 defeitos)
 
 | Detectado por | Quantidade | Defeitos |
 |---|---|---|
 | Produção, antes do usuário final reportar | 4 | 1, 2, 3, 4 |
 | CI, antes do merge | 2 | 5, 12 |
-| Teste manual, execução de casos ou uso com dados reais | 10 | 7, 8, 13, 14, 15, 16, 17, 18, 19, 20 |
+| Teste manual, execução de casos ou uso com dados reais | 13 | 7, 8, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 |
 | Auditoria ou medição | 3 | 6, 9, 10 |
 | Não registrado | 1 | 11 |
 
-> **Leitura.** Dos 20 defeitos, **10 são de conexão entre as peças** (1, 2, 3, 4, 5, 6, 11, 12, 15, 20: dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge), e 10 são de regra, dado ou interface (7, 8, 9, 10, 13, 14, 16, 17, 18, 19). Isso reforça a prioridade dos testes de integração do [relatório de integração](relatorio-testes-integracao.md). Os defeitos 1 a 4 foram relatados como ocorridos em produção. Os demais foram achados por outros meios, mas como `homolog` publica direto no ambiente visível (ver o [plano de testes](plano-de-testes.md)), os defeitos 6, 7, 10 e 11 também estiveram no código publicado até a correção; os registros consultados não dizem se algum usuário foi afetado.
+> **Leitura.** Dos 23 defeitos, **10 são de conexão entre as peças** (1, 2, 3, 4, 5, 6, 11, 12, 15, 20: dependência faltando, contrato front ↔ Gateway, ordem de middleware, rotas públicas, cabeçalhos duplicados, import perdido num merge), e 13 são de regra, dado ou interface (7, 8, 9, 10, 13, 14, 16, 17, 18, 19, 21, 22, 23). Isso reforça a prioridade dos testes de integração do [relatório de integração](relatorio-testes-integracao.md). Os defeitos 1 a 4 foram relatados como ocorridos em produção. Os demais foram achados por outros meios, mas como `homolog` publica direto no ambiente visível (ver o [plano de testes](plano-de-testes.md)), os defeitos 6, 7, 10 e 11 também estiveram no código publicado até a correção; os registros consultados não dizem se algum usuário foi afetado.
 
 ## 3. Histórico do CI
 
