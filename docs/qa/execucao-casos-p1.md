@@ -236,24 +236,30 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 | CT-NOT-02 | **Não verificável** | O alerta de atraso depende do ciclo do worker de monitoramento e **não tem canal de entrega** (o push, #207, não existe). A lógica (limiar de 5 min, sem repetir, reset com margem) é coberta pelos testes unitários do `deduplicador` e do `monitoring_worker`, mas não há como observar o alerta no app. |
 | CT-MAP-03 e CT-ETA-03 | **Não executados** | Precisam alterar a localização pelo DevTools (Sensors). Com o DevTools aberto a extensão do navegador perde o controle dos cliques, então só podem ser feitos à mão. Passo a passo para quem for fazer: DevTools, More tools, Sensors, Location, Other; escolher uma posição perto de uma parada de linha com ônibus em movimento; ver o marcador azul se mover (MAP-03) e manter o popup do ônibus aberto por ~1 min para ver o tempo mudar (ETA-03). |
 
+## CT-COL-05 e renovação de sessão (#222) (28/10, ~09:17, produção, conta do usuário, desktop)
+
+| Item | Estado | O que foi visto |
+|---|---|---|
+| CT-COL-05 | **Aprovado** | Os 3 reportes de teste do CT-COL-03 (linha 0.960, "Aguardando confirmação") foram criados às ~08:13 e apareciam na lista às ~08:15. Às ~09:17, depois de 60 min sem confirmação, "Ocorrências" mostra **"Nenhuma ocorrência ativa no momento."** Evidência: [`lista vazia`](evidencias/CT-COL-05-lista-vazia-apos-60-min.jpg); [`ontem`](evidencias/CT-COL-05-lista-sem-ocorrencia-de-ontem.jpg) é a conferência anterior. |
+| **#222** (renovação da sessão) | **Validada em produção** | Ao abrir `/ocorrencias` com o token de acesso vencido, a rede da aba registrou: `GET /api/auth/me` **401**, `GET /api/mobilidade/viagens/ativa` **401**, `GET /api/colaboracao/ocorrencias` **401**, depois `POST /api/auth/refresh` **200**, `GET /api/colaboracao/ocorrencias` **200** (refeita) e `GET /api/auth/me` **200**. A tela mostrou "Carregando…" por alguns segundos e terminou logada, **sem pedir login**. Isto fecha o caminho de sucesso que o CT-AUT-03 deixou pendente. |
+
 ## Quadro geral dos 49 casos (atualizado em 28/10)
 
 | Estado | Qtd | Casos |
 |---|---|---|
-| Aprovado | 31 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado) |
-| Aprovado em parte ou com ressalva | 11 | AUT-01 (revalidado só por API), AUT-03 (rota existe; renovação real não exercitada), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-05, ROT-06, ROT-07, SEG-01, VIA-02 |
+| Aprovado | 32 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05 |
+| Aprovado em parte ou com ressalva | 11 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (o sistema não envia e-mail), COL-04, ETA-04, PAR-03, ROT-05, ROT-06, ROT-07, SEG-01, VIA-02 |
 | **Reprovado por configuração** | 1 | VIA-01: o embarque é aceito longe do ônibus porque o secret `RAIO_EMBARQUE_M` está em 100 km em produção (decisão até a defesa); a regra de 100 m só vale quando o secret voltar a 100 |
 | Não verificável hoje | 3 | NOT-02 (sem canal de entrega), VIA-07 (a regra fica mascarada pelo raio), VIA-08 (precisa de ônibus se aproximando) |
-| Não executado | 3 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão), COL-05 (conferência de expiração em andamento, ver abaixo) |
+| Não executado | 2 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão) |
 
-> 31 + 11 + 1 + 3 + 3 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
+> 32 + 11 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
 
 ## Pendentes
 
 - **MAP-03 e ETA-03** (à mão, com DevTools Sensors): ver o passo a passo na seção de 28/10.
 - **VIA-08 e VIA-07**: só em campo; **entram no ensaio da defesa**. Para o VIA-07, antes voltar o raio a 100 m.
-- **COL-05**: conferir de novo a lista de ocorrências depois de 60 min dos reportes de teste de 28/10 (criados ~08:13).
-- **#222 (renovação de sessão)**: **não validada.** Em 28/10 o usuário precisou entrar de novo, então a sessão não se manteve de um dia para o outro. Não há como saber, pelas evidências coletadas, se a renovação automática falhou ou se o app pediu login como previsto; não foi possível observar a chamada de renovação. Fica declarada como não verificada.
+- **#222 (renovação de sessão)**: validada em 28/10, ver a seção acima.
 - **#217 (folha de rota)**: conferir em celular real.
 - **Usabilidade (heurísticas de Nielsen)**: avaliação não feita (ver o roteiro da disciplina).
 
