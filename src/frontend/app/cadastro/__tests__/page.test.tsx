@@ -32,7 +32,7 @@ describe("Cadastro", () => {
         id: "1",
         nome: "Ana Passageira",
         email: "ana@example.com",
-        mensagem: "Verifique seu e-mail para confirmar a conta.",
+        mensagem: "Conta criada. Você já pode entrar.",
       }),
     });
 
@@ -42,7 +42,7 @@ describe("Cadastro", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Verifique seu e-mail para confirmar a conta.")
+        screen.getByText("Conta criada. Você já pode entrar.")
       ).toBeInTheDocument();
     });
   });

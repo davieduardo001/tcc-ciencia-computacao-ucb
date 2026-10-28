@@ -60,7 +60,7 @@ export default function Cadastro() {
 
     try {
       await registrarUsuario({ nome, email, senha, termosAceitos });
-      setMensagemSucesso("Verifique seu e-mail para confirmar a conta.");
+      setMensagemSucesso("Conta criada. Você já pode entrar.");
       setNome("");
       setEmail("");
       setSenha("");

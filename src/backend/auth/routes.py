@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
@@ -293,13 +293,14 @@ def registrar(dados: RegistrarInput, db: Session = Depends(get_db)):
         id=str(usuario.id),
         nome=usuario.nome,
         email=usuario.email,
-        mensagem="Verifique seu e-mail para confirmar a conta.",
+        mensagem="Conta criada. Você já pode entrar.",
     )
 
 
 @router.post("/esqueci-senha", response_model=RespostaGenerica)
 def esqueci_senha(
     dados: SolicitacaoResetSenha,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     if not _verificar_rate_limit(dados.email):
@@ -315,8 +316,8 @@ def esqueci_senha(
         db.add(token_obj)
         db.commit()
 
-        enviar_email_reset_senha(dados.email, token_plano)
-        logger.info(f"Token de reset gerado para {dados.email}")
+        background_tasks.add_task(enviar_email_reset_senha, dados.email, token_plano)
+        logger.info("Token de reset gerado e envio de e-mail agendado.")
 
     return RespostaGenerica(
         mensagem="Se o e-mail estiver cadastrado, voce recebera um link de redefinicao."

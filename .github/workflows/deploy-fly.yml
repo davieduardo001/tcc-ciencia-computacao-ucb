@@ -50,6 +50,26 @@ jobs:
           --stage
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_AUTH }}
+      - name: "Configurar e-mail SMTP (recuperação de senha, issue #237)"
+        run: |
+          if [ -z "$SMTP_USER" ] || [ -z "$SMTP_PASSWORD" ] || [ -z "$SMTP_FROM" ] || [ -z "$FRONTEND_URL" ]; then
+            echo "Secrets SMTP ausentes: o e-mail de recuperação não será enviado."
+            exit 0
+          fi
+          flyctl secrets set \
+            SMTP_USER="$SMTP_USER" \
+            SMTP_PASSWORD="$SMTP_PASSWORD" \
+            SMTP_FROM="$SMTP_FROM" \
+            FRONTEND_URL="$FRONTEND_URL" \
+            --config src/backend/auth/fly.toml \
+            --stage > /dev/null
+          echo "Secrets SMTP aplicados (staged)."
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN_AUTH }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
       - run: >
           flyctl deploy
           --config src/backend/auth/fly.toml
