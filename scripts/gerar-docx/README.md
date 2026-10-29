@@ -11,8 +11,10 @@ Encaixa um documento em Markdown (`docs/`) dentro de um template `.docx` ou `.do
 ## Uso
 
 ```bash
-python3 scripts/gerar-docx/build.py <tipo> <template> <markdown> <saida.docx>
+python3 scripts/gerar-docx/build.py <tipo> <template> <markdown> <saida.docx> [data]
 ```
+
+O último argumento é a data da capa e do cabeçalho (padrão `28/out/26`; exemplo: `30/out/26`).
 
 | Tipo | Template | Markdown |
 |---|---|---|

@@ -4,7 +4,7 @@
 Mantém capa, cabeçalho, rodapé, estilos e numeração de títulos do template;
 remove os textos de orientação; preenche os campos (nome, grupo, data, versão).
 
-Uso: build.py <tipo: visao|drs|arq|relatorio> <template> <markdown> <saida.docx>
+Uso: build.py <tipo: visao|drs|arq|relatorio> <template> <markdown> <saida.docx> [data, ex.: 30/out/26]
 """
 import sys, re, copy, zipfile, subprocess, tempfile, os, io
 from lxml import etree
@@ -659,5 +659,6 @@ def main(tipo, template, md_path, saida_path, hoje='28/out/26', versao='3.0'):
 
 if __name__ == '__main__':
     tipo, template, md_path, saida = sys.argv[1:5]
+    hoje = sys.argv[5] if len(sys.argv) > 5 else '28/out/26'
     MD_BASE = os.path.dirname(os.path.abspath(md_path))
-    main(tipo, template, md_path, saida)
+    main(tipo, template, md_path, saida, hoje=hoje)
