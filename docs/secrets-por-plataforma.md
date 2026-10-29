@@ -2,7 +2,17 @@
 
 Guia de quais secrets configurar em cada plataforma. **NUNCA** commit valores reais no repositório.
 
-**Status:** Todos os secrets já foram configurados em 15/08/2026.
+**Última revisão:** 28/10/2026. O quadro de secrets abaixo foi conferido contra `.github/workflows/*.yml` e `gh secret list`; os valores configurados diretamente no Fly (por exemplo `JWT_SECRET`) não são verificáveis pelo repositório, confira com `fly secrets list --app <app>`.
+
+---
+
+## Onde cada secret vive
+
+| Plataforma | O que guarda |
+|------------|--------------|
+| **GitHub Actions** (secrets do repositório) | `DATABASE_URL` (usado pelo job `migrate` e pela ingestão do SEMOB), `FLY_DEPLOY_TOKEN_GATEWAY`, `_AUTH`, `_MOBILIDADE`, `_COLABORACAO` (um por app, escopo mínimo), `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `GOOGLE_CLIENT_ID`, `CARTO_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `FRONTEND_URL`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
+| **Fly.io** (secrets de cada app) | Os do próprio serviço (ver tabela por app). `GOOGLE_CLIENT_ID`, os `SMTP_*`/`FRONTEND_URL` (no `movecity-auth`) e os `VAPID_*` (no `movecity-mobilidade`) são **empurrados pelo workflow `deploy-fly.yml`** a cada deploy, a partir dos secrets do GitHub |
+| **Vercel** | Variáveis do projeto `movecity-frontend` (o build de produção é feito pelo workflow, que injeta `NEXT_PUBLIC_GOOGLE_CLIENT_ID` e `NEXT_PUBLIC_CARTO_API_KEY`) |
 
 ---
 
@@ -34,26 +44,32 @@ postgresql://movecity_owner:SENHA_AQUI@ep-shiny-term-acc2b3yz.sa-east-1.aws.neon
 
 ## Fly.io (Backend — FastAPI)
 
-**App:** `movecity-backend`
+**Apps:** `movecity-gateway`, `movecity-auth`, `movecity-mobilidade`, `movecity-colaboracao` (4 apps independentes)
 **Região:** `gru` (São Paulo)
 
-| Secret | Status | Descrição |
-|--------|--------|-----------|
-| `DATABASE_URL` | ✅ Configurado | String de conexão do Neon |
-| `JWT_SECRET` | ✅ Configurado | Chave para assinar tokens JWT |
-| `JWT_ALGORITHM` | ✅ Configurado | Fixo: `HS256` |
-| `JWT_EXPIRATION_MINUTES` | ✅ Configurado | Fixo: `60` |
-| `ENVIRONMENT` | ✅ Configurado | Fixo: `production` |
+Secrets por app (o que o código de cada serviço lê):
+
+| Secret | Gateway | Auth | Mobilidade | Colaboracao | Descrição |
+|--------|---------|------|------------|-------------|-----------|
+| `DATABASE_URL` | não usa | sim | sim | sim | String de conexão do Neon |
+| `JWT_SECRET` | sim | sim | não | não | Chave para assinar/validar tokens JWT |
+| `JWT_ALGORITHM` | sim | sim | não | não | Fixo: `HS256` |
+| `JWT_EXPIRATION_MINUTES` | sim | sim | não | não | Fixo: `60` |
+| `ENVIRONMENT` | sim | sim | sim | sim | Fixo: `production` |
+| `CORS_ORIGINS` | sim | lê | lê | lê | Origens permitidas, separadas por vírgula; o padrão do código é `http://localhost:3000`, então o Gateway precisa da URL do frontend |
+| `GOOGLE_CLIENT_ID` | não | sim | não | não | Aplicado pelo job `deploy-auth` (login via Google, US #12) |
+| `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `FRONTEND_URL` | não | sim | não | não | E-mail de recuperação de senha (issue #237). Aplicados pelo job `deploy-auth`; se faltar qualquer um dos quatro no GitHub, o job avisa, segue o deploy e o e-mail não é enviado. O envio usa `smtp.gmail.com:587` (`auth/email_service.py`) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | não | não | sim | não | Web Push (issue #200). Aplicados pelo job `deploy-mobilidade`; se faltar qualquer um, Web Push fica desligado |
 
 **Variáveis opcionais de ajuste do embarque (serviço de mobilidade, issue #190)** — não são secrets e todas têm padrão no código; só configure se precisar mudar o comportamento:
 
 | Variável | Padrão | O que faz |
 |----------|--------|-----------|
-| `RAIO_EMBARQUE_M` | `100` | Distância máxima (m) entre o usuário e o ônibus para confirmar "Peguei este ônibus". |
+| `RAIO_EMBARQUE_M` | `100` | Distância máxima (m) entre o usuário e o ônibus para confirmar "Peguei este ônibus". **Em produção está em `100000` (100 km)**, por decisão do grupo de 27/10/2026 (issue #216), somente para demonstrar o embarque de qualquer lugar até a defesa; com esse valor a regra de 100 m não é exercitada. Para voltar ao padrão: `flyctl secrets set RAIO_EMBARQUE_M=100 --app movecity-mobilidade` e retestar a recusa a mais de 100 m. |
 | `RAIO_PARADA_EMBARQUE_M` | `400` | Embarque "com o ônibus chegando": distância máxima (m) do usuário a uma parada da linha. **A validar em campo.** |
 | `ETA_MAXIMO_EMBARQUE_MIN` | `2` | Embarque "com o ônibus chegando": tempo máximo (min) até o ônibus chegar à parada. **A validar em campo.** |
 
-Valor ausente, em branco, não numérico ou menor ou igual a zero usa o padrão (os inválidos registram um aviso no log). Como o backend não separa homolog de produção (issue #42), o valor definido no Fly vale para os dois ambientes. O raio é uma checagem de bom senso, não uma barreira de segurança: a posição do usuário vem do cliente.
+Valor ausente, em branco, não numérico ou menor ou igual a zero usa o padrão (os inválidos registram um aviso no log). Como o backend não separa homolog de produção (issue #42) e `homolog` publica direto na produção, o valor definido no Fly vale para os dois. O raio é uma checagem de bom senso, não uma barreira de segurança: a posição do usuário vem do cliente.
 
 ### Web Push (VAPID) — alerta de proximidade com a tela bloqueada (issue #195)
 
@@ -68,7 +84,7 @@ O aviso de "sua parada está chegando" já aparece dentro do app. Para chegar co
 
 As três primeiras precisam estar **todas** presentes e **combinar entre si**. Se faltar uma, o `VAPID_SUBJECT` for inválido, a privada não for uma chave válida ou a pública não corresponder à privada, o push fica desligado e o log registra o motivo (só o nome da variável, nunca o valor).
 
-**Quem configura:** quem tem acesso ao Fly (o time, não o agente). As chaves não são geradas nem guardadas pelo código.
+**Quem configura:** quem tem acesso ao Fly e ao GitHub (o time, não o agente). As chaves não são geradas nem guardadas pelo código. Hoje os três valores estão como secrets do repositório no GitHub e o job `deploy-mobilidade` os aplica no Fly a cada deploy (`flyctl secrets set ... --stage`), então o passo 2 abaixo é a alternativa manual.
 
 **1. Gerar o par de chaves** (numa máquina com o ambiente do backend instalado, para ter a biblioteca `cryptography`):
 
@@ -89,7 +105,7 @@ EOF
 
 Guarde a privada no gerenciador de senhas do time. **Gere o par uma vez só:** trocar as chaves depois invalida todas as inscrições existentes, e cada pessoa precisa ativar de novo em Configurações.
 
-**2. Configurar no Fly** (o `set` reinicia as máquinas do serviço; faça com o par já gerado):
+**2. Configurar no Fly, manualmente** (o `set` reinicia as máquinas do serviço; faça com o par já gerado):
 
 ```bash
 fly secrets set \
@@ -112,18 +128,18 @@ fly secrets set \
 - **Atraso do aviso.** O worker verifica a cada 5 min por padrão. Quem escolhe avisar com 5 min de antecedência recebe, em média, 2,5 min antes. Se isso se confirmar em campo, defina `WORKER_PROXIMIDADE_INTERVAL_SECONDS=60`: o feed de posições é cacheado por 20 s, então não adianta ir abaixo disso. O padrão não foi alterado sem medição.
 - **LGPD.** A tabela `inscricao_push` guarda só endpoint, chaves da inscrição e dono. A mensagem não leva coordenadas nem identificadores. A inscrição é apagada quando a pessoa desativa, sai da conta ou o serviço de push informa que ela expirou.
 
-**URL do backend:** `https://movecity-backend.fly.dev`
+**URLs dos apps:** `https://movecity-gateway.fly.dev` (única que o navegador acessa), `https://movecity-auth.fly.dev`, `https://movecity-mobilidade.fly.dev`, `https://movecity-colaboracao.fly.dev`
 
-**Comandos úteis:**
+**Comandos úteis** (troque `<app>` por um dos 4 apps):
 ```bash
 # Listar secrets
-fly secrets list --app movecity-backend
+fly secrets list --app <app>
 
 # Atualizar secret
-fly secrets set JWT_SECRET="novo-valor" --app movecity-backend
+fly secrets set JWT_SECRET="novo-valor" --app <app>
 
 # Deploy (aplica secrets staged)
-fly secrets deploy --app movecity-backend
+fly secrets deploy --app <app>
 ```
 
 ---
@@ -132,12 +148,17 @@ fly secrets deploy --app movecity-backend
 
 **Projeto:** `movecity-frontend`
 **Repo:** `davieduardo001/tcc-ciencia-computacao-ucb`
+**Deploy:** workflow `deploy-vercel.yml`, em push para `homolog` (modo `--prod`).
 
-| Secret | Status | Descrição |
-|--------|--------|-----------|
-| `NEXT_PUBLIC_API_URL` | ✅ Configurado | URL do backend Fly.io |
-| `NEXT_PUBLIC_MAP_TILES` | ✅ Configurado | URL dos tiles OpenStreetMap |
-| `NEXT_PUBLIC_APP_NAME` | ✅ Configurado | Nome do app |
+Variáveis lidas pelo código do frontend:
+
+| Variável | Onde é definida | Descrição |
+|----------|-----------------|-----------|
+| `NEXT_PUBLIC_API_URL` | Projeto Vercel | URL do Gateway (`https://movecity-gateway.fly.dev`); sem ela, o código usa `http://localhost:8000` (`lib/api.ts`) |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Workflow (secret `GOOGLE_CLIENT_ID`) | Login via Google |
+| `NEXT_PUBLIC_CARTO_API_KEY` | Workflow (secret `CARTO_API_KEY`) | Base do mapa CARTO Voyager; sem ela o mapa usa o tile padrão do OpenStreetMap |
+
+`NEXT_PUBLIC_MAP_TILES` e `NEXT_PUBLIC_APP_NAME`, que constavam de versões anteriores deste documento, **não são lidas por nenhum código** do frontend hoje.
 
 **Comandos úteis:**
 ```bash
@@ -164,14 +185,12 @@ vercel env add NOME_VARIAVEL production
 
 ## Checklist de Configuração
 
-- [x] Conta criada no Neon
-- [x] Projeto criado no Neon (`movecity`)
-- [x] `DATABASE_URL` copiado do Neon
-- [x] Conta criada no Fly.io
-- [x] `fly auth login` executado
-- [x] Secrets adicionados no Fly.io (5 secrets)
-- [x] Conta criada no Vercel
-- [x] Repo conectado no Vercel
-- [x] Secrets adicionados no Vercel (3 secrets)
-- [ ] Deploy automático funcionando no Vercel (pendente do primeiro push)
-- [ ] Backend deployado no Fly.io (pendente do primeiro push)
+- [x] Conta e projeto `movecity` no Neon; `DATABASE_URL` nos secrets do GitHub (migrations e ingestão) e nos apps `auth`, `mobilidade` e `colaboracao`
+- [x] Conta no Fly.io; 4 apps criados (`movecity-gateway`, `-auth`, `-mobilidade`, `-colaboracao`)
+- [x] Tokens de deploy do Fly (1 por app) como `FLY_DEPLOY_TOKEN_*` no GitHub
+- [x] Projeto `movecity-frontend` na Vercel e `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` no GitHub
+- [x] `GOOGLE_CLIENT_ID` e `CARTO_API_KEY` no GitHub
+- [x] `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` e `FRONTEND_URL` no GitHub (28/10/2026)
+- [x] `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT` no GitHub (27/10/2026)
+- [x] Deploy automático do backend (push em `homolog`/`main`) e do frontend (push em `homolog`) funcionando
+- [ ] `RAIO_EMBARQUE_M` de volta a `100` em produção (hoje `100000`, decisão de demonstração; issue #216)

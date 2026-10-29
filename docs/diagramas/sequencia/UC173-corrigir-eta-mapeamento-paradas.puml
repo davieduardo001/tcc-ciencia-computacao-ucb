@@ -1,0 +1,212 @@
+@startuml UC173_MapeamentoParadasEETA
+hide footbox
+title Diagrama de Sequencia - Identidade Unica de Parada Fisica e Tempo de Chegada Correto (FIX #173)
+
+actor "Rotina de Ingestao" as Rotina
+actor "Passageiro" as Passageiro
+
+participant ":TelaMapa" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoIngestao" as Ingestao <<servico mobilidade>>
+participant ":FonteSEMOB" as Fonte <<servico externo>>
+participant ":ServicoParada" as Service <<servico mobilidade>>
+participant ":ServicoChegadas" as Chegadas <<servico mobilidade>>
+participant ":ModeloParada" as Parada <<modelo>>
+participant ":ModeloRota" as Rota <<modelo>>
+participant ":ModeloVeiculo" as Veiculo <<modelo>>
+
+note over Rotina, Veiculo
+  Entregue (homolog): parada fisica com codigo unico e estavel, vinculada a cada rota, e tempo de chegada
+  medido ao longo do trajeto a partir desse vinculo.
+  Nao coberto por este diagrama: o Cenario 3 da issue (bater com a realidade em campo) e validacao manual.
+end note
+
+== Ingestao em lote (mensal ou manual): construir as paradas fisicas ==
+
+Rotina -> Ingestao : executarIngestao()
+activate Ingestao
+
+Ingestao -> Fonte : baixarTrajetosPontosEHorarios()
+activate Fonte
+Fonte --> Ingestao : trajetosPorLinhaESentido, abrigosSemIdentificador, horarios
+deactivate Fonte
+
+Ingestao -> Ingestao : associarAbrigosAoTrajetoDeCadaRota()
+note right of Ingestao : O mesmo abrigo fisico aparece repetido\ncom coordenadas ligeiramente diferentes.
+Ingestao -> Ingestao : fundirAbrigosProximosEmParadaFisica(raio 10 m)
+Ingestao -> Ingestao : gerarCodigoDaParadaPeloCentroide()
+note right of Ingestao : Codigo deterministico: a mesma parada\ngera o mesmo codigo em toda ingestao.
+
+Ingestao -> Parada : substituirParadasFisicas(paradas)
+activate Parada
+Parada --> Ingestao : paradasGravadas
+deactivate Parada
+
+loop para cada rota (linha e sentido)
+  Ingestao -> Ingestao : posicionarParadasAoLongoDoTrajeto()
+  Ingestao -> Rota : gravarVinculosParadaRota(linha, sentido, parada, ordem, posicaoNoTrajeto)
+  activate Rota
+  Rota --> Ingestao : vinculosGravados
+  deactivate Rota
+end
+
+Ingestao --> Rotina : resumoDaIngestao(paradasFisicas, vinculos)
+deactivate Ingestao
+
+== Passageiro abre os detalhes de uma parada: codigo estavel entre linhas ==
+
+Passageiro -> View : tocarParadaNoMapa(coordenada)
+activate View
+
+View -> Gateway : requisicao(token, coordenada)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Parada : buscarParadaFisicaProxima(coordenada, raio 40 m)
+  activate Parada
+
+  alt parada fisica encontrada
+    Parada --> Service : paradaFisica(codigo, nome, posicao)
+    deactivate Parada
+    Service -> Rota : obterLinhasDaParada(paradaFisica)
+    activate Rota
+    Rota --> Service : linhasComSentidoEOrdem
+    deactivate Rota
+    Service --> Gateway : resposta(paradaFisica, linhas, proximosHorarios)
+    deactivate Service
+    Gateway --> View : retornarResposta(paradaFisica, linhas)
+    View -> View : exibirDetalhesDaParada(codigoUnico)
+
+  else sem parada fisica por perto
+    Parada --> Service : nenhuma()
+    deactivate Parada
+    note right of Service : Transicao: antes da primeira ingestao com paradas\nfisicas, usa o catalogo antigo de paradas por linha.\nNesse caso o codigo vem da coordenada tocada e\npode variar entre linhas.
+    Service -> Service : localizarNoCatalogoPorLinha(coordenada)
+    Service --> Gateway : resposta(parada, linhas) | respostaErro(naoEncontrada, 404)
+    deactivate Service
+    Gateway --> View : retornarResposta(parada | naoEncontrada)
+    View -> View : exibirDetalhesOuAviso()
+  end
+
+else token expirado ou ausente
+  Gateway --> View : notificarNaoAutorizado(401)
+
+  View -> Gateway : renovarSessao(refreshToken)
+  activate Gateway
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+
+  alt sessao ainda ativa
+    Sessao --> Auth : tokenValido
+    deactivate Sessao
+    Auth -> Sessao : emitirNovosTokens(usuarioId)
+    activate Sessao
+    Sessao --> Auth : novosTokens
+    deactivate Sessao
+    Auth --> Gateway : sessaoRenovada(novosTokens)
+    deactivate Auth
+    Gateway --> View : retornarResposta(sessaoRenovada)
+    deactivate Gateway
+
+    View -> Gateway : requisicao(novoToken, coordenada)
+    activate Gateway
+    Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+    activate Service
+    Service --> Gateway : resposta(paradaFisica, linhas)
+    deactivate Service
+    Gateway --> View : retornarResposta(paradaFisica, linhas)
+    deactivate Gateway
+    View -> View : exibirDetalhesDaParada(codigoUnico)
+
+  else refresh revogado ou invalido
+    Sessao --> Auth : sessaoInexistente()
+    deactivate Sessao
+    Auth --> Gateway : erroNaoAutorizado(401)
+    deactivate Auth
+    Gateway --> View : notificarNaoAutorizado(401)
+    deactivate Gateway
+    View -> View : redirecionarParaLogin("Sua sessao expirou, entre novamente.")
+  end
+end
+
+deactivate Gateway
+deactivate View
+
+== Tempo de chegada na parada: relacionar parada, veiculo e sentido pelo codigo ==
+
+loop enquanto o painel da parada estiver aberto (a cada 20 s)
+  View -> Gateway : requisicao(token, codigoDaParada)
+  activate View
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Chegadas : encaminharRequisicao(req, identidadeUsuario)
+  activate Chegadas
+
+  Chegadas -> Parada : buscarPorCodigo(codigoDaParada)
+  activate Parada
+
+  alt codigo de parada fisica conhecido
+    Parada --> Chegadas : paradaFisica
+    deactivate Parada
+
+    Chegadas -> Rota : obterVinculosDaParada(paradaFisica)
+    activate Rota
+    Rota --> Chegadas : vinculos(linha, sentido, posicaoNoTrajeto)
+    deactivate Rota
+
+    Chegadas -> Veiculo : obterPosicoesDasLinhas(linhasDaParada)
+    activate Veiculo
+    Veiculo --> Chegadas : posicoesPorLinha
+    deactivate Veiculo
+
+    loop para cada linha da parada
+      alt ha onibus a caminho no sentido da parada, com posicao recente
+        Chegadas -> Chegadas : calcularTempoAoLongoDoTrajetoAteAParada(veiculo, vinculo)
+        note right of Chegadas : Escolhe o onibus de menor tempo.\nSentido oposto ou onibus que ja passou\nnao entram no calculo.
+        Chegadas -> Chegadas : registrarTempo(origem: ao vivo)
+
+      else sem onibus a caminho
+        Chegadas -> Rota : obterHorarioPrevistoDePassagem(vinculo)
+        activate Rota
+
+        alt horarios do dia e tempo de percurso disponiveis
+          Rota --> Chegadas : passagemPrevista(horario)
+          deactivate Rota
+          Chegadas -> Chegadas : registrarTempo(origem: previsto)
+
+        else sem dados para prever
+          Rota --> Chegadas : semDados()
+          deactivate Rota
+          Chegadas -> Chegadas : registrarSemPrevisao()
+        end
+      end
+    end
+
+    Chegadas --> Gateway : resposta(paradaFisica, chegadasPorLinha)
+    deactivate Chegadas
+    Gateway --> View : retornarResposta(chegadasPorLinha)
+    View -> View : exibirTempoPorLinhaComOrigem()
+
+  else codigo desconhecido
+    Parada --> Chegadas : nenhuma()
+    deactivate Parada
+    Chegadas --> Gateway : respostaErro(naoEncontrada, 404)
+    deactivate Chegadas
+    Gateway --> View : retornarResposta(naoEncontrada)
+    View -> View : exibirAvisoParadaNaoEncontrada()
+  end
+
+  deactivate Gateway
+  deactivate View
+end
+
+@enduml

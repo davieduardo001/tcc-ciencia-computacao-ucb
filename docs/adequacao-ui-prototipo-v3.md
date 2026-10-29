@@ -1,5 +1,7 @@
 # Adequação de UI ao Protótipo v3 — Web, Tablet e Mobile
 
+> **Documento histórico (01/10/2026, com atualização de 14/10/2026 sobre o card #179).** É um planejamento da época e não uma descrição do estado atual da interface: a lista de telas "ainda não implementadas" e as fases abaixo refletem a situação de outubro, e o texto "Telas do protótipo v3 vs. o que existe hoje" não foi atualizado desde então. Estado atual: ver as rotas em `src/frontend/app/` (hoje existem também `alertas`, `favoritos`, `configuracoes`, `status`, `tutorial`, `recuperar-senha` e `redefinir-senha`) e os resultados de validação em `docs/qa/`.
+
 Mapeamento do que precisa ser corrigido/ajustado na interface real (`src/frontend`) para ficar
 aderente ao protótipo de alta fidelidade "MoveCity App v3" (arquivo fornecido localmente,
 export estático do Figma) e funcionar bem nos três tamanhos de tela. Este documento é o

@@ -9,6 +9,7 @@ participant ":GatewayAPI" as Gateway <<servico gateway>>
 participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
 participant ":ModeloUsuario" as User <<modelo>>
 participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoDeDominio" as Service <<servico dominio>>
 
 Passageiro -> View : informarCredenciais(email, senha)
 activate View
@@ -38,6 +39,8 @@ alt campos validos
             deactivate Sessao
             
             Auth --> Gateway : autenticado(tokens)
+            deactivate Auth
+            Gateway -> Gateway : definirCookiesDeSessao(tokens)
             Gateway --> View : retornarResposta(tokens)
             
             View -> View : armazenarTokensLocalmente(tokens)
@@ -51,6 +54,7 @@ alt campos validos
                 User --> Auth : contaBloqueada()
                 deactivate User
                 Auth --> Gateway : erroAutenticacao(contaBloqueada)
+                deactivate Auth
                 Gateway --> View : retornarResposta(contaBloqueada)
                 View -> View : exibirMensagemBloqueio()
             else
@@ -62,6 +66,7 @@ alt campos validos
 
         else conta inativa ou suspensa
             Auth --> Gateway : erroAutenticacao(contaInativa)
+            deactivate Auth
             Gateway --> View : retornarResposta(contaInativa)
             View -> View : exibirMensagemErro("Conta inativa. Verifique seu e-mail.")
         end
@@ -70,6 +75,7 @@ alt campos validos
         User --> Auth : inexistente()
         deactivate User
         Auth --> Gateway : erroAutenticacao(usuarioInexistente)
+        deactivate Auth
         Gateway --> View : retornarResposta(usuarioInexistente)
         View -> View : exibirMensagemErro("Usuario ou senha invalidos")
     end
@@ -81,4 +87,76 @@ else campos invalidos
 end
 
 deactivate View
+== Sessao expirada: renovacao transparente (qualquer recurso protegido) ==
+
+note over Passageiro, Service
+  O Gateway valida o token localmente e nao renova a sessao por conta propria: quando o token nao vale,
+  responde 401 e e a tela quem pede a renovacao e refaz a chamada. A renovacao troca o par de tokens
+  (o token de renovacao anterior deixa de valer). Renovacoes simultaneas aguardam a mesma resposta.
+end note
+
+Passageiro -> View : usarRecursoProtegido()
+activate View
+
+View -> Gateway : requisicao(token, parametros)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+    Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+    activate Service
+    Service --> Gateway : resposta(dados)
+    deactivate Service
+    Gateway --> View : retornarResposta(dados)
+    View -> View : exibirConteudo(dados)
+
+else token expirado ou ausente
+    Gateway --> View : notificarNaoAutorizado(401)
+
+    View -> Gateway : renovarSessao(refreshToken)
+    activate Gateway
+    Gateway -> Auth : renovarSessao(refreshToken)
+    activate Auth
+    Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+    activate Sessao
+
+    alt sessao ainda ativa e usuario ativo
+        Sessao --> Auth : tokenValido
+        deactivate Sessao
+        Auth -> Sessao : emitirNovosTokens(usuarioId)
+        activate Sessao
+        Sessao --> Auth : novosTokens
+        deactivate Sessao
+        Auth --> Gateway : sessaoRenovada(novosTokens)
+        deactivate Auth
+        Gateway -> Gateway : definirCookiesDeSessao(novosTokens)
+        Gateway --> View : retornarResposta(sessaoRenovada)
+        deactivate Gateway
+
+        View -> Gateway : requisicao(novoToken, parametros)
+        activate Gateway
+        Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+        activate Service
+        Service --> Gateway : resposta(dados)
+        deactivate Service
+        Gateway --> View : retornarResposta(dados)
+        deactivate Gateway
+        View -> View : exibirConteudo(dados)
+
+    else sessao encerrada, token de renovacao invalido ou usuario inativo
+        Sessao --> Auth : sessaoInexistente()
+        deactivate Sessao
+        Auth --> Gateway : erroNaoAutorizado(401)
+        deactivate Auth
+        Gateway --> View : notificarNaoAutorizado(401)
+        deactivate Gateway
+        View -> View : limparSessaoNoAparelho()
+        View -> View : redirecionarParaLogin("Sua sessao expirou, entre novamente.")
+    end
+end
+
+deactivate Gateway
+deactivate View
+
 @enduml

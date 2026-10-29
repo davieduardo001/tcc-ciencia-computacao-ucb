@@ -5,7 +5,7 @@
 
 Esta pasta reúne o esquema de testes no estilo QA do Movecity: o plano, os casos de teste manuais por User Story entregue e os relatórios de testes unitários, de integração, de cobertura e de defeitos. Nasce da issue [#151](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/151).
 
-> **Fotografia datada.** Todos os números foram medidos em **16/10/2026**, no commit `07c9edc` da branch `homolog` (merge do PR #194). Eles não se atualizam sozinhos: ao fim de cada sprint, o procedimento da seção "Como regerar" refaz as medições.
+> **Fotografia datada.** Os números de cobertura, de CI e de PRs foram medidos em **16/10/2026**, no commit `07c9edc` da branch `homolog` (merge do PR #194). A contagem de testes automatizados foi refeita em **28/10/2026** pelo log do CI; os casos manuais foram executados em 27 e 28/10. Eles não se atualizam sozinhos: ao fim de cada sprint, o procedimento da seção "Como regerar" refaz as medições.
 
 ## Documentos
 
@@ -25,7 +25,7 @@ Esta pasta reúne o esquema de testes no estilo QA do Movecity: o plano, os caso
 
 | Medida | Valor | Fonte |
 |---|---|---|
-| Testes automatizados (backend + frontend) | **1.260**, 0 falhas | execução em 16/10/2026, `07c9edc` |
+| Testes automatizados (backend + frontend) | **1.640**, 0 falhas (844 backend, 796 frontend) | log do CI em 28/10/2026, execução `40689632241`, `48483be`. Em 16/10 eram **1.260** (`07c9edc`) |
 | Backend (pytest, Postgres 16 + migrations) | 671 testes em 56 arquivos, 65 s | idem |
 | Frontend (Jest) | 589 testes em 33 suítes, 36 s | idem |
 | Cobertura do código de produção do backend | 93,7% das instruções | `pytest --cov`, ver o relatório |

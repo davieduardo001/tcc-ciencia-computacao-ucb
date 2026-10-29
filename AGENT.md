@@ -1,16 +1,28 @@
 # AGENT.md — Movecity
 
-Manual de bordo do projeto. Fonte de verdade para stack, time, arquitetura e próximos passos.
-As regras de workflow (branches, commits, skills) estão em `CLAUDE.md`.
+Ponto de entrada comum a **todos os agentes de IA** do projeto (Claude Code, OpenCode, Gemini). Aqui estão os fatos do projeto: o que é, quem faz o quê, a stack e a arquitetura. Tudo que configura a atuação dos agentes (regras, workflow, skills, agentes e configurações de cada ferramenta) fica em [`ai/`](ai/README.md).
 
-## Leitura Obrigatória no Início de Cada Sessão
+```
+CLAUDE.md ──► AGENT.md ──► ai/   regras.md · workflow.md · skills/ · agents/ · instalar.sh
+```
 
-Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo do projeto:
+## Onde está cada coisa
 
-- `docs/documento_visao.md` — visão geral do produto, objetivos e requisitos
-- `docs/distribuicao_us.md` — quem é responsável por cada User Story e GitHub de cada membro
+| Preciso de... | Arquivo |
+|---|---|
+| Regras de branches, commits, PRs e diagramas | [`ai/regras.md`](ai/regras.md) |
+| Ciclo de sprint, DoR e DoD (dois níveis) | [`ai/workflow.md`](ai/workflow.md) |
+| Skills e agentes disponíveis, e como ativá-los na sua ferramenta | [`ai/README.md`](ai/README.md) |
+| Como a IA deve agir no repositório (autoria, bypass, verificação) | [`docs/boas-praticas-ia.md`](docs/boas-praticas-ia.md) |
+| Manual do ciclo, do backlog ao deploy | [`docs/manual-sprint.md`](docs/manual-sprint.md) |
 
----
+## Leitura obrigatória no início de cada sessão
+
+Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo do projeto. O Claude Code os carrega sozinho por meio das importações a seguir; as outras ferramentas devem abri-los.
+
+@ai/regras.md
+@docs/documento_visao.md
+@docs/distribuicao_us.md
 
 ---
 
@@ -19,7 +31,7 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - **Nome:** Movecity — Mobilidade Urbana Colaborativa no DF
 - **Objetivo:** Mitigar o "ônibus fantasma" e riscos de segurança em paradas via GPS do GDF + reportes crowdsourced.
 - **Contexto:** TCC do Grupo Segurança no Transporte — UCB. Projeto-piloto em Taguatinga/Ceilândia.
-- **Status:** Fase de Especificação e Planejamento.
+- **Status:** Entrega final. Produto em produção em <https://movecity-frontend.vercel.app>; defesa em 13/11/2026.
 
 ---
 
@@ -68,14 +80,14 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
     └──► [Colaboracao Service] ──► [PostgreSQL]
 ```
 
-**Regra:** Nenhum serviço acessa o banco diretamente. Tudo passa pelo Gateway.
+**Regra:** o frontend só fala com o Gateway. Os serviços de domínio acessam o PostgreSQL (Neon); o Gateway não acessa o banco.
 
 **Decisões registradas:**
 - Gateway é o **ponto único de entrada** para todas as requisições
 - Gateway valida JWT localmente — sem round-trip ao Auth Service
 - Gateway seta cookies httpOnly (access + refresh) — proteção contra XSS
 - Gateway roteia requests para serviços backend via proxy
-- Tokens em httpOnly cookies (access + refresh) — proteção contra XSS
+- Tokens em httpOnly cookies (access + refresh) — proteção contra XSS. Limitação conhecida (#253): o frontend também grava os tokens no `localStorage`, o que reduz essa proteção até a correção
 - Cookies com `SameSite=None` + `Secure`: frontend (Vercel) e Gateway (Fly) são cross-site
 - Leaflet com base CARTO Voyager, recuando pro tile padrão do OSM sem a chave
 - Fly.io com **4 apps independentes** (gateway, auth, mobilidade, colaboracao)
@@ -101,95 +113,3 @@ Antes de qualquer resposta, leia os arquivos abaixo para ter contexto completo d
 - Extrai `identidadeUsuario` e passa via `request.state`
 - Serviços de domínio recebem `identidadeUsuario` já validado
 - Documentação completa: `docs/gateway-auth-flow.md`
-
----
-
-## Workflow de Desenvolvimento (Sprint)
-
-### Fluxo Completo
-
-```
-1. Planning       →  Selecionar USs do Sprint Backlog (1 US por pessoa mín.)
-       ↓
-2. Desenvolvimento →  Usar opencode (skills + agentes)
-       ↓
-3. PR              →  Abrir PR com testes + checklist preenchido
-       ↓
-4. Review          →  1 reviewer aprova (OBRIGATÓRIO)
-       ↓
-5. Homologação     →  Merge para homolog → deploy automático (Vercel)
-       ↓
-6. Produção        →  Merge homolog → main → deploy (Vercel + Fly.io)
-```
-
-### Regras Críticas
-
-| Regra | Detalhe |
-|-------|---------|
-| **PR requer aprovação** | 1 reviewer mínimo antes do merge. Sem exceção. |
-| **Nunca commitar direto** | `main` e `homolog` são protegidos |
-| **Conventional Commits** | `feat:`, `fix:`, `docs:`, `test:`, etc. |
-| **Sem Co-Authored-By** | Commits são apenas do desenvolvedor |
-| **1 US por pessoa** | Cada membro pega 1 US por sprint |
-| **Aprovação = botão Approve** | Comentário no PR não conta — só review formal via "Review changes" |
-
-Regras de como agentes de IA devem operar nesse workflow (bypass, verificação, autoria): `docs/boas-praticas-ia.md`.
-
-### Critérios DOR (Definitivamente Pronto para Desenvolvimento)
-
-- [ ] PRD e SPEC documentados
-- [ ] Critérios de aceite definidos
-- [ ] Estimativa de complexidade
-- [ ] Dependências mapeadas
-- [ ] Diagrama de sequência disponível
-
-### Critérios DOD (Definition of Done) — obrigatório, 2 níveis
-
-Uma US **não fecha** sem passar pelos dois níveis. Promoção pra `main` pode acontecer em lote (várias USs de uma vez), então o nível de sprint é o que garante que a US está genuinamente terminada antes do release.
-
-**DoD-Sprint** (conta como feita na sprint):
-- [ ] PR mergeado em `homolog` (aprovação formal + CI verde)
-- [ ] Critérios de aceite (cenários BDD) validados em homolog
-- [ ] Comentário na issue com o resultado
-
-**DoD-Release** (conta como entregue de verdade):
-- [ ] PR homolog → main aprovado e mergeado
-- [ ] Validado em produção (endpoint/tela real, não suposição)
-- [ ] Issue fechada
-- [ ] Documentação atualizada, se a US alterou algo documentado (arquitetura, setup, etc.)
-
-### Agentes e Skills (opencode)
-
-| Agente | Uso |
-|--------|-----|
-| `build` | Desenvolvimento padrão (todas as ferramentas) |
-| `plan` | Planejamento e análise (sem alterações) |
-| `backend` | FastAPI, modelos, endpoints |
-| `frontend` | Next.js, React, telas |
-| `reviewer` | Review de código (read-only) |
-| `tester` | Testes unitários (pytest/Jest) |
-| `dev-environment` | Infra local: Docker, migrations, dependências |
-
-| Skill | Uso |
-|-------|-----|
-| `desenvolver-us-backend` | Guia completo para dev backend |
-| `desenvolver-us-frontend` | Guia completo para dev frontend |
-| `criar-testes` | Criar testes unitários |
-| `review-pr` | Checklist de review de PR |
-| `criar-diagrama` | Criar diagramas PlantUML |
-| `criar-issue-sprint` | Criar issue com sprint |
-| `gerenciar-sprint` | Gerenciar andamento da sprint |
-| `vincular-issues-sprint` | Vincular issues filhas à sprint |
-| `vincular-pr-issue` | Vincular PRs a issues |
-
-Documentação completa: `docs/boas-praticas-opencode.md`
-
----
-
-## Próximos Passos
-
-1. Adicionar @gualbertonathalia como colaboradora no repositório
-2. Atualizar assignees das issues #22, #27–29, #32, #33 para @gualbertonathalia
-3. Adicionar @Vitoria-Albuquerque e @gualbertonathalia como assignees na #33 (protótipo)
-4. Modelar banco de dados (entidades: Usuário, Linha, Parada, Reporte)
-5. Configurar pipeline CI/CD no GitHub Actions

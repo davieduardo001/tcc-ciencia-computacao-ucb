@@ -13,7 +13,7 @@ git clone https://github.com/davieduardo001/tcc-ciencia-computacao-ucb.git
 cd tcc-ciencia-computacao-ucb
 ```
 
-Abra o agente **de dentro dessa pasta** — o contexto do projeto (`CLAUDE.md`/`AGENT.md` pro Claude Code, `opencode.json`/`.opencode/` pro OpenCode) é carregado automaticamente porque ele lê os arquivos do repositório.
+Abra o agente **de dentro dessa pasta** — o contexto do projeto é carregado a partir de `CLAUDE.md` → `AGENT.md` → `ai/` (Claude Code). Para o OpenCode e o Gemini, rode antes `./ai/instalar.sh`, que cria os atalhos `opencode.json`, `.opencode/` e `.gemini/` apontando para `ai/`.
 
 | Ferramenta | Como abrir |
 |---|---|
@@ -63,7 +63,7 @@ O agente vai criar/editar os arquivos necessários (endpoints, models, component
 
 O agente executa `pytest -v` (backend) e/ou `npm test` (frontend) e te mostra o resultado real — não aceite um "deve estar passando", peça o output.
 
-Se algo falhar, peça pra ele investigar e corrigir antes de seguir pro commit.
+Se algo falhar, peça pra ele investigar e corrigir antes de seguir pro commit. Se a US mexeu em dependências ou em algum serviço do backend, rode também `./scripts/verificar-deploy.sh` (ver `docs/checklist-pre-commit.md`): ele reproduz o contêiner de cada serviço, que é onde faltas no `requirements.txt` do serviço aparecem.
 
 ---
 
@@ -96,7 +96,9 @@ O agente preenche o template do PR e referencia a issue (`Closes #23`).
 
 O agente roda `gh pr checks`/`gh run watch` e reporta o resultado real, não assume. Se falhar, ele investiga a causa antes de propor correção — não sai chutando fix.
 
-[anexar imagem: aba "Checks" do PR com os 3 jobs verdes]
+Os checks obrigatórios do PR são sete: `Testes Backend (pytest)`, `Testes Frontend (Jest)`, `Lint e Conventional Commits` (valida o título do PR e os commits) e `Contêiner do serviço` para gateway, auth, mobilidade e colaboracao.
+
+[anexar imagem: aba "Checks" do PR com os checks verdes]
 
 ---
 
@@ -123,7 +125,7 @@ Ele checa `reviewDecision` via `gh pr view` — só segue se vier `APPROVED`.
 
 O agente **deve confirmar com você antes de mergear**, mesmo com CI verde e aprovação — isso é regra (`docs/boas-praticas-ia.md`). Ele nunca decide sozinho bypassar a branch protection; se isso for necessário, é decisão sua, explícita, registrada na issue.
 
-O merge dispara o deploy automático de homologação (Vercel + Fly.io, se tocou em `src/backend/**`).
+O merge dispara o deploy automático: o frontend sai para a Vercel (`--prod`, se tocou em `src/frontend/**`) e o backend para o Fly.io, rodando antes as migrations (se tocou em `src/backend/**`). **Atenção:** `homolog` e produção compartilham os mesmos apps e o mesmo banco (risco aceito, issue #42), então este merge já publica de verdade. Use o merge **squash** (o título do PR vira a mensagem do commit).
 
 [anexar imagem: workflow de deploy rodando após o merge]
 
@@ -133,7 +135,7 @@ O merge dispara o deploy automático de homologação (Vercel + Fly.io, se tocou
 
 > "Confirma que os endpoints da US #23 estão respondendo em homolog."
 
-O agente valida de verdade (`curl`, não só "o deploy deve ter funcionado"). Para telas, use a URL de preview que a Vercel gera por branch.
+O agente valida de verdade (`curl`, não só "o deploy deve ter funcionado"), por exemplo `GET /health` de cada serviço e o endpoint da US pelo Gateway. Para telas, use `https://movecity-frontend.vercel.app`, que é o que o deploy a partir de `homolog` publica (não há URL de preview por branch no workflow atual). Registre o resultado na issue: é o DoD-Sprint.
 
 ---
 
@@ -143,7 +145,7 @@ Mesmo ciclo dos passos 6 a 10, trocando a base do PR pra `main`:
 
 > "Abre o PR de homolog pra main."
 
-Mesmas regras: CI verde, aprovação formal, confirmação sua antes do merge.
+Mesmas regras: CI verde, aprovação formal, confirmação sua antes do merge. A diferença é o tipo de merge: a promoção `homolog` → `main` usa **merge commit**, nunca squash (ver `docs/guia-contribuicao.md`). O merge em `main` dispara de novo o deploy do backend (se `src/backend/**` mudou); o frontend não tem deploy a partir da `main`.
 
 [anexar imagem: os serviços respondendo em produção após o merge]
 

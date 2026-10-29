@@ -1,5 +1,7 @@
 # Brainstorming de Temas - TCC
 
+> **Documento histórico (maio/2026, commit inicial do repositório).** Registra as ideias de tema consideradas antes da escolha do projeto. O tema escolhido foi o **Movecity** (mobilidade urbana colaborativa no DF); as ideias abaixo não foram desenvolvidas. Estado atual: ver `docs/documento_visao.md` e `docs/documento_arquitetura.md`.
+
 Este documento serve para listar e avaliar ideias potenciais para o Trabalho de Conclusão de Curso, focando em **Agentic Workflows** e **Ciência da Computação**.
 
 ## 💡 Ideias Iniciais
