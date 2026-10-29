@@ -205,13 +205,13 @@ Se `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` ou `FRONTEND_URL` faltarem, o e-mai
 
 ```python
 # shared/config.py
-JWT_SECRET: str = "dev-secret-change-in-production"   # padrão de desenvolvimento
+JWT_SECRET: str = "<valor de desenvolvimento omitido>"
 JWT_ALGORITHM: str = "HS256"
 JWT_EXPIRATION_MINUTES: int = 60                       # vale para o access token
 CORS_ORIGINS: str = "http://localhost:3000"
 ```
 
-O refresh token tem validade fixa de 7 dias no código (`auth/security.py`). Gateway e Auth Service precisam usar o mesmo `JWT_SECRET`; o valor usado no Fly.io é secret do app e não é verificado por este documento.
+O refresh token tem validade fixa de 7 dias no código (`auth/security.py`). Gateway e Auth Service precisam usar o mesmo `JWT_SECRET`, que em produção é secret do app no Fly.io e não consta neste documento.
 
 ### CORS (obrigatório para cookies)
 
@@ -273,7 +273,7 @@ Com o CORS mais externo, o preflight `OPTIONS` (que nunca leva cookie) é respon
 | **Replay** | Access token de 1 h; refresh de 7 dias, rotacionado a cada renovação | — |
 | **Token roubado** | O refresh token deixa de valer no logout (sessão apagada) | O access token já emitido vale até expirar; o Gateway não consulta `sessoes` |
 | **Força bruta** | Bloqueio de 15 min após 5 senhas erradas; limite de 5 pedidos de recuperação por e-mail em 15 min | Limite de recuperação na memória do processo |
-| **Identidade forjada** | O Gateway descarta o `X-User-Id` do cliente (#188) | Serviços de domínio acessíveis diretamente nas URLs públicas confiam no cabeçalho |
+| **Identidade forjada** | O Gateway descarta o `X-User-Id` do cliente (#188) | Autenticação entre o Gateway e os serviços de domínio em revisão; endurecimento previsto |
 
 ---
 
