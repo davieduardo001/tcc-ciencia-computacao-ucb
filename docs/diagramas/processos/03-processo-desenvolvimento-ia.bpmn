@@ -1,0 +1,546 @@
+<?xml version="1.0" ?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_DEV" targetNamespace="http://movecity.ucb.br/bpmn">
+  <bpmn:collaboration id="Collab_DEV">
+    <bpmn:participant id="Part_Desenvolvedor" name="Desenvolvedor" processRef="Process_Desenvolvedor"/>
+    <bpmn:participant id="Part_Revisor" name="Revisor" processRef="Process_Revisor"/>
+    <bpmn:participant id="Part_PipelineCICD" name="Pipeline CI/CD" processRef="Process_PipelineCICD"/>
+    <bpmn:messageFlow id="Mdev_0" sourceRef="A05" targetRef="E11" name="PR aberto/atualizado, solicita CI"/>
+    <bpmn:messageFlow id="Mdev_1" sourceRef="E12" targetRef="E02" name="Resultado do CI: verde"/>
+    <bpmn:messageFlow id="Mdev_2" sourceRef="E12b" targetRef="E02" name="Resultado do CI: falha"/>
+    <bpmn:messageFlow id="Mdev_3" sourceRef="A05" targetRef="E09" name="PR vinculado à issue, solicitação de review"/>
+    <bpmn:messageFlow id="Mdev_4" sourceRef="E10" targetRef="E03" name="Decisão do review"/>
+    <bpmn:messageFlow id="Mdev_5" sourceRef="A09" targetRef="E14" name="Merge realizado em homolog"/>
+    <bpmn:messageFlow id="Mdev_6" sourceRef="E13" targetRef="E04" name="Deploy em homolog concluído"/>
+    <bpmn:messageFlow id="Mdev_7" sourceRef="A14" targetRef="E14" name="Merge realizado em main"/>
+    <bpmn:messageFlow id="Mdev_8" sourceRef="E13" targetRef="E07" name="Deploy em produção concluído"/>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Desenvolvedor" isExecutable="false">
+    <bpmn:startEvent id="E01" name="US selecionada (DOR atendido)"/>
+    <bpmn:userTask id="A01" name="Ler US, PRD/SPEC e diagrama de sequência"/>
+    <bpmn:userTask id="A02" name="Criar branch (homolog ou main, conforme o tipo)"/>
+    <bpmn:userTask id="A03" name="Desenvolver com apoio do agente de IA (planejar, codificar, testar local)"/>
+    <bpmn:exclusiveGateway id="G01" name="Testes locais passam?"/>
+    <bpmn:userTask id="A04" name="Corrigir com o agente e retestar"/>
+    <bpmn:userTask id="A05" name="Commit Conventional Commits (sem atribuição de IA) e abrir PR"/>
+    <bpmn:intermediateCatchEvent id="E02" name="Receber resultado do CI">
+      <bpmn:messageEventDefinition/>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="G02" name="CI passou?"/>
+    <bpmn:manualTask id="A06" name="Corrigir conforme falha do CI"/>
+    <bpmn:intermediateCatchEvent id="E03" name="Receber decisão do review">
+      <bpmn:messageEventDefinition/>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="G03" name="Aprovação formal (Review -&gt; Approve) recebida?"/>
+    <bpmn:manualTask id="A07" name="Ajustar conforme comentários do review"/>
+    <bpmn:exclusiveGateway id="G04" name="Bypass excepcional e deliberado (ex.: teste do pipeline)?"/>
+    <bpmn:userTask id="A08" name="Registrar bypass explicitamente na issue, com justificativa"/>
+    <bpmn:userTask id="A09" name="Confirmar merge em homolog (decisão sempre humana)"/>
+    <bpmn:intermediateCatchEvent id="E04" name="Receber confirmação de deploy em homolog">
+      <bpmn:messageEventDefinition/>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="A10" name="Validar critérios de aceite (BDD) em homolog"/>
+    <bpmn:exclusiveGateway id="G05" name="Critérios atendidos em homolog?"/>
+    <bpmn:manualTask id="A11" name="Retomar desenvolvimento com o agente"/>
+    <bpmn:userTask id="A12" name="Comentar resultado na issue (DoD-Sprint)"/>
+    <bpmn:endEvent id="E05" name="US concluída na sprint (DoD-Sprint)"/>
+    <bpmn:userTask id="A13" name="Abrir PR homolog -&gt; main (em lote, fim da sprint)"/>
+    <bpmn:intermediateCatchEvent id="E06" name="Receber aprovação do PR homolog-&gt;main">
+      <bpmn:messageEventDefinition/>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="A14" name="Confirmar merge em main (decisão sempre humana)"/>
+    <bpmn:intermediateCatchEvent id="E07" name="Receber confirmação de deploy em produção">
+      <bpmn:messageEventDefinition/>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="A15" name="Validar endpoint/tela real em produção"/>
+    <bpmn:exclusiveGateway id="G06" name="Validado em produção?"/>
+    <bpmn:manualTask id="A16" name="Investigar e corrigir com o agente"/>
+    <bpmn:userTask id="A17" name="Fechar issue e atualizar documentação"/>
+    <bpmn:endEvent id="E08" name="Incremento entregue em produção (DoD-Release)"/>
+    <bpmn:sequenceFlow id="Fdev_0" sourceRef="E01" targetRef="A01"/>
+    <bpmn:sequenceFlow id="Fdev_1" sourceRef="A01" targetRef="A02"/>
+    <bpmn:sequenceFlow id="Fdev_2" sourceRef="A02" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_3" sourceRef="A03" targetRef="G01"/>
+    <bpmn:sequenceFlow id="Fdev_4" sourceRef="G01" targetRef="A05" name="Sim"/>
+    <bpmn:sequenceFlow id="Fdev_5" sourceRef="G01" targetRef="A04" name="Não"/>
+    <bpmn:sequenceFlow id="Fdev_6" sourceRef="A04" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_7" sourceRef="A05" targetRef="E02"/>
+    <bpmn:sequenceFlow id="Fdev_8" sourceRef="E02" targetRef="G02"/>
+    <bpmn:sequenceFlow id="Fdev_9" sourceRef="G02" targetRef="E03" name="Sim - CI passou"/>
+    <bpmn:sequenceFlow id="Fdev_10" sourceRef="G02" targetRef="A06" name="Não"/>
+    <bpmn:sequenceFlow id="Fdev_11" sourceRef="A06" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_12" sourceRef="E03" targetRef="G03"/>
+    <bpmn:sequenceFlow id="Fdev_13" sourceRef="G03" targetRef="A09" name="Sim - aprovação formal"/>
+    <bpmn:sequenceFlow id="Fdev_14" sourceRef="G03" targetRef="G04" name="Não"/>
+    <bpmn:sequenceFlow id="Fdev_15" sourceRef="G04" targetRef="A08" name="Sim - bypass excepcional"/>
+    <bpmn:sequenceFlow id="Fdev_16" sourceRef="G04" targetRef="A07" name="Não - regra geral"/>
+    <bpmn:sequenceFlow id="Fdev_17" sourceRef="A07" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_18" sourceRef="A08" targetRef="A09"/>
+    <bpmn:sequenceFlow id="Fdev_19" sourceRef="A09" targetRef="E04"/>
+    <bpmn:sequenceFlow id="Fdev_20" sourceRef="E04" targetRef="A10"/>
+    <bpmn:sequenceFlow id="Fdev_21" sourceRef="A10" targetRef="G05"/>
+    <bpmn:sequenceFlow id="Fdev_22" sourceRef="G05" targetRef="A12" name="Sim"/>
+    <bpmn:sequenceFlow id="Fdev_23" sourceRef="G05" targetRef="A11" name="Não"/>
+    <bpmn:sequenceFlow id="Fdev_24" sourceRef="A11" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_25" sourceRef="A12" targetRef="E05"/>
+    <bpmn:sequenceFlow id="Fdev_26" sourceRef="E05" targetRef="A13" name="Em lote, fim da sprint"/>
+    <bpmn:sequenceFlow id="Fdev_27" sourceRef="A13" targetRef="E06"/>
+    <bpmn:sequenceFlow id="Fdev_28" sourceRef="E06" targetRef="A14"/>
+    <bpmn:sequenceFlow id="Fdev_29" sourceRef="A14" targetRef="E07"/>
+    <bpmn:sequenceFlow id="Fdev_30" sourceRef="E07" targetRef="A15"/>
+    <bpmn:sequenceFlow id="Fdev_31" sourceRef="A15" targetRef="G06"/>
+    <bpmn:sequenceFlow id="Fdev_32" sourceRef="G06" targetRef="A17" name="Sim"/>
+    <bpmn:sequenceFlow id="Fdev_33" sourceRef="G06" targetRef="A16" name="Não"/>
+    <bpmn:sequenceFlow id="Fdev_34" sourceRef="A16" targetRef="A03"/>
+    <bpmn:sequenceFlow id="Fdev_35" sourceRef="A17" targetRef="E08"/>
+  </bpmn:process>
+  <bpmn:process id="Process_Revisor" isExecutable="false">
+    <bpmn:startEvent id="E09" name="PR recebido para revisão">
+      <bpmn:messageEventDefinition/>
+    </bpmn:startEvent>
+    <bpmn:userTask id="A18" name="Analisar mudanças do PR (Files changed)"/>
+    <bpmn:exclusiveGateway id="G07" name="Código atende ao padrão e à US?"/>
+    <bpmn:userTask id="A19" name="Comentar solicitando ajustes (não conta como aprovação)"/>
+    <bpmn:userTask id="A20" name="Submeter review formal (Review changes -&gt; Approve)"/>
+    <bpmn:endEvent id="E10" name="Decisão de review enviada">
+      <bpmn:messageEventDefinition/>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Frv_0" sourceRef="E09" targetRef="A18"/>
+    <bpmn:sequenceFlow id="Frv_1" sourceRef="A18" targetRef="G07"/>
+    <bpmn:sequenceFlow id="Frv_2" sourceRef="G07" targetRef="A20" name="Sim"/>
+    <bpmn:sequenceFlow id="Frv_3" sourceRef="G07" targetRef="A19" name="Não"/>
+    <bpmn:sequenceFlow id="Frv_4" sourceRef="A19" targetRef="E10"/>
+    <bpmn:sequenceFlow id="Frv_5" sourceRef="A20" targetRef="E10"/>
+  </bpmn:process>
+  <bpmn:process id="Process_PipelineCICD" isExecutable="false">
+    <bpmn:startEvent id="E11" name="PR aberto ou atualizado">
+      <bpmn:messageEventDefinition/>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="A21" name="Rodar lint, pytest, Jest"/>
+    <bpmn:exclusiveGateway id="G08" name="Todos os testes passam?"/>
+    <bpmn:endEvent id="E12" name="Resultado do CI (verde) enviado">
+      <bpmn:messageEventDefinition/>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="E12b" name="Resultado do CI (falha) enviado">
+      <bpmn:messageEventDefinition/>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="E14" name="Merge realizado em homolog ou main">
+      <bpmn:messageEventDefinition/>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="A22" name="Disparar deploy automático (Fly.io / Vercel)"/>
+    <bpmn:endEvent id="E13" name="Deploy concluído">
+      <bpmn:messageEventDefinition/>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Fci_0" sourceRef="E11" targetRef="A21"/>
+    <bpmn:sequenceFlow id="Fci_1" sourceRef="A21" targetRef="G08"/>
+    <bpmn:sequenceFlow id="Fci_2" sourceRef="G08" targetRef="E12" name="Sim"/>
+    <bpmn:sequenceFlow id="Fci_3" sourceRef="G08" targetRef="E12b" name="Não"/>
+    <bpmn:sequenceFlow id="Fci_4" sourceRef="E14" targetRef="A22"/>
+    <bpmn:sequenceFlow id="Fci_5" sourceRef="A22" targetRef="E13"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_DEV">
+    <bpmndi:BPMNPlane id="Plane_DEV" bpmnElement="Collab_DEV">
+      <bpmndi:BPMNShape id="Shape_Part_Desenvolvedor" bpmnElement="Part_Desenvolvedor" isHorizontal="true">
+        <dc:Bounds x="60" y="60" width="6950" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E01" bpmnElement="E01">
+        <dc:Bounds x="130" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A01" bpmnElement="A01">
+        <dc:Bounds x="350" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A02" bpmnElement="A02">
+        <dc:Bounds x="570" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A03" bpmnElement="A03">
+        <dc:Bounds x="790" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G01" bpmnElement="G01">
+        <dc:Bounds x="1010" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A04" bpmnElement="A04">
+        <dc:Bounds x="1230" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A05" bpmnElement="A05">
+        <dc:Bounds x="1450" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E02" bpmnElement="E02">
+        <dc:Bounds x="1670" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G02" bpmnElement="G02">
+        <dc:Bounds x="1890" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A06" bpmnElement="A06">
+        <dc:Bounds x="2110" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E03" bpmnElement="E03">
+        <dc:Bounds x="2330" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G03" bpmnElement="G03">
+        <dc:Bounds x="2550" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A07" bpmnElement="A07">
+        <dc:Bounds x="2770" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G04" bpmnElement="G04">
+        <dc:Bounds x="2990" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A08" bpmnElement="A08">
+        <dc:Bounds x="3210" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A09" bpmnElement="A09">
+        <dc:Bounds x="3430" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E04" bpmnElement="E04">
+        <dc:Bounds x="3650" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A10" bpmnElement="A10">
+        <dc:Bounds x="3870" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G05" bpmnElement="G05">
+        <dc:Bounds x="4090" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A11" bpmnElement="A11">
+        <dc:Bounds x="4310" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A12" bpmnElement="A12">
+        <dc:Bounds x="4530" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E05" bpmnElement="E05">
+        <dc:Bounds x="4750" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A13" bpmnElement="A13">
+        <dc:Bounds x="4970" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E06" bpmnElement="E06">
+        <dc:Bounds x="5190" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A14" bpmnElement="A14">
+        <dc:Bounds x="5410" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E07" bpmnElement="E07">
+        <dc:Bounds x="5630" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A15" bpmnElement="A15">
+        <dc:Bounds x="5850" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G06" bpmnElement="G06">
+        <dc:Bounds x="6070" y="135" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A16" bpmnElement="A16">
+        <dc:Bounds x="6290" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A17" bpmnElement="A17">
+        <dc:Bounds x="6510" y="120" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E08" bpmnElement="E08">
+        <dc:Bounds x="6730" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Part_Revisor" bpmnElement="Part_Revisor" isHorizontal="true">
+        <dc:Bounds x="60" y="390" width="1450" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E09" bpmnElement="E09">
+        <dc:Bounds x="130" y="472" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A18" bpmnElement="A18">
+        <dc:Bounds x="350" y="450" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G07" bpmnElement="G07">
+        <dc:Bounds x="570" y="465" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A19" bpmnElement="A19">
+        <dc:Bounds x="790" y="450" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A20" bpmnElement="A20">
+        <dc:Bounds x="1010" y="450" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E10" bpmnElement="E10">
+        <dc:Bounds x="1230" y="472" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Part_PipelineCICD" bpmnElement="Part_PipelineCICD" isHorizontal="true">
+        <dc:Bounds x="60" y="720" width="1890" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E11" bpmnElement="E11">
+        <dc:Bounds x="130" y="802" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A21" bpmnElement="A21">
+        <dc:Bounds x="350" y="780" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_G08" bpmnElement="G08">
+        <dc:Bounds x="570" y="795" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E12" bpmnElement="E12">
+        <dc:Bounds x="790" y="802" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E12b" bpmnElement="E12b">
+        <dc:Bounds x="1010" y="802" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E14" bpmnElement="E14">
+        <dc:Bounds x="1230" y="802" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_A22" bpmnElement="A22">
+        <dc:Bounds x="1450" y="780" width="110" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_E13" bpmnElement="E13">
+        <dc:Bounds x="1670" y="802" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Fdev_0" bpmnElement="Fdev_0">
+        <di:waypoint x="166" y="160"/>
+        <di:waypoint x="350" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_1" bpmnElement="Fdev_1">
+        <di:waypoint x="460" y="160"/>
+        <di:waypoint x="570" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_2" bpmnElement="Fdev_2">
+        <di:waypoint x="680" y="160"/>
+        <di:waypoint x="790" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_3" bpmnElement="Fdev_3">
+        <di:waypoint x="900" y="160"/>
+        <di:waypoint x="1010" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_4" bpmnElement="Fdev_4">
+        <di:waypoint x="1060" y="160"/>
+        <di:waypoint x="1450" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_5" bpmnElement="Fdev_5">
+        <di:waypoint x="1060" y="160"/>
+        <di:waypoint x="1230" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_6" bpmnElement="Fdev_6">
+        <di:waypoint x="1285" y="200"/>
+        <di:waypoint x="1285" y="289"/>
+        <di:waypoint x="845" y="289"/>
+        <di:waypoint x="845" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_7" bpmnElement="Fdev_7">
+        <di:waypoint x="1560" y="160"/>
+        <di:waypoint x="1670" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_8" bpmnElement="Fdev_8">
+        <di:waypoint x="1706" y="160"/>
+        <di:waypoint x="1890" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_9" bpmnElement="Fdev_9">
+        <di:waypoint x="1940" y="160"/>
+        <di:waypoint x="2330" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_10" bpmnElement="Fdev_10">
+        <di:waypoint x="1940" y="160"/>
+        <di:waypoint x="2110" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_11" bpmnElement="Fdev_11">
+        <di:waypoint x="2165" y="200"/>
+        <di:waypoint x="2165" y="289"/>
+        <di:waypoint x="845" y="289"/>
+        <di:waypoint x="845" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_12" bpmnElement="Fdev_12">
+        <di:waypoint x="2366" y="160"/>
+        <di:waypoint x="2550" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_13" bpmnElement="Fdev_13">
+        <di:waypoint x="2600" y="160"/>
+        <di:waypoint x="3430" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_14" bpmnElement="Fdev_14">
+        <di:waypoint x="2600" y="160"/>
+        <di:waypoint x="2990" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_15" bpmnElement="Fdev_15">
+        <di:waypoint x="3040" y="160"/>
+        <di:waypoint x="3210" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_16" bpmnElement="Fdev_16">
+        <di:waypoint x="3015" y="185"/>
+        <di:waypoint x="3015" y="311"/>
+        <di:waypoint x="2825" y="311"/>
+        <di:waypoint x="2825" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_17" bpmnElement="Fdev_17">
+        <di:waypoint x="2825" y="200"/>
+        <di:waypoint x="2825" y="245"/>
+        <di:waypoint x="845" y="245"/>
+        <di:waypoint x="845" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_18" bpmnElement="Fdev_18">
+        <di:waypoint x="3320" y="160"/>
+        <di:waypoint x="3430" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_19" bpmnElement="Fdev_19">
+        <di:waypoint x="3540" y="160"/>
+        <di:waypoint x="3650" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_20" bpmnElement="Fdev_20">
+        <di:waypoint x="3686" y="160"/>
+        <di:waypoint x="3870" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_21" bpmnElement="Fdev_21">
+        <di:waypoint x="3980" y="160"/>
+        <di:waypoint x="4090" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_22" bpmnElement="Fdev_22">
+        <di:waypoint x="4140" y="160"/>
+        <di:waypoint x="4530" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_23" bpmnElement="Fdev_23">
+        <di:waypoint x="4140" y="160"/>
+        <di:waypoint x="4310" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_24" bpmnElement="Fdev_24">
+        <di:waypoint x="4365" y="200"/>
+        <di:waypoint x="4365" y="289"/>
+        <di:waypoint x="845" y="289"/>
+        <di:waypoint x="845" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_25" bpmnElement="Fdev_25">
+        <di:waypoint x="4640" y="160"/>
+        <di:waypoint x="4750" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_26" bpmnElement="Fdev_26">
+        <di:waypoint x="4786" y="160"/>
+        <di:waypoint x="4970" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_27" bpmnElement="Fdev_27">
+        <di:waypoint x="5080" y="160"/>
+        <di:waypoint x="5190" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_28" bpmnElement="Fdev_28">
+        <di:waypoint x="5226" y="160"/>
+        <di:waypoint x="5410" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_29" bpmnElement="Fdev_29">
+        <di:waypoint x="5520" y="160"/>
+        <di:waypoint x="5630" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_30" bpmnElement="Fdev_30">
+        <di:waypoint x="5666" y="160"/>
+        <di:waypoint x="5850" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_31" bpmnElement="Fdev_31">
+        <di:waypoint x="5960" y="160"/>
+        <di:waypoint x="6070" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_32" bpmnElement="Fdev_32">
+        <di:waypoint x="6120" y="160"/>
+        <di:waypoint x="6510" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_33" bpmnElement="Fdev_33">
+        <di:waypoint x="6120" y="160"/>
+        <di:waypoint x="6290" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_34" bpmnElement="Fdev_34">
+        <di:waypoint x="6345" y="200"/>
+        <di:waypoint x="6345" y="311"/>
+        <di:waypoint x="845" y="311"/>
+        <di:waypoint x="845" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fdev_35" bpmnElement="Fdev_35">
+        <di:waypoint x="6620" y="160"/>
+        <di:waypoint x="6730" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_0" bpmnElement="Frv_0">
+        <di:waypoint x="166" y="490"/>
+        <di:waypoint x="350" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_1" bpmnElement="Frv_1">
+        <di:waypoint x="460" y="490"/>
+        <di:waypoint x="570" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_2" bpmnElement="Frv_2">
+        <di:waypoint x="620" y="490"/>
+        <di:waypoint x="1010" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_3" bpmnElement="Frv_3">
+        <di:waypoint x="620" y="490"/>
+        <di:waypoint x="790" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_4" bpmnElement="Frv_4">
+        <di:waypoint x="900" y="490"/>
+        <di:waypoint x="1230" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Frv_5" bpmnElement="Frv_5">
+        <di:waypoint x="1120" y="490"/>
+        <di:waypoint x="1230" y="490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_0" bpmnElement="Fci_0">
+        <di:waypoint x="166" y="820"/>
+        <di:waypoint x="350" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_1" bpmnElement="Fci_1">
+        <di:waypoint x="460" y="820"/>
+        <di:waypoint x="570" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_2" bpmnElement="Fci_2">
+        <di:waypoint x="620" y="820"/>
+        <di:waypoint x="790" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_3" bpmnElement="Fci_3">
+        <di:waypoint x="620" y="820"/>
+        <di:waypoint x="1010" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_4" bpmnElement="Fci_4">
+        <di:waypoint x="1266" y="820"/>
+        <di:waypoint x="1450" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Fci_5" bpmnElement="Fci_5">
+        <di:waypoint x="1560" y="820"/>
+        <di:waypoint x="1670" y="820"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_0" bpmnElement="Mdev_0">
+        <di:waypoint x="1504" y="200"/>
+        <di:waypoint x="1504" y="242"/>
+        <di:waypoint x="143" y="242"/>
+        <di:waypoint x="143" y="802"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_1" bpmnElement="Mdev_1">
+        <di:waypoint x="808" y="802"/>
+        <di:waypoint x="808" y="655"/>
+        <di:waypoint x="1684" y="655"/>
+        <di:waypoint x="1684" y="178"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_2" bpmnElement="Mdev_2">
+        <di:waypoint x="1029" y="802"/>
+        <di:waypoint x="1029" y="572"/>
+        <di:waypoint x="1685" y="572"/>
+        <di:waypoint x="1685" y="178"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_3" bpmnElement="Mdev_3">
+        <di:waypoint x="1507" y="200"/>
+        <di:waypoint x="1507" y="270"/>
+        <di:waypoint x="146" y="270"/>
+        <di:waypoint x="146" y="472"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_4" bpmnElement="Mdev_4">
+        <di:waypoint x="1251" y="472"/>
+        <di:waypoint x="1251" y="270"/>
+        <di:waypoint x="2347" y="270"/>
+        <di:waypoint x="2347" y="178"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_5" bpmnElement="Mdev_5">
+        <di:waypoint x="3489" y="200"/>
+        <di:waypoint x="3489" y="490"/>
+        <di:waypoint x="1248" y="490"/>
+        <di:waypoint x="1248" y="802"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_6" bpmnElement="Mdev_6">
+        <di:waypoint x="1693" y="802"/>
+        <di:waypoint x="1693" y="407"/>
+        <di:waypoint x="3669" y="407"/>
+        <di:waypoint x="3669" y="178"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_7" bpmnElement="Mdev_7">
+        <di:waypoint x="5471" y="200"/>
+        <di:waypoint x="5471" y="655"/>
+        <di:waypoint x="1250" y="655"/>
+        <di:waypoint x="1250" y="802"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Mdev_8" bpmnElement="Mdev_8">
+        <di:waypoint x="1695" y="802"/>
+        <di:waypoint x="1695" y="242"/>
+        <di:waypoint x="5651" y="242"/>
+        <di:waypoint x="5651" y="178"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

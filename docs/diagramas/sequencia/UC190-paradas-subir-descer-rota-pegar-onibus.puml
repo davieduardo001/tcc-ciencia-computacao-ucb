@@ -1,0 +1,283 @@
+@startuml UC190_ParadasSubirDescerNaRota
+hide footbox
+title Diagrama de Sequencia - Paradas de Subir e Descer na Rota Montada, Tempo do Onibus e Pegar o Onibus pela Rota (US #190)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaRota" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoChegadas" as Chegadas <<servico mobilidade>>
+participant ":ServicoViagem" as Viagens <<servico mobilidade>>
+participant ":ModeloRota" as Rota <<modelo>>
+participant ":ModeloVeiculo" as Veiculo <<modelo>>
+participant ":ModeloViagem" as Viagem <<modelo>>
+
+note over Passageiro, Viagem
+  Pre-condicao: a rota (origem e destino) ja foi calculada (ver UC20). Nessa resposta cada ponto de subir e de
+  descer ja traz o codigo da parada, quando a rota tem parada ingerida a ate 40 m do ponto (ver UC173).
+  Escopo de paradas: somente embarque e desembarque de cada trecho; as demais paradas do trajeto nao entram.
+  Limites do embarque pela rota (raio de 100 m, parada a ate 400 m e onibus a ate 2 min) sao configuraveis
+  e, na issue, marcados como "a validar em campo". Nao validados com onibus reais.
+end note
+
+== Ver as paradas de subir e descer com o tempo do onibus ==
+
+Passageiro -> View : escolherOpcaoDeRota(opcao)
+activate View
+
+View -> View : destacarParadasDeSubirEDescerDeCadaTrecho()
+
+alt nenhum ponto da opcao tem codigo de parada
+  View -> View : exibirSemPrevisaoNoMomento()
+
+else algum ponto tem codigo de parada
+  View -> Gateway : requisicao(token, trechos(linha, sentido, codigoEmbarque, codigoDesembarque))
+  activate Gateway
+
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+
+  alt token valido
+    Gateway -> Chegadas : encaminharRequisicao(req, identidadeUsuario)
+    activate Chegadas
+
+    Chegadas -> Veiculo : obterPosicoesDasLinhas(linhasDosTrechos)
+    activate Veiculo
+    Veiculo --> Chegadas : posicoesPorLinha
+    deactivate Veiculo
+
+    loop para cada trecho, na ordem da viagem
+      Chegadas -> Rota : obterVinculosDasParadas(linha, sentido, codigoEmbarque, codigoDesembarque)
+      activate Rota
+      Rota --> Chegadas : vinculos(posicaoNoTrajeto)
+      deactivate Rota
+
+      alt ha onibus a caminho da parada de embarque, no sentido do trecho
+        Chegadas -> Chegadas : escolherOnibusDeMenorTempoAteEmbarque()
+        Chegadas -> Chegadas : registrarTempoDeEmbarque(origem: ao vivo, prefixo)
+
+        alt parada de descer vem depois da de subir no trajeto
+          Chegadas -> Chegadas : calcularTempoDoMesmoOnibusAteDesembarque()
+          Chegadas -> Chegadas : registrarTempoDeDesembarque(origem: ao vivo)
+        else descer antes de subir ou mesma parada
+          Chegadas -> Chegadas : registrarDesembarqueSemPrevisao()
+        end
+
+      else sem onibus a caminho
+        Chegadas -> Rota : obterPassagemPrevistaNoEmbarque(linha, sentido, vinculo)
+        activate Rota
+
+        alt saidas do dia e tempo de percurso disponiveis
+          Rota --> Chegadas : passagemPrevista(horario)
+          deactivate Rota
+          Chegadas -> Chegadas : registrarTempoDeEmbarque(origem: previsto, horario)
+          Chegadas -> Chegadas : somarTempoDePercursoEntreAsParadasParaODesembarque()
+
+        else sem dados para prever
+          Rota --> Chegadas : semDados()
+          deactivate Rota
+          note right of Chegadas : O sistema nunca inventa um tempo.
+          Chegadas -> Chegadas : registrarEmbarqueEDesembarqueSemPrevisao()
+        end
+      end
+    end
+
+    Chegadas --> Gateway : resposta(chegadasPorTrecho)
+    deactivate Chegadas
+    Gateway --> View : retornarResposta(chegadasPorTrecho)
+    View -> View : exibirMarcadoresETempoPorTrecho(origem, "Parada sem nome" se nao houver)
+
+  else token expirado ou ausente
+    Gateway --> View : notificarNaoAutorizado(401)
+
+    View -> Gateway : renovarSessao(refreshToken)
+    activate Gateway
+    Gateway -> Auth : renovarSessao(refreshToken)
+    activate Auth
+    Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+    activate Sessao
+
+    alt sessao ainda ativa
+      Sessao --> Auth : tokenValido
+      deactivate Sessao
+      Auth -> Sessao : emitirNovosTokens(usuarioId)
+      activate Sessao
+      Sessao --> Auth : novosTokens
+      deactivate Sessao
+      Auth --> Gateway : sessaoRenovada(novosTokens)
+      deactivate Auth
+      Gateway --> View : retornarResposta(sessaoRenovada)
+      deactivate Gateway
+
+      View -> Gateway : requisicao(novoToken, trechos)
+      activate Gateway
+      Gateway -> Chegadas : encaminharRequisicaoOriginal(req, identidadeUsuario)
+      activate Chegadas
+      Chegadas --> Gateway : resposta(chegadasPorTrecho)
+      deactivate Chegadas
+      Gateway --> View : retornarResposta(chegadasPorTrecho)
+      deactivate Gateway
+      View -> View : exibirMarcadoresETempoPorTrecho(origem)
+
+    else refresh revogado ou invalido
+      Sessao --> Auth : sessaoInexistente()
+      deactivate Sessao
+      Auth --> Gateway : erroNaoAutorizado(401)
+      deactivate Auth
+      Gateway --> View : notificarNaoAutorizado(401)
+      deactivate Gateway
+      View -> View : redirecionarParaLogin("Sua sessao expirou, entre novamente.")
+    end
+  end
+
+  deactivate Gateway
+end
+
+deactivate View
+
+== Manter o tempo atualizado enquanto a opcao estiver selecionada (a cada 20 s) ==
+
+loop enquanto a opcao de rota estiver selecionada
+  View -> Gateway : requisicao(token, trechos)
+  activate View
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Chegadas : encaminharRequisicao(req, identidadeUsuario)
+  activate Chegadas
+  Chegadas --> Gateway : resposta(chegadasPorTrecho)
+  deactivate Chegadas
+  Gateway --> View : retornarResposta(chegadasPorTrecho)
+  View -> View : atualizarTempos(ignorarRespostaMaisAntiga)
+  deactivate Gateway
+  deactivate View
+end
+
+== Pegar o onibus a partir de um trecho da rota ==
+
+Passageiro -> View : tocarPegueiEsteOnibus(trecho)
+activate View
+
+alt localizacao do passageiro indisponivel
+  View -> View : exibirAviso("Ative a localizacao para indicar que pegou o onibus.")
+
+else localizacao disponivel
+  View -> View : obterPosicaoDoPassageiro()
+  View -> Gateway : requisicao(token, linha, posicaoPassageiro, paradaDestino = desembarque do trecho)
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Viagens : encaminharRequisicao(req, identidadeUsuario)
+  activate Viagens
+
+  Viagens -> Viagem : consultarViagemAtiva(identidadeUsuario)
+  activate Viagem
+  Viagem --> Viagens : viagemAtiva | nenhuma
+  deactivate Viagem
+
+  alt passageiro ja esta em viagem
+    Viagens --> Gateway : respostaErro(conflito, 409)
+    deactivate Viagens
+    Gateway --> View : retornarResposta(conflito)
+    View -> View : exibirAviso("Voce ja esta em uma viagem.")
+
+  else sem viagem ativa
+    opt trecho tem parada de desembarque com codigo
+      Viagens -> Rota : validarParadaDeDestino(linha, paradaDestino)
+      activate Rota
+      Rota --> Viagens : paradaValida | paradaDesconhecida | paradaForaDaLinha
+      deactivate Rota
+    end
+
+    alt parada de destino invalida
+      Viagens --> Gateway : respostaErro(paradaInvalida, 422)
+      deactivate Viagens
+      Gateway --> View : retornarResposta(paradaInvalida)
+      View -> View : exibirAviso(motivo)
+
+    else destino valido ou sem destino
+      Viagens -> Veiculo : obterOnibusDaLinhaAteORaioDoPassageiro(linha, posicaoPassageiro, raioDeEmbarque)
+      activate Veiculo
+
+      alt onibus da linha dentro do raio, com posicao recente
+        Veiculo --> Viagens : onibusMaisProximo(prefixo, sentido)
+        deactivate Veiculo
+
+      else nenhum onibus dentro do raio
+        Veiculo --> Viagens : nenhum()
+        deactivate Veiculo
+        Viagens -> Rota : obterParadaDaLinhaProximaDoPassageiro(linha, posicaoPassageiro, raio 400 m)
+        activate Rota
+        Rota --> Viagens : paradaMaisProxima(sentido) | nenhuma
+        deactivate Rota
+
+        opt ha parada da linha por perto
+          Viagens -> Viagens : buscarOnibusQueChegaAEstaParadaEm(ate 2 min, sentido da parada)
+        end
+      end
+
+      alt onibus identificado (ao lado do passageiro ou chegando a sua parada)
+        note right of Viagens : A posicao do passageiro so confirma o\nembarque e e descartada (LGPD).
+        Viagens -> Viagem : registrarViagem(identidadeUsuario, linha, sentido, prefixo, paradaDestino?)
+        activate Viagem
+        Viagem --> Viagens : viagemRegistrada
+        deactivate Viagem
+        Viagens --> Gateway : resposta(viagemRegistrada, 201)
+        deactivate Viagens
+        Gateway --> View : retornarResposta(viagemRegistrada)
+        View -> View : passarParaModoEmViagem(paradaDestinoJaDefinida)
+
+      else nenhum onibus identificavel
+        Viagens --> Gateway : respostaErro(naoConfirmado, 422)
+        deactivate Viagens
+        Gateway --> View : retornarResposta(naoConfirmado)
+        View -> View : exibirAviso("Nenhum onibus desta linha esta perto de voce agora.")
+        note right of View : Nenhuma viagem e registrada.
+      end
+    end
+  end
+
+  deactivate Gateway
+end
+
+deactivate View
+
+== Ver quanto falta para um onibus chegar a minha parada (popup do onibus) ==
+
+Passageiro -> View : abrirPopupDoOnibus(onibus)
+activate View
+
+loop enquanto o popup estiver aberto (a cada 20 s)
+  View -> Gateway : requisicao(token, linha, posicaoPassageiro)
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Chegadas : encaminharRequisicao(req, identidadeUsuario)
+  activate Chegadas
+
+  Chegadas -> Rota : obterParadaDaLinhaProximaDoPassageiro(linha, posicaoPassageiro)
+  activate Rota
+  Rota --> Chegadas : paradaDoPassageiro(sentido) | nenhuma
+  deactivate Rota
+
+  Chegadas -> Veiculo : obterPosicoesDaLinha(linha)
+  activate Veiculo
+  Veiculo --> Chegadas : posicoes
+  deactivate Veiculo
+
+  Chegadas -> Chegadas : calcularTempoDeCadaOnibusAteAParadaPeloTrajeto()
+  note right of Chegadas : Sem tempo para onibus parado, de sentido oposto\nou que ja passou da parada.\nSem parada por perto: nao ha tempo em linha reta.
+  Chegadas --> Gateway : resposta(onibus, tempoAteAParada | nenhum)
+  deactivate Chegadas
+  Gateway --> View : retornarResposta(onibus, tempoAteAParada | nenhum)
+
+  alt este onibus tem tempo ate a parada
+    View -> View : exibirChegaNaSuaParadaEmNMin(origem: ao vivo)
+  else sem tempo
+    View -> View : exibirSemPrevisaoNoMomento()
+  end
+
+  deactivate Gateway
+end
+
+deactivate View
+
+@enduml
