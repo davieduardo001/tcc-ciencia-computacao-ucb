@@ -11,7 +11,7 @@ Guia de quem fala o quê na defesa de **13/11/2026**, com a tese central, os nú
 
 ## 1. A tese
 
-> **Todo o código do Movecity foi gerado por agentes de IA, conduzidos por seis estudantes que especificaram, revisaram e aprovaram. Dentro de um processo com travas (issue → BDD → PR → CI → review → homolog → main), isso entregou um produto funcional e testado em ~10 semanas. A IA escreveu; o processo e as pessoas garantiram a qualidade, e onde o processo falhou, os defeitos apareceram.**
+> **Todo o código do Movecity foi gerado por agentes de IA, conduzidos por seis estudantes que especificaram, revisaram e aprovaram. Dentro de um processo com travas (issue → BDD → PR → CI → review → homolog → main), isso entregou um produto funcional e testado em ~11 semanas. A IA escreveu; o processo e as pessoas garantiram a qualidade, e onde o processo falhou, os defeitos apareceram.**
 
 Três ideias que toda fala deve reforçar:
 
@@ -44,34 +44,34 @@ Cada pessoa fala do que **entregou**, para saber responder às perguntas.
 
 ## 3. A tese em números (bloco 7 e apoio dos blocos 6 e 8)
 
-Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicação.
+Todos coletados de `gh issue/pr list` e `git log` em 29/10/2026, salvo indicação (volume, revisão e tempo de merge recalculados nesse dia; testes e defeitos em 28/10).
 
 ### 3.1 Volume
 
 | Métrica | Valor | Observação |
 |---|---|---|
-| Issues criadas | **84** (71 fechadas, 13 abertas) | 7 com label `bug` |
-| USs/épicos fechados | **31 de 38** | issues com label `Epico …` |
-| Pull Requests | **126** (114 mergeados, 11 fechados sem merge, 1 aberto) | |
-| PRs por destino | 102 → `homolog`, 21 → `main` | o resto são branches de feature empilhadas |
-| PRs por tipo de branch | 61 `feat`, 37 `fix`, 9 `chore`, 9 `docs` | |
-| Commits | **138** | `feat` 35, `fix` 28, `docs` 26, `chore` 24 (Conventional Commits) |
-| Período | 15/08 a 27/10/2026 | ~10 semanas; pico de 20+ PRs/semana nas semanas 36–38 e 42 |
-| Autores de PR | Davi 71, Vitória 29, Kelvin 11, Breno 7, Nathália 5, Luis 3 | **desigual**: dizer isso com naturalidade e explicar (Davi também orquestra, infra e correções) |
+| Issues criadas | **103** (70 fechadas, 33 abertas) | 22 com label `bug` |
+| USs/épicos fechados | **30 de 38** | issues com label `Epico …` |
+| Pull Requests | **155** (143 mergeados, 11 fechados sem merge, 1 aberto) | |
+| PRs por destino | 114 → `homolog`, 38 → `main` | o resto são branches de feature empilhadas |
+| PRs por tipo de branch | 65 `feat`, 45 `fix`, 25 `docs`, 10 `chore`, 10 outros (`homolog`, `ci`, `sync`) | |
+| Commits | **283** (sem merges, `main` + `homolog`) | `fix` 84, `feat` 83, `docs` 75, `chore` 26, `test` 6, `refactor` 3 (Conventional Commits) |
+| Período | 15/08 a 29/10/2026 | ~11 semanas; pico de 20+ PRs/semana nas semanas 36–38 e 42 |
+| Autores de PR | Davi 99, Vitória 29, Kelvin 12, Breno 7, Nathália 5, Luis 3 | **desigual**: dizer isso com naturalidade e explicar (Davi também orquestra, infra e correções) |
 
 ### 3.2 Revisão: aprovados e não aprovados
 
 | Métrica | Valor | Como apresentar |
 |---|---|---|
-| PRs mergeados | 114 | |
-| Com aprovação formal registrada | **50 de 114** | Os 64 restantes: **59 são PRs do próprio Davi**, que o GitHub não deixa aprovar (autor não aprova o próprio PR). Ver 3.4 |
+| PRs mergeados | 143 | |
+| Com aprovação formal registrada | **50 de 143** | Os 93 restantes: **88 são PRs do próprio Davi**, que o GitHub não deixa aprovar (autor não aprova o próprio PR). Ver 3.4 |
 | Aprovações (reviews `APPROVED`) | 53 (Davi 40, Vitória 13) | |
 | Pedido de alterações | 1 (#176, rota favorita) | exemplo de review que **barrou** e voltou ajustado |
 | Reviews dispensados e reaprovados | 3 (#183, #184, #185) | cadeia do card #179 |
 | PRs fechados sem merge | **11** | 3 são testes deliberados de workflow (#67, #68, #71); 3 são tentativas de recuperação de senha (#73, #74, #86) refeitas no #87/#153; 3 do tutorial (#155–#157) consolidados no #158; #165 consolidado no #166; #88 sync cancelado. **Nenhum foi "rejeitado por qualidade"**: foram retrabalho e consolidação. |
-| Tempo criação → merge | mediana **17 min**; média 6,3 h; 79 de 114 em menos de 1 h | mostra fluxo rápido; a banca vai perguntar se a revisão foi profunda |
+| Tempo criação → merge | mediana **18 min**; média 6,4 h; 97 de 143 em menos de 1 h | mostra fluxo rápido; a banca vai perguntar se a revisão foi profunda |
 
-### 3.3 Qualidade (de `docs/qa/`, 16/10/2026)
+### 3.3 Qualidade (de `docs/qa/`, atualizado em 28/10/2026)
 
 | Métrica | Valor |
 |---|---|
@@ -90,8 +90,8 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 | Pergunta provável | Resposta que temos | Pendência antes de 13/11 |
 |---|---|---|
 | "Quanto do código foi escrito pela IA?" | **Todo.** O código foi gerado por agentes de IA; as pessoas especificaram (issue, BDD, diagrama de sequência), revisaram e aprovaram. Por regra de autoria (`boas-praticas-ia.md`) os commits não levam assinatura de ferramenta, então o repositório não mostra isso; a declaração é do grupo. | Dizer explicitamente no slide e na fala. Não usar "% de código" (seria 100% e não mede esforço); falar do que a pessoa fez. |
-| "Por que só 50 de 114 PRs têm aprovação formal?" | Dos 64 sem aprovação, **59 são PRs do Davi**, que é quem aprova os do grupo e não pode aprovar o próprio (regra do GitHub). Dos outros 5, 4 são do Breno/Nathália (#152, #153, #176, #209) e 1 da Vitória (#103, branch empilhada). | **Conferir os 5** (#103, #152, #153, #176, #209) e os 59 de Davi: como foram mergeados (bypass de admin?) e se estão registrados em comentário, conforme `boas-praticas-ia.md`. Ponto de atenção: PRs do Davi dependem de bypass ou de um segundo revisor. |
-| "Mediana de 17 min até o merge não é revisão superficial?" | Por tipo: `feat` **25 min**, `fix` **8 min**, `docs` 14 min, `chore` 4 min. PRs pequenos e o CI cobre o mecânico, mas é um risco real: um único revisor. | Reconhecer o risco do revisor único como limite. |
+| "Por que só 50 de 143 PRs têm aprovação formal?" | Dos 93 sem aprovação, **88 são PRs do Davi**, que é quem aprova os do grupo e não pode aprovar o próprio (regra do GitHub). Dos outros 5, 4 são do Breno/Nathália (#152, #153, #176, #209; 3 do Breno e 1 da Nathália) e 1 da Vitória (#103, branch empilhada). | **Conferir os 5** (#103, #152, #153, #176, #209) e os 88 de Davi: como foram mergeados (bypass de admin?) e se estão registrados em comentário, conforme `boas-praticas-ia.md`. Ponto de atenção: PRs do Davi dependem de bypass ou de um segundo revisor. |
+| "Mediana de 18 min até o merge não é revisão superficial?" | Por tipo: `feat` **20 min**, `fix` **9 min**, `docs` 25 min, `chore` 13 min. PRs pequenos e o CI cobre o mecânico, mas é um risco real: um único revisor. | Reconhecer o risco do revisor único como limite. |
 | "Os casos de teste manuais foram executados?" | Em 27/10 executamos os 18 casos P1 (API e navegador, desktop e celular; `docs/qa/execucao-casos-p1.md`): **4 reprovados**, que viraram defeitos (cadastro sem aceite dos termos, `/auth/refresh` inexistente, seção "Chegando nesta parada" ausente). Os P2/P3 foram executados até 28/10 (32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração); 3 não são verificáveis hoje (NOT-02, VIA-07, VIA-08) e 2 ficam para execução à mão (MAP-03, ETA-03). Quadro em `docs/qa/execucao-casos-p1.md`. | Fazer à mão MAP-03 e ETA-03 (DevTools Sensors); levar VIA-07 e VIA-08 para o ensaio. |
 | "Existe ambiente de homologação?" | **Não separado, por decisão de custo**: `homolog` publica na produção da Vercel; backend e banco compartilham apps e Neon (free tier). Risco aceito e documentado. | Mostrar como trabalho futuro. |
 | "Os cookies httpOnly protegem contra XSS?" | Era o desenho: o Gateway grava os tokens em cookies httpOnly, `SameSite=None` e `Secure`. Mas o frontend também grava os tokens no `localStorage` (sem usá-los), o que expõe a XSS e reduz essa proteção. Achado em 28/10 por leitura de código, issue #253. | Corrigir antes da defesa, se houver tempo; senão, declarar como limite conhecido. |
@@ -104,11 +104,11 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 
 1. **Como trabalhamos (1 min):** skills e comandos versionados (centralizados em `ai/skills`: criar issue, gerenciar branches e commits, gerar diagrama de sequência, desenvolver US backend/frontend, review de PR). Manual do ciclo em `docs/manual-sprint.md`.
 2. **As travas (1 min):** `main` e `homolog` protegidas, CI obrigatório, aprovação formal, DoD em dois níveis (sprint e release), "IA não faz merge nem bypass sem pedir". Fonte: `docs/boas-praticas-ia.md`.
-3. **O que os números dizem (1 min):** 84 issues → 126 PRs → 1.640 testes; 27/27 PRs com teste; CI de 79% para 94% verde.
+3. **O que os números dizem (1 min):** 103 issues → 155 PRs → 1.640 testes; 27/27 PRs com teste; CI de 79% para 94% verde.
 4. **Onde a IA/o processo falhou (1,5 min):** 26 defeitos, 4 em produção, 10 de conexão entre as peças; o `X-User-Id` (#188) como defeito de segurança; a lição de "verificar antes de declarar pronto".
 5. **Conclusão (0,5 min):** a IA mudou **onde o esforço humano vai**: menos digitação, mais especificação (BDD, diagramas), revisão e verificação.
 
-**Slide sugerido (um só, denso):** linha do tempo de 10 semanas com PRs por semana (barras), e ao lado os 4 números que importam: 1.640 testes · 93,7% / 89,1% · 26 defeitos (4 em produção) · 11 PRs fechados sem merge (retrabalho, não rejeição).
+**Slide sugerido (um só, denso):** linha do tempo de 11 semanas com PRs por semana (barras), e ao lado os 4 números que importam: 1.640 testes · 93,7% / 89,1% · 26 defeitos (4 em produção) · 11 PRs fechados sem merge (retrabalho, não rejeição).
 
 ---
 
@@ -130,7 +130,7 @@ Com uma pessoa só no teclado, combinar a deixa de cada passo ("próximo: abrir 
 
 | Item | Quem | Observação |
 |---|---|---|
-| Conferir os PRs sem aprovação (3.4) e como foram mergeados | Davi | Sem isso, não colocar o 50/114 nos slides |
+| Conferir os PRs sem aprovação (3.4) e como foram mergeados | Davi | Sem isso, não colocar o 50/143 nos slides |
 | Regerar os números de qualidade (`docs/qa/README.md`, "Como regerar") | Davi / Breno | Os de 16/10 são anteriores a vários PRs |
 | Corrigir os defeitos abertos (#216, #233, #236 e o risco #234; #230, #231 e #232 já corrigidos) ou declará-los como limites | Davi + responsáveis | P1 e P2/P3 executados até 28/10 (quadro em `docs/qa/execucao-casos-p1.md`); #211 a #215 já corrigidos |
 | Slides (#205), vídeo de plano B | Vitória + todos | |
