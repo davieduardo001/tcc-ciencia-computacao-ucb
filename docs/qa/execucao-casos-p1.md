@@ -266,6 +266,18 @@ Depois do merge do PR #238 (#237). Pedido de recuperação feito pela tela `/rec
 | Link inválido (token falso) | Com as duas senhas iguais e um token falso, aparece **"Este link nao e mais valido ou expirou."** (o texto vem do backend e **sem acentos**, issue #243). Nenhuma conta foi afetada. [`inválido`](evidencias/CT-AUT-05-link-invalido.jpg) |
 | Link já usado e link expirado | **Não vistos na tela.** Pelo código (`redefinir_senha`): token usado ou expirado cai na mesma resposta 400 do link inválido; ao redefinir, o token é marcado `usado`. O token do e-mail acima já foi usado e **não foi reutilizado**, para não arriscar trocar a senha da conta. |
 
+## Verificação complementar da busca de parada (#21, RF-13) (29/10, produção, conta do usuário, desktop 1366 px)
+
+A #21 não tem caso de teste dedicado e o DRS deixava a conferência em produção como pendente. Foram exercitados os três cenários da issue. **Não altera os 49 casos nem o quadro geral.**
+
+| Cenário da #21 | Resultado | O que foi visto |
+|---|---|---|
+| 1. Busca por nome com resultado | Aprovado | "Terminal" (Enter) devolveu 3 paradas "Setor Terminal Norte, HCGN 716" (já exercitado no CT-PAR-02) |
+| 2. Busca por endereço ou ponto de referência | Aprovado | "QNL 10 Taguatinga Norte" devolveu **1 parada encontrada**, "Edf Setor L Norte Qnl 10 Bl…" (6 linhas), marcada no mapa. [`por endereço`](evidencias/RF-13-busca-por-endereco.jpg) |
+| 3. Nenhum resultado | Aprovado | "zzqxkw" mostrou "Nenhuma parada encontrada para "zzqxkw". Tente outro nome, um bairro ou um ponto de referência próximo." [`sem resultado`](evidencias/RF-13-busca-sem-resultado.jpg) |
+
+A busca só dispara com Enter (#236). O raio de 500 m do cenário 2 não foi medido; só se viu o resultado da busca por endereço.
+
 ## Quadro geral dos 49 casos (atualizado em 28/10)
 
 | Estado | Qtd | Casos |

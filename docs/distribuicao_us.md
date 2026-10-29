@@ -111,7 +111,7 @@ As seções por pessoa acima registram a **distribuição planejada** no início
 **Como ler:**
 - **Responsável (issue):** assignee atual da issue. Em várias USs ele difere do plano das seções acima, e em outras quem abriu o PR é outra pessoa; por isso há uma coluna com os autores dos PRs.
 - **Estado:** *Entregue em `main`* (issue fechada, promovida para produção); *Entregue em `homolog`* (PR mergeado, aguarda a promoção para `main`; como o workflow de deploy publica `homolog` na produção da Vercel e do Fly.io, o código já está no ar, ver o [plano de testes](qa/plano-de-testes.md)); *Aberta* (sem PR mergeado); *Fora de escopo* (trabalho futuro, segundo a issue #206).
-- A conta `ngualbertolopes` é a que aparece nas issues e PRs atribuídos à Nathália Gualberto; o plano original cita `@gualbertonathalia`. **A confirmar** se as duas contas são da mesma pessoa.
+- A conta `ngualbertolopes` é a que aparece nas issues e PRs atribuídos à Nathália Gualberto; o plano original cita `@gualbertonathalia`. As duas contas são da mesma pessoa: os perfis do GitHub têm o mesmo nome (Nathália Gualberto Lopes).
 
 ### USs do planejamento original (#10 a #33)
 
@@ -139,8 +139,8 @@ As seções por pessoa acima registram a **distribuição planejada** no início
 | #29 | Preferências de notificação | @Kelvin963 | #127 (@Kelvin963, backend); #223 e #224 (@davieduardo001, tela `/alertas` e correção) | Backend em `main`; tela entregue em `homolog` (issue reaberta em 27/10 por falta da tela) |
 | #30 | Tutorial no primeiro acesso | @Kelvin963 | #158 (@Kelvin963) | Entregue em `main` |
 | #31 | Ciclo de vida da sessão (Gateway como proxy) | @davieduardo001 | #56, #66 (@davieduardo001) | Entregue em `main` |
-| #32 | Termos de uso e política de privacidade | @gualbertonathalia, @brenouchihar, @Kelvin963 | a confirmar | Issue fechada |
-| #33 | Protótipo de alta fidelidade | @Vitoria-Albuquerque, @gualbertonathalia | a confirmar | Issue fechada |
+| #32 | Termos de uso e política de privacidade | @gualbertonathalia, @brenouchihar, @Kelvin963 | sem PR de código: o texto dos Termos foi postado como comentário da issue (12/06/2026, @brenouchihar) | Issue fechada |
+| #33 | Protótipo de alta fidelidade | @Vitoria-Albuquerque, @gualbertonathalia | sem PR de código: protótipo publicado no GitHub Pages (link na issue, 18/06/2026, @Vitoria-Albuquerque); páginas HTML versionadas em `prototipo-alta-fid/` (commit 6d098c3, 18/06/2026) | Issue fechada |
 
 ### USs criadas depois do planejamento (Sprints 2 a 4)
 
@@ -149,10 +149,10 @@ As seções por pessoa acima registram a **distribuição planejada** no início
 | #133 | Recuperação de senha no aplicativo (rota no Gateway e telas) | @brenouchihar | #153 (@brenouchihar) | Entregue em `main`. O envio do e-mail por SMTP (#237, PR #238) está em `homolog` |
 | #136 | Instalar o Movecity na tela inicial (PWA) | @davieduardo001 | #137 (@davieduardo001) | Entregue em `main` (promovida pela #142) |
 | #159 | ETA real da rota planejada | @Vitoria-Albuquerque | #160 (@Vitoria-Albuquerque) | Entregue em `main` |
-| #171 | Pegar o ônibus (indicar embarque e acompanhar a viagem) | @Kelvin963 | #186, #187 (@Vitoria-Albuquerque), #191 (@davieduardo001) | Entregue em `main` (promovida pela #203). Assignee e autor dos PRs divergem |
+| #171 | Pegar o ônibus (indicar embarque e acompanhar a viagem) | @Kelvin963 | #186, #187 (@Vitoria-Albuquerque), #191 (@davieduardo001) | Entregue em `main` (promovida pela #203). Atribuída ao @Kelvin963 e entregue pela @Vitoria-Albuquerque (confirmado pelo grupo) |
 | #172 | Alerta de proximidade da parada | @ngualbertolopes | #178 (@ngualbertolopes), #194 (@davieduardo001) | Entregue em `main` (promovida pela #203) |
 | #190 | Paradas de subir e descer na rota, com o tempo do ônibus | @davieduardo001 | #191, #193 (@davieduardo001) | Entregue em `main` (promovida pela #203) |
-| #195 | Alerta de proximidade com a tela bloqueada (Web Push) | @davieduardo001 | #196 (@davieduardo001) | Entregue em `main`; a validação em aparelho real segue na #200 (aberta) |
+| #195 | Alerta de proximidade com a tela bloqueada (Web Push) | @davieduardo001 | #196 (@davieduardo001) | Entregue em `main`; o grupo testou o Web Push em iPhone com resultado funcional (sem evidência registrada); a #200 segue aberta |
 | #199 | Fallback colaborativo da posição do ônibus, com consentimento | @ngualbertolopes | nenhum | **Aberta** (planejada na Sprint 4, sem PR mergeado) |
 | #207 | Notificações push dos alertas de atraso e das rotas preferidas | @louisassis | nenhum | **Aberta** (planejada na Sprint 4, sem PR mergeado) |
 | #115 | Planejar viagem por horário (motor GTFS + RAPTOR) | @davieduardo001 | nenhum | **Fora de escopo** (trabalho futuro, #206) |
