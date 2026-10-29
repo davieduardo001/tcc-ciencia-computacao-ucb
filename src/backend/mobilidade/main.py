@@ -11,6 +11,7 @@ from mobilidade.routes import router as mobilidade_router
 from mobilidade.workers.monitoramento import criar_worker, intervalo_proximidade_do_ambiente
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.services.servico_proximidade import ServicoProximidade
+from mobilidade.services.servico_cancelamento import ServicoCancelamento
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from mobilidade.providers.viagens_ativas_banco import ViagensAtivasDoBanco
@@ -18,6 +19,7 @@ from mobilidade.viagem_routes import router as viagem_router
 from mobilidade.push_routes import router as push_router
 from mobilidade.web_push import NotificadorWebPush, configuracao_vapid_do_ambiente
 from mobilidade.providers.preferencias_banco import PreferenciasDoBanco
+from mobilidade.providers.destinatarios_banco import DestinatariosDoBanco
 from mobilidade.providers.veiculos_ao_vivo import VeiculosAoVivo
 from mobilidade.providers.eta_destino_trajeto import EtaDoDestinoPorTrajeto
 from mobilidade.rota_service import RotaService
@@ -49,26 +51,33 @@ app.include_router(viagem_router, prefix="/mobilidade", tags=["viagem"])
 app.include_router(push_router, prefix="/mobilidade", tags=["push"])
 
 
-def _notificador_de_proximidade(app: FastAPI):
+def _notificador_web_push(app: FastAPI):
     """
     Web Push quando as três variáveis VAPID existem e são coerentes; senão o
     no-op de sempre (o aviso continua chegando DENTRO do app). O alerta de
     atraso (#27) não passa por aqui.
+
+    Uma única instância serve os alertas de proximidade (#172) e de
+    cancelamento (#28): os dois compartilham o mesmo executor de threads.
     """
     config = configuracao_vapid_do_ambiente()
     if not config.disponivel:
-        logger.info("Web Push desligado (VAPID não configurado): alerta de proximidade só no app.")
+        logger.info("Web Push desligado (VAPID não configurado): alertas só no app.")
         return NotificadorNulo()
 
     executor = ThreadPoolExecutor(max_workers=MAX_THREADS_WEB_PUSH, thread_name_prefix="web-push")
     app.state.executor_push = executor
-    logger.info("Web Push ligado para o alerta de proximidade.")
+    logger.info("Web Push ligado para os alertas de proximidade e cancelamento.")
     return NotificadorWebPush(config, SessionLocal, executor=executor)
 
 
 @app.on_event("startup")
 def startup():
     servico = ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
+
+    # Web Push compartilhado pelos alertas de proximidade (#172) e de
+    # cancelamento (#28): mesmo executor, mesmas inscrições.
+    notificador = _notificador_web_push(app)
 
     # US #172 — alerta de proximidade da parada, agora sobre as viagens
     # reais da US #171 (o provider provisório devolvia sempre []).
@@ -79,8 +88,19 @@ def startup():
         viagens=ViagensAtivasDoBanco(),
         veiculos=VeiculosAoVivo(),
         preferencias=PreferenciasDoBanco(),
-        notificador=_notificador_de_proximidade(app),
+        notificador=notificador,
         eta=EtaDoDestinoPorTrajeto(RotaService()),
+    )
+
+    # US #28 — alerta de cancelamento de viagem (partida prevista sem
+    # veículo, com sugestão de alternativa). Mesmos veículos e mesmas
+    # preferências do alerta de proximidade; os destinatários vêm da
+    # união entre linhas acompanhadas e rotas favoritas.
+    servico_cancelamento = ServicoCancelamento(
+        veiculos=VeiculosAoVivo(),
+        preferencias=PreferenciasDoBanco(),
+        notificador=notificador,
+        destinatarios=DestinatariosDoBanco(),
     )
 
     intervalo = int(getattr(settings, "WORKER_INTERVAL_MINUTES", 5))
@@ -90,6 +110,7 @@ def startup():
         servico_proximidade=servico_proximidade,
         # None (padrão) mantém o intervalo geral; ver monitoramento.py.
         intervalo_proximidade_segundos=intervalo_proximidade_do_ambiente(),
+        servico_cancelamento=servico_cancelamento,
     )
     scheduler.start()
     app.state.scheduler = scheduler

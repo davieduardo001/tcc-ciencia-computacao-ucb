@@ -239,6 +239,9 @@ def chaves_validas(p256dh: str, auth: str) -> bool:
 # ---------------------------------------------------------------------------
 
 URL_AO_CLICAR = "/mapa"
+# O cancelamento abre a central de alertas (US #29): é lá que ficam o
+# histórico e as preferências de notificação.
+URL_CANCELAMENTO_AO_CLICAR = "/alertas"
 _MAX_NOME_PARADA = 80
 
 
@@ -256,6 +259,28 @@ def montar_carga(numero_linha: str, parada: str, eta_minutos: float) -> dict:
         "corpo": f"Linha {numero_linha}{destino}: chega em {tempo}.",
         "url": URL_AO_CLICAR,
         "tag": "proximidade",
+    }
+
+
+def montar_carga_cancelamento(
+    numero_linha: str, horario: str, alternativa: str | None
+) -> dict:
+    """
+    Carga do alerta de cancelamento de viagem — US #28.
+
+    LGPD, mesma régua da `montar_carga`: linha e horário são informação
+    pública de operação; nada de coordenada, usuário ou viagem. O `tag`
+    distinto evita que um alerta de cancelamento substitua (ou seja
+    substituído por) um de proximidade no aviso do sistema.
+    """
+    corpo = f"A partida das {horario} da linha {numero_linha} não foi confirmada."
+    if alternativa:
+        corpo += f" Considere a linha {alternativa} como alternativa."
+    return {
+        "titulo": "Possível cancelamento de viagem",
+        "corpo": corpo,
+        "url": URL_CANCELAMENTO_AO_CLICAR,
+        "tag": f"cancelamento:{numero_linha}:{horario}",
     }
 
 
@@ -414,6 +439,38 @@ class NotificadorWebPush(NotificadorNulo):
             # commit). Se levantássemos, ele cairia no tratamento de erro
             # do ciclo e seria contado como falha, sem desfazer nada.
             logger.warning("Falha ao despachar o Web Push do alerta de proximidade", exc_info=True)
+
+    def alerta_cancelamento_viagem(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        horario: str,
+        alternativa: str | None,
+    ) -> None:
+        """
+        US #28 — partida prevista sem veículo, com sugestão de alternativa.
+
+        Mesmo caminho do alerta de proximidade: carga própria (tag própria
+        para não brigar com o outro aviso), destinos do aparelho da
+        pessoa, e nunca levanta exceção — o alerta já está no banco.
+        """
+        if not self.config.disponivel:
+            return
+        try:
+            carga = json.dumps(
+                montar_carga_cancelamento(numero_linha, horario, alternativa),
+                ensure_ascii=False,
+            )
+            destinos = self._destinos_do_usuario(uuid.UUID(str(usuario_id)))
+            for destino in destinos:
+                if self._executor is not None:
+                    self._executor.submit(self._enviar_para, destino, carga)
+                else:
+                    self._enviar_para(destino, carga)
+        except Exception:
+            logger.warning(
+                "Falha ao despachar o Web Push do alerta de cancelamento", exc_info=True
+            )
 
     # ------------------------------------------------------------------
 

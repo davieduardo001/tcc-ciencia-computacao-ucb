@@ -711,6 +711,84 @@ def test_o_alerta_de_atraso_continua_sem_efeito_neste_notificador(db):
 
 
 # --------------------------------------------------------------------------
+# US #28 — carga e envio do alerta de cancelamento de viagem
+# --------------------------------------------------------------------------
+
+
+def test_carga_do_cancelamento_tem_o_texto_que_a_pessoa_le():
+    carga = web_push.montar_carga_cancelamento("0.110", "06:00", None)
+
+    assert carga["titulo"] == "Possível cancelamento de viagem"
+    assert "06:00" in carga["corpo"]
+    assert "0.110" in carga["corpo"]
+    assert carga["url"] == web_push.URL_CANCELAMENTO_AO_CLICAR
+    assert carga["tag"].startswith("cancelamento:")
+
+
+def test_carga_do_cancelamento_cita_a_linha_alternativa():
+    carga = web_push.montar_carga_cancelamento("0.110", "06:00", "0.900")
+
+    assert "Considere a linha 0.900 como alternativa." in carga["corpo"]
+
+
+def test_carga_do_cancelamento_sem_alternativa_nao_inventa_sugestao():
+    carga = web_push.montar_carga_cancelamento("0.110", "06:00", None)
+
+    assert "alternativa" not in carga["corpo"].lower()
+
+
+def test_carga_do_cancelamento_nao_carrega_coordenada_nem_identificador():
+    texto = json.dumps(web_push.montar_carga_cancelamento("0.110", "06:00", "0.900"))
+
+    assert str(USUARIO) not in texto
+    assert "lat" not in texto and "lng" not in texto
+
+
+def test_tag_do_cancelamento_e_distinta_da_de_proximidade():
+    cancelamento = web_push.montar_carga_cancelamento("0.110", "06:00", None)
+    proximidade = web_push.montar_carga("0.110", "W3 Sul 502", 3.0)
+
+    assert cancelamento["tag"] != proximidade["tag"]
+
+
+def test_notificador_envia_o_cancelamento_para_os_aparelhos_do_usuario(db):
+    a, b = _inscrever(db), _inscrever(db)
+    envios = _Envios()
+
+    _notificador(envios).alerta_cancelamento_viagem(
+        str(USUARIO), "0.110", "06:00", "0.900"
+    )
+
+    assert {c["inscricao"]["endpoint"] for c in envios.chamadas} == {a.endpoint, b.endpoint}
+    carga = envios.chamadas[0]["carga"]
+    assert "0.110" in carga["corpo"]
+    assert str(USUARIO) not in json.dumps(carga)
+
+
+def test_notificador_de_cancelamento_nao_envia_para_aparelhos_de_outro_usuario(db):
+    _inscrever(db, OUTRO)
+    envios = _Envios()
+
+    _notificador(envios).alerta_cancelamento_viagem(
+        str(USUARIO), "0.110", "06:00", None
+    )
+
+    assert envios.chamadas == []
+
+
+def test_notificador_de_cancelamento_sem_configuracao_vapid_nao_faz_nada(db):
+    _inscrever(db)
+    envios = _Envios()
+    notificador = web_push.NotificadorWebPush(
+        web_push.ConfiguracaoVapid(), SessionLocal, enviar=envios
+    )
+
+    notificador.alerta_cancelamento_viagem(str(USUARIO), "0.110", "06:00", None)
+
+    assert envios.chamadas == []
+
+
+# --------------------------------------------------------------------------
 # integração com o ServicoProximidade real
 # --------------------------------------------------------------------------
 
@@ -907,7 +985,7 @@ def test_main_usa_o_notificador_nulo_sem_vapid(sem_vapid):
 
     fake_app = SimpleNamespace(state=SimpleNamespace())
 
-    notificador = principal._notificador_de_proximidade(fake_app)
+    notificador = principal._notificador_web_push(fake_app)
 
     assert isinstance(notificador, NotificadorNulo)
     assert not isinstance(notificador, web_push.NotificadorWebPush)
@@ -919,7 +997,7 @@ def test_main_usa_web_push_quando_o_vapid_esta_configurado(com_vapid):
 
     fake_app = SimpleNamespace(state=SimpleNamespace())
 
-    notificador = principal._notificador_de_proximidade(fake_app)
+    notificador = principal._notificador_web_push(fake_app)
     try:
         assert isinstance(notificador, web_push.NotificadorWebPush)
         assert notificador.config.disponivel
@@ -935,6 +1013,6 @@ def test_main_com_vapid_incoerente_volta_ao_notificador_nulo(com_vapid, monkeypa
     monkeypatch.setenv("VAPID_PUBLIC_KEY", outra_publica)
     fake_app = SimpleNamespace(state=SimpleNamespace())
 
-    notificador = principal._notificador_de_proximidade(fake_app)
+    notificador = principal._notificador_web_push(fake_app)
 
     assert not isinstance(notificador, web_push.NotificadorWebPush)

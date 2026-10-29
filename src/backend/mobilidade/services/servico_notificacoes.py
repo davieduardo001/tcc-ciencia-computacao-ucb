@@ -25,6 +25,22 @@ class Notificador(ABC):
         """US #172 — passageiro a bordo se aproximando da parada de destino."""
         ...
 
+    @abstractmethod
+    def alerta_cancelamento_viagem(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        horario: str,
+        alternativa: str | None,
+    ) -> None:
+        """
+        US #28 — partida prevista da linha não teve veículo (Cenário 3).
+
+        `alternativa` é a linha sugerida com >= 70% de sobreposição de
+        paradas (Cenário 2), ou None quando não há sugestão.
+        """
+        ...
+
 
 class NotificadorNulo(Notificador):
     def alerta_disparado(self, usuario_id: str, linha_id: str, atraso: float) -> None:
@@ -42,6 +58,15 @@ class NotificadorNulo(Notificador):
         numero_linha: str,
         parada_destino: str,
         eta_minutos: float,
+    ) -> None:
+        pass
+
+    def alerta_cancelamento_viagem(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        horario: str,
+        alternativa: str | None,
     ) -> None:
         pass
 
@@ -68,4 +93,15 @@ class NotificadorMock(Notificador):
     ) -> None:
         self.chamadas.append(
             ("proximidade", usuario_id, numero_linha, parada_destino, eta_minutos)
+        )
+
+    def alerta_cancelamento_viagem(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        horario: str,
+        alternativa: str | None,
+    ) -> None:
+        self.chamadas.append(
+            ("cancelamento_viagem", usuario_id, numero_linha, horario, alternativa)
         )
