@@ -1,0 +1,24 @@
+digraph G {
+ graph [rankdir=TB, compound=true, nodesep=0.35, ranksep=0.6, fontname="Liberation Sans", pad=0.3];
+ node [shape=box, style="rounded,filled", fillcolor="#FFFFFF", fontname="Liberation Sans", fontsize=10];
+ edge [fontname="Liberation Sans", fontsize=9, arrowhead=vee];
+ subgraph cluster_ap { label="Apresentação (Next.js, Vercel)"; style="filled"; fillcolor="#E8F1FB"; color="#6C8EBF";
+   app [label="app/\ntelas: mapa, rotas, ocorrências,\nfavoritos, alertas, login, tutorial"];
+   lib [label="lib/\napi.ts (chamadas ao Gateway)\nrenovação da sessão, navegacao.ts"];
+   pwa [label="PWA\nmanifest.ts, sw.js"]; }
+ subgraph cluster_gw { label="API Gateway (FastAPI)"; style="filled"; fillcolor="#FFF4D6"; color="#D6B656";
+   gw [label="middleware.py · jwt_validator.py\nproxy.py · routes.py · cookies.py"]; }
+ subgraph cluster_sv { label="Serviços de domínio (FastAPI, um app por serviço)"; style="filled"; fillcolor="#E6F4E6"; color="#82B366";
+   auth [label="auth\nsecurity.py · google_auth.py\nemail_service.py · routes.py"];
+   mob [label="mobilidade\nposicao_service · viagem_service\nchegada_service · rota_service\npush · agendadores"];
+   col [label="colaboracao\nocorrências · favoritos\npreferências · monitoring_worker"];
+   shared [label="shared\ndatabase.py · settings"]; }
+ subgraph cluster_da { label="Dados"; style="filled"; fillcolor="#F3E5F5"; color="#9673A6";
+   db [label="PostgreSQL (Neon)\n21 tabelas · 20 migrations", shape=cylinder]; }
+ subgraph cluster_ex { label="Serviços externos"; style="filled"; fillcolor="#F2F2F2"; color="#999999";
+   semob [label="API SEMOB/GDF"]; osrm [label="OSRM · Nominatim"]; gg [label="Google OAuth · Gmail SMTP"]; wp [label="Web Push (VAPID)"]; carto [label="CARTO / OSM tiles"]; }
+ app -> lib; lib -> gw [label="HTTPS + cookies httpOnly"]; pwa -> gw [style=dashed];
+ gw -> auth; gw -> mob; gw -> col;
+ auth -> shared; mob -> shared; col -> shared; shared -> db;
+ mob -> semob; mob -> osrm; mob -> wp; auth -> gg; app -> carto [style=dashed];
+}
