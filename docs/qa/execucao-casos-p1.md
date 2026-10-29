@@ -240,7 +240,7 @@ Consequência para os casos anteriores: o resultado "nenhum ônibus em operaçã
 
 | Item | Estado | O que foi visto |
 |---|---|---|
-| CT-COL-05 | **Aprovado** | Os 3 reportes de teste do CT-COL-03 (linha 0.960, "Aguardando confirmação") foram criados às ~08:13 e apareciam na lista às ~08:15. Às ~09:17, depois de 60 min sem confirmação, "Ocorrências" mostra **"Nenhuma ocorrência ativa no momento."** Evidência: [`lista vazia`](evidencias/CT-COL-05-lista-vazia-apos-60-min.jpg); [`ontem`](evidencias/CT-COL-05-lista-sem-ocorrencia-de-ontem.jpg) é a conferência anterior. |
+| CT-COL-05 | **Aprovado com ressalva** | Os 3 reportes de teste do CT-COL-03 (tipo "Lotação", linha 0.960, "Aguardando confirmação") foram criados às ~08:13 e apareciam na lista às ~08:15. Às ~09:17, **~64 min depois**, "Ocorrências" mostra **"Nenhuma ocorrência ativa no momento."**, o que cumpre o esperado do caso (ocorrência com mais de 60 min sem confirmação não aparece). **Ressalva:** o código define a validade **por tipo** (`Ocorrencia.TTL_MINUTOS`: Lotação 15 min, Atraso 30 min, entre 15 e 120 min), e não 60 min; a conferência foi feita uma única vez, ~64 min depois, então **não prova o prazo exato** de cada tipo. O caso e a issue #24 falam em 60 min, o que não corresponde ao código. Evidência: [`lista vazia`](evidencias/CT-COL-05-lista-vazia-apos-60-min.jpg); [`ontem`](evidencias/CT-COL-05-lista-sem-ocorrencia-de-ontem.jpg) é a conferência anterior. |
 | **#222** (renovação da sessão) | **Validada em produção** | Ao abrir `/ocorrencias` com o token de acesso vencido, a rede da aba registrou: `GET /api/auth/me` **401**, `GET /api/mobilidade/viagens/ativa` **401**, `GET /api/colaboracao/ocorrencias` **401**, depois `POST /api/auth/refresh` **200**, `GET /api/colaboracao/ocorrencias` **200** (refeita) e `GET /api/auth/me` **200**. A tela mostrou "Carregando…" por alguns segundos e terminou logada, **sem pedir login**. Isto fecha o caminho de sucesso que o CT-AUT-03 deixou pendente. |
 
 ## Validação das correções #231 e #232 e CT-ROT-05 completo (28/10, ~09:50, produção, conta do usuário, desktop)
@@ -270,13 +270,13 @@ Depois do merge do PR #238 (#237). Pedido de recuperação feito pela tela `/rec
 
 | Estado | Qtd | Casos |
 |---|---|---|
-| Aprovado | 33 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), COL-05, ROT-05 |
-| Aprovado em parte ou com ressalva | 10 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (e-mail, link, nova senha, link inválido e confirmação divergente comprovados; faltam link usado e expirado na tela), COL-04, ETA-04, PAR-03, ROT-06, ROT-07, SEG-01, VIA-02 |
+| Aprovado | 32 | AUT-02, AUT-04, AUT-06, AUT-07, COL-01, COL-02, COL-03, ETA-01, ETA-02, MAP-01, MAP-02, MAP-04, MAP-05, MAP-06, MAP-07, MAP-08, MAP-09, PAR-01 (revalidado), PAR-02, ROT-01, ROT-02, ROT-03, ROT-04, SEG-02, SEG-03, VIA-03, VIA-04, VIA-05, VIA-06, NOT-01 (depois da correção), PAR-04 (revalidado), ROT-05 |
+| Aprovado em parte ou com ressalva | 11 | AUT-01 (revalidado só por API), AUT-03 (rota existe; a renovação real foi observada depois, ver #222), AUT-05 (e-mail, link, nova senha, link inválido e confirmação divergente comprovados; faltam link usado e expirado na tela), COL-04, COL-05 (prazo real por tipo, não 60 min), ETA-04, PAR-03, ROT-06, ROT-07, SEG-01, VIA-02 |
 | **Reprovado por configuração** | 1 | VIA-01: o embarque é aceito longe do ônibus porque o secret `RAIO_EMBARQUE_M` está em 100 km em produção (decisão até a defesa); a regra de 100 m só vale quando o secret voltar a 100 |
 | Não verificável hoje | 3 | NOT-02 (sem canal de entrega), VIA-07 (a regra fica mascarada pelo raio), VIA-08 (precisa de ônibus se aproximando) |
 | Não executado | 2 | MAP-03 e ETA-03 (precisam do DevTools Sensors, à mão) |
 
-> 33 + 10 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
+> 32 + 11 + 1 + 3 + 2 = 49. Cada caso aparece pelo **estado final**: PAR-01, PAR-04, AUT-01, NOT-01 e VIA-01 tiveram duas execuções (antes e depois das correções). Passos e evidência de cada um estão nas seções acima.
 
 ## Pendentes
 
