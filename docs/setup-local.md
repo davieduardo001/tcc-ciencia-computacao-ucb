@@ -189,8 +189,9 @@ tcc-ciencia-computacao-ucb/
 │       ├── lib/              # Utilitários, hooks
 │       └── package.json      # Dependências Node
 ├── docker-compose.yml        # PostgreSQL local
-├── opencode.json             # Config dos agentes
-└── .opencode/                # Skills e agentes
+├── AGENT.md                  # Ponto de entrada dos agentes de IA
+├── CLAUDE.md                 # Aponta para o AGENT.md
+└── ai/                       # Regras, skills, agentes e configurações dos agentes de IA
 ```
 
 ---

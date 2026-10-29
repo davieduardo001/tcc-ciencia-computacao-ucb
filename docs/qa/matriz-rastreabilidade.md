@@ -47,7 +47,7 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 1. **#22** são notificações geradas no servidor. Segundo o comentário da #172 sobre o alerta de atraso (#27), o notificador usado pelos serviços de alerta é o `NotificadorNulo`, que não entrega nada ao usuário; sem canal de entrega não há comportamento observável na tela para um caso manual, e a US fica coberta só por teste automatizado. Reavaliar quando o Web Push existir (issue #195).
 2. **#174** não tem cenários BDD na issue (só o escopo técnico). Os casos CT-PAR-01 e CT-PAR-03 foram escritos a partir da descrição dos PRs #184, #185 e #192.
 3. **US sem entrega, fora desta matriz:** #21 (sem código em `homolog` nem em `main`), #26, #28, #115 e #118 (backlog).
-4. Issues fechadas aparecem como entregues em produção; as marcadas "aberta · Homolog" estão mergeadas em `homolog` e aguardam a promoção para `main` (DoD de dois níveis do `AGENT.md`).
+4. Issues fechadas aparecem como entregues em produção; as marcadas "aberta · Homolog" estão mergeadas em `homolog` e aguardam a promoção para `main` (DoD de dois níveis do `ai/workflow.md`).
 
 ## 3. Cobertura dos cenários por casos manuais
 

@@ -102,7 +102,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 27/10/2026, salvo indicaç�
 
 ## 4. Como mostrar a tese (roteiro do bloco 7, 5 min)
 
-1. **Como trabalhamos (1 min):** skills e comandos versionados (`.claude/commands`, `.opencode/skills`, `.gemini`: criar issue, gerenciar branches e commits, gerar diagrama de sequência, desenvolver US backend/frontend, review de PR). Manual do ciclo em `docs/manual-sprint.md`.
+1. **Como trabalhamos (1 min):** skills e comandos versionados (centralizados em `ai/skills`: criar issue, gerenciar branches e commits, gerar diagrama de sequência, desenvolver US backend/frontend, review de PR). Manual do ciclo em `docs/manual-sprint.md`.
 2. **As travas (1 min):** `main` e `homolog` protegidas, CI obrigatório, aprovação formal, DoD em dois níveis (sprint e release), "IA não faz merge nem bypass sem pedir". Fonte: `docs/boas-praticas-ia.md`.
 3. **O que os números dizem (1 min):** 84 issues → 126 PRs → 1.640 testes; 27/27 PRs com teste; CI de 79% para 94% verde.
 4. **Onde a IA/o processo falhou (1,5 min):** 26 defeitos, 4 em produção, 10 de conexão entre as peças; o `X-User-Id` (#188) como defeito de segurança; a lição de "verificar antes de declarar pronto".

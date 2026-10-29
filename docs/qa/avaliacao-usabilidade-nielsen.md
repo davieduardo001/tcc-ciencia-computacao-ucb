@@ -8,9 +8,9 @@ Teste 4.3 do roteiro de software da disciplina (Projeto de Solução Computacion
 ## Método e limites
 
 - **Método:** inspeção da interface pelas 10 heurísticas de Nielsen, com severidade de 0 a 4 (0 = não é problema, 1 = cosmético, 2 = pequeno, 3 = grande, 4 = catastrófico).
-- **Avaliador:** um só, durante a execução dos casos, em desktop (1366 px) e celular (390 px). A técnica pede **3 a 5 avaliadores independentes**, porque um só costuma achar menos da metade dos problemas.
+- **Avaliador:** um só, e **de forma agêntica**: a avaliação foi feita por um agente de IA, conduzido por um integrante do grupo, durante a execução dos casos de teste, em desktop (1366 px) e celular (390 px). Por decisão do grupo (28/10/2026), a avaliação fica com esse único avaliador e **não será repetida por outras pessoas**.
+- **Limites do método:** a técnica pede **3 a 5 avaliadores independentes**, porque um só costuma achar menos da metade dos problemas. Um agente também não tem a percepção de um passageiro: não sente a pressa de quem espera o ônibus, não usa o aplicativo na rua, com sol e rede ruim. Os achados abaixo são hipóteses de usabilidade com evidência de tela, não um resultado estatístico.
 - **Não houve teste com usuários reais** (trabalhadores de turno, estudantes). Esta avaliação não substitui isso.
-- **Próximo passo recomendado:** 2 ou 3 pessoas do grupo repetirem o percurso abaixo, cada uma por conta própria, e depois comparar com esta tabela.
 - **Percurso avaliado:** cadastro e login, tutorial, buscar linha, ver ônibus, abrir parada, planejar rota, pegar o ônibus, encerrar a viagem, reportar ocorrência, preferências de alerta.
 
 ## Resultado por heurística

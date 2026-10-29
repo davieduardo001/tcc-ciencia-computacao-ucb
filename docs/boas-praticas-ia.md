@@ -16,7 +16,7 @@ A IA é ferramenta, o desenvolvedor é responsável. Toda ação que a IA execut
 
 - **Nunca** incluir `Co-Authored-By` ou qualquer referência a ferramentas de IA (Claude, Gemini, OpenCode, etc.) em commits, PRs ou comentários de issue.
 - Nunca comentar em issues ou PRs do GitHub dizendo que uma IA ajudou, gerou ou implementou algo — o histórico deve registrar apenas o trabalho, não a ferramenta usada para chegar lá.
-- Isso já era regra no `CLAUDE.md`; este documento só reforça o motivo: o repositório é acadêmico (TCC) e a autoria do trabalho é do time.
+- Isso já era regra no `ai/regras.md` (antes, no `CLAUDE.md`); este documento só reforça o motivo: o repositório é acadêmico (TCC) e a autoria do trabalho é do time.
 
 ---
 
@@ -93,6 +93,6 @@ Quando um plano de arquitetura/deploy (seja escrito por outra sessão de IA ou p
 
 - `docs/workflow-passo-a-passo.md` — o "como fazer" na prática, checklist do ciclo completo
 - `docs/guia-contribuicao.md` — gitflow e Conventional Commits
-- `AGENT.md` — arquitetura e workflow de sprint
+- `AGENT.md` — arquitetura; `ai/workflow.md` — workflow de sprint
 - `docs/relato-deploy-sprint0.md` — estudo de caso completo de onde essas regras vieram
 - `docs/boas-praticas-opencode.md` — uso específico do OpenCode (plan/build mode, agentes, skills)
