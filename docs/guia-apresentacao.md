@@ -77,7 +77,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 29/10/2026, salvo indicaç�
 |---|---|
 | Testes automatizados | **1.640**, 0 falhas (844 backend, 796 frontend), contados no log do CI em 28/10; eram **1.260** em 16/10 e **297** no registro original da #151 |
 | Cobertura | backend **93,7%**, frontend **89,1%** (piso otimista: 3 arquivos fora da medição) |
-| PRs `feat`/`fix` com teste | **27 de 27** desde 22/09 |
+| PRs `feat`/`fix` com teste | **41 de 42** desde 22/09 (27 de 27 até 16/10; a exceção é o #202, remoção de um item de menu, sem teste) |
 | CI de PR verde | 74% no total → 79% (Sprint 2) → **94%** (Sprint 3) |
 | Defeitos catalogados | **26** (13 até 16/10 + 13 achados em 27 e 28/10): 10 de conexão entre as peças e 16 de regra, dado ou interface. Fonte: `docs/qa/relatorio-cobertura-e-defeitos.md` |
 | Onde foram detectados | produção 4 · CI 2 · teste manual, execução de casos ou uso real 14 · auditoria, medição ou conferência de documento ou código 5 · não registrado 1 |
@@ -104,7 +104,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 29/10/2026, salvo indicaç�
 
 1. **Como trabalhamos (1 min):** skills e comandos versionados (centralizados em `ai/skills`: criar issue, gerenciar branches e commits, gerar diagrama de sequência, desenvolver US backend/frontend, review de PR). Manual do ciclo em `docs/manual-sprint.md`.
 2. **As travas (1 min):** `main` e `homolog` protegidas, CI obrigatório, aprovação formal, DoD em dois níveis (sprint e release), "IA não faz merge nem bypass sem pedir". Fonte: `docs/boas-praticas-ia.md`.
-3. **O que os números dizem (1 min):** 103 issues → 155 PRs → 1.640 testes; 27/27 PRs com teste; CI de 79% para 94% verde.
+3. **O que os números dizem (1 min):** 103 issues → 155 PRs → 1.640 testes; 41 de 42 PRs `feat`/`fix` com teste; CI de 79% para 94% verde.
 4. **Onde a IA/o processo falhou (1,5 min):** 26 defeitos, 4 em produção, 10 de conexão entre as peças; o `X-User-Id` (#188) como defeito de segurança; a lição de "verificar antes de declarar pronto".
 5. **Conclusão (0,5 min):** a IA mudou **onde o esforço humano vai**: menos digitação, mais especificação (BDD, diagramas), revisão e verificação.
 

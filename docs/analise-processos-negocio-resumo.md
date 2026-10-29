@@ -232,7 +232,7 @@ Resultado: **duas tratadas, seis em parte, uma não resolvida** (a versão anter
 
 *Tabela 10 – Riscos de governança e mitigação*
 
-**O processo em números** (`gh` de 28/10; `docs/guia-apresentacao.md`, 3; `docs/qa/`): 101 issues e 146 PRs (132 mergeados; 11 fechados sem merge, por retrabalho e consolidação, nenhum por reprovação de qualidade); 138 commits entre 15/08 e 27/10 (cerca de 10 semanas); 1.640 testes automatizados passando no CI de 28/10 (844 backend, 796 frontend); cobertura de 93,7% e 89,1% (medida em 16/10); todos os 27 PRs `feat`/`fix` desde 22/09 com teste; 26 defeitos catalogados, a maioria de conexão entre as peças, 4 em produção; 49 casos manuais executados em produção (32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração, 3 não verificáveis, 2 pendentes). Falhas reconhecidas: aprovação por comentário confundida com review formal (#35); `X-User-Id` repassado pelo cliente (#188); `/auth/refresh` inexistente (#212); tokens em `localStorage` (#253, aberta).
+**O processo em números** (`gh` de 29/10; `docs/guia-apresentacao.md`, 3; `docs/qa/`): 103 issues e 155 PRs (143 mergeados; 11 fechados sem merge, por retrabalho e consolidação, nenhum por reprovação de qualidade); 283 commits entre 15/08 e 29/10 (cerca de 11 semanas); 1.640 testes automatizados passando no CI de 28/10 (844 backend, 796 frontend); cobertura de 93,7% e 89,1% (medida em 16/10); 41 dos 42 PRs `feat`/`fix` desde 22/09 com teste; 26 defeitos catalogados, a maioria de conexão entre as peças, 4 em produção; 49 casos manuais executados em produção (32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração, 3 não verificáveis, 2 pendentes). Falhas reconhecidas: aprovação por comentário confundida com review formal (#35); `X-User-Id` repassado pelo cliente (#188); `/auth/refresh` inexistente (#212); tokens em `localStorage` (#253, aberta).
 
 ### Defesa do uso de IA no desenvolvimento
 
@@ -242,7 +242,7 @@ Resultado: **duas tratadas, seis em parte, uma não resolvida** (a versão anter
 
 **Qualidade e produtividade:** os números descrevem o que foi entregue; **não há medição de ganho de produtividade** (sem grupo de controle).
 
-**Limites:** revisor único e mediana de 17 min até o merge de um PR; autoria de PRs desigual; testes que mockam integrações; sem ambiente de homologação separado; um único avaliador de usabilidade; sem validação em campo; raio de embarque em 100 km na demonstração (regra real: 100 m).
+**Limites:** revisor único e mediana de 18 min até o merge de um PR; autoria de PRs desigual; testes que mockam integrações; sem ambiente de homologação separado; um único avaliador de usabilidade; sem validação em campo; raio de embarque em 100 km na demonstração (regra real: 100 m).
 
 ---
 

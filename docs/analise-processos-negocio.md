@@ -113,7 +113,7 @@ Segundo a Pesquisa Distrital por Amostra de Domicílios (IPEDF, 2022), **33,3% d
 
 **Estado em 28/10/2026** (fontes: `gh issue list` e `gh pr list` de 28/10; `docs/guia-apresentacao.md`, seção 3; `docs/qa/`). A defesa do TCC é em 13/11/2026.
 
-**Volume.** O repositório tem 101 issues (70 fechadas e 31 abertas) e 146 PRs (132 mergeados, 11 fechados sem merge e 3 abertos) na consulta de 28/10. O guia de apresentação, de 27/10, registrava 84 issues e 126 PRs; a diferença é o trabalho das últimas 24 horas (correções, validação em produção e documentação). Das 24 histórias de usuário distribuídas entre os integrantes (`docs/distribuicao_us.md`), organizadas em três épicos (Autenticação, Mapa e Rastreamento, Colaboração), o repositório tem 38 issues com rótulo de épico, das quais 30 fechadas e 8 abertas. O trabalho foi organizado em cinco sprints (issues #38, #90, #144, #175 e #206; a Sprint 4, de fechamento e apresentação, segue aberta).
+**Volume.** O repositório tem 103 issues (70 fechadas e 33 abertas) e 155 PRs (143 mergeados, 11 fechados sem merge e 1 aberto) na consulta de 29/10. O guia de apresentação, de 27/10, registrava 84 issues e 126 PRs; a diferença é o trabalho dos dois dias seguintes (correções, validação em produção e documentação), e o guia foi atualizado em 29/10. Das 24 histórias de usuário distribuídas entre os integrantes (`docs/distribuicao_us.md`), organizadas em três épicos (Autenticação, Mapa e Rastreamento, Colaboração), o repositório tem 38 issues com rótulo de épico, das quais 30 fechadas e 8 abertas. O trabalho foi organizado em cinco sprints (issues #38, #90, #144, #175 e #206; a Sprint 4, de fechamento e apresentação, segue aberta).
 
 **Arquitetura implementada.** API Gateway como ponto único de entrada (JWT validado localmente, cookies httpOnly), três serviços de domínio em FastAPI (autenticação, mobilidade e colaboração), frontend em Next.js com Leaflet, banco PostgreSQL (Neon), quatro apps no Fly.io e frontend na Vercel (`docs/documento_arquitetura.md`, seção 10). Decisões que contrariaram o plano inicial estão registradas nessa seção: sem PostGIS (ADR-02), dados da SEMOB copiados para o banco por ingestão em lote (ADR-03) e posições de GPS lidas ao vivo com cache de 20 s e nunca persistidas (ADR-04).
 
@@ -1140,14 +1140,14 @@ Esta subseção registra o que o processo modelado entregou de fato. Fontes: `gh
 
 | Métrica | Valor | Fonte |
 |---|---|---|
-| Issues | 101 (70 fechadas, 31 abertas), em 28/10; 84 em 27/10 | `gh issue list` |
-| Pull Requests | 146 (132 mergeados, 11 fechados sem merge, 3 abertos), em 28/10; 126 em 27/10 | `gh pr list` |
-| Commits | 138 (`feat` 35, `fix` 28, `docs` 26, `chore` 24), em 27/10 | Guia, 3.1 |
-| Período | 15/08 a 27/10/2026, cerca de 10 semanas | Guia, 3.1 |
-| PRs por tipo de branch (de 126) | 61 `feat`, 37 `fix`, 9 `chore`, 9 `docs` | Guia, 3.1 |
+| Issues | 103 (70 fechadas, 33 abertas), em 29/10; 84 em 27/10 | `gh issue list` |
+| Pull Requests | 155 (143 mergeados, 11 fechados sem merge, 1 aberto), em 29/10; 126 em 27/10 | `gh pr list` |
+| Commits | 283 sem merges em `main` e `homolog` (`fix` 84, `feat` 83, `docs` 75, `chore` 26), em 29/10 | Guia, 3.1 |
+| Período | 15/08 a 29/10/2026, cerca de 11 semanas | Guia, 3.1 |
+| PRs por tipo de branch (de 155) | 65 `feat`, 45 `fix`, 25 `docs`, 10 `chore`, 10 outros | Guia, 3.1 |
 | Issues de épico (US) | 30 fechadas de 38 | `gh issue list` |
 | PRs fechados sem merge | 11, todos por retrabalho ou consolidação (3 testes deliberados de workflow, 3 tentativas de recuperação de senha refeitas, 3 do tutorial consolidados em um, entre outros); nenhum por reprovação de qualidade | Guia, 3.2 |
-| Tempo da criação ao merge de um PR | mediana de 17 min; `feat` 25 min, `fix` 8 min | Guia, 3.2 e 3.4 |
+| Tempo da criação ao merge de um PR | mediana de 18 min; `feat` 20 min, `fix` 9 min | Guia, 3.2 e 3.4 |
 
 **Qualidade.**
 
@@ -1155,7 +1155,7 @@ Esta subseção registra o que o processo modelado entregou de fato. Fontes: `gh
 |---|---|---|
 | Testes automatizados | 1.640 passando no CI de 28/10 (844 de backend, 796 de frontend); eram 1.260 em 16/10 (671 + 589) e 297 no registro original da #151 | `docs/qa/relatorio-testes-unitarios.md` |
 | Cobertura | backend 93,7%; frontend 89,1% (piso otimista: 3 arquivos fora da medição) | `docs/qa/relatorio-cobertura-e-defeitos.md` |
-| Disciplina de teste | 27 de 27 PRs `feat`/`fix` desde 22/09 trazem arquivo de teste | `docs/qa/resumo-executivo.md` |
+| Disciplina de teste | 41 de 42 PRs `feat`/`fix` desde 22/09 trazem arquivo de teste (27 de 27 até 16/10; exceção: #202) | `docs/qa/resumo-executivo.md` e `gh pr view --json files` |
 | CI de PR verde | 74% no total, 79% na Sprint 2, 94% na Sprint 3 | `docs/qa/relatorio-cobertura-e-defeitos.md` |
 | Casos manuais em produção | 49 de 49 executados: 32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração, 3 não verificáveis hoje, 2 pendentes | `docs/qa/execucao-casos-p1.md` |
 | Defeitos catalogados | 26 (a classificação por origem abaixo é a dos 24 primeiros: 10 de conexão entre as peças e 14 de regra, dado ou interface; 4 ocorreram em produção, 2 foram pegos pelo CI, 14 por teste manual ou uso real; os 2 novos são o armazenamento de tokens em `localStorage`, #253, e a mensagem de 2 confirmações, #249) | `docs/qa/relatorio-cobertura-e-defeitos.md` |
@@ -1167,7 +1167,7 @@ Esta subseção registra o que o processo modelado entregou de fato. Fontes: `gh
 - *De código:* o Gateway repassava o `X-User-Id` enviado pelo cliente, e os serviços liam o falso (#188, defeito de segurança, corrigido no PR #189); o `/auth/refresh` chamado pelo Gateway não existia no serviço de autenticação (#212); o cadastro aceitava `termos_aceitos: false` (#211). Os dois últimos foram achados pela execução manual dos casos em 27/10, não pelos testes automatizados, que mockam a vizinhança.
 - *Leitura:* os defeitos relevantes são de conexão entre as peças, não de regra de negócio; o CI pegou os que estavam ao seu alcance e os que escaparam só apareceram com dado real ou com a execução manual (`docs/qa/resumo-executivo.md`).
 
-**Limites do processo.** (1) Revisor único: a revisão formal é feita por uma pessoa, e a mediana de 17 min até o merge torna legítima a pergunta sobre a profundidade da revisão. (2) A autoria dos PRs ficou desigual (Davi 71, Vitória 29, Kelvin 11, Breno 7, Nathália 5 e Luis 3, em 27/10), embora a regra seja uma US por pessoa por sprint; parte do trabalho do orquestrador é infraestrutura e correção. (3) O GitHub não permite que o autor aprove o próprio PR; **a conferência de como cada PR do orquestrador foi mergeado frente à regra de aprovação formal está pendente** (`docs/guia-apresentacao.md`, seções 3.4 e 6) e, enquanto não for feita, este documento não afirma que a regra valeu sem exceção. (4) Não há ambiente de homologação separado da produção (decisão de custo). (5) Não houve validação em campo nem teste com usuários reais.
+**Limites do processo.** (1) Revisor único: a revisão formal é feita por uma pessoa, e a mediana de 18 min até o merge torna legítima a pergunta sobre a profundidade da revisão. (2) A autoria dos PRs ficou desigual (Davi 99, Vitória 29, Kelvin 12, Breno 7, Nathália 5 e Luis 3, em 29/10), embora a regra seja uma US por pessoa por sprint; parte do trabalho do orquestrador é infraestrutura e correção. (3) O GitHub não permite que o autor aprove o próprio PR; **a conferência de como cada PR do orquestrador foi mergeado frente à regra de aprovação formal está pendente** (`docs/guia-apresentacao.md`, seções 3.4 e 6) e, enquanto não for feita, este documento não afirma que a regra valeu sem exceção. (4) Não há ambiente de homologação separado da produção (decisão de custo). (5) Não houve validação em campo nem teste com usuários reais.
 
 ---
 
@@ -1185,7 +1185,7 @@ O processo tem pontos de controle formal que o desenvolvimento sem IA não garan
 
 ### 5.3 Qualidade e produtividade: o que os números sustentam
 
-Os números de 4.10 descrevem o que foi entregue: 101 issues e 146 PRs em cerca de dez semanas, 30 das 38 issues de épico fechadas, 1.640 testes automatizados, cobertura de 93,7% (backend) e 89,1% (frontend), e todos os 27 PRs `feat`/`fix` desde 22/09 com teste. O ciclo de `docs/manual-sprint.md` — ler a US e o diagrama antes de codar, testar localmente antes do CI, commit atômico — é a prática do time; o CI de PR passou de 79% verde (Sprint 2) para 94% (Sprint 3), mas a causa dessa melhora não foi isolada. Este documento **não afirma ganho de produtividade**: não houve grupo de controle nem medição do tempo que o mesmo trabalho levaria sem IA, e métricas como tempo médio de ciclo da US não foram coletadas de forma sistemática (a mediana de 17 min de criação ao merge é de PR, não de US).
+Os números de 4.10 descrevem o que foi entregue: 103 issues e 155 PRs em cerca de onze semanas, 30 das 38 issues de épico fechadas, 1.640 testes automatizados, cobertura de 93,7% (backend) e 89,1% (frontend), e 41 dos 42 PRs `feat`/`fix` desde 22/09 com teste. O ciclo de `docs/manual-sprint.md` — ler a US e o diagrama antes de codar, testar localmente antes do CI, commit atômico — é a prática do time; o CI de PR passou de 79% verde (Sprint 2) para 94% (Sprint 3), mas a causa dessa melhora não foi isolada. Este documento **não afirma ganho de produtividade**: não houve grupo de controle nem medição do tempo que o mesmo trabalho levaria sem IA, e métricas como tempo médio de ciclo da US não foram coletadas de forma sistemática (a mediana de 18 min de criação ao merge é de PR, não de US).
 
 ### 5.4 Limites e riscos assumidos
 
