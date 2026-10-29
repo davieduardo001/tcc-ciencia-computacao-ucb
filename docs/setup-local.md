@@ -218,8 +218,9 @@ tcc-ciencia-computacao-ucb/
 ├── scripts/                  # verificar-deploy.sh (checagem pré-deploy)
 ├── prototipo-alta-fid/       # Protótipo web de alta fidelidade
 ├── docker-compose.yml        # PostgreSQL + pgAdmin locais
-├── opencode.json             # Config dos agentes
-└── .opencode/                # Skills e agentes
+├── AGENT.md                  # Ponto de entrada dos agentes de IA
+├── CLAUDE.md                 # Aponta para o AGENT.md
+└── ai/                       # Regras, skills, agentes e configurações dos agentes de IA
 ```
 
 ---

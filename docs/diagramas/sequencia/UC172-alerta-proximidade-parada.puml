@@ -1,0 +1,239 @@
+@startuml UC172_AlertaProximidadeParada
+hide footbox
+title Diagrama de Sequencia - Receber Alerta de Proximidade da Parada de Destino, dentro do app (US #172)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaMapa" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoViagem" as Service <<servico mobilidade>>
+participant ":ServicoProximidade" as Monitor <<servico mobilidade>>
+participant ":ModeloViagem" as Viagem <<modelo>>
+participant ":ModeloPreferenciaNotificacao" as Pref <<modelo>>
+participant ":ModeloVeiculo" as Veiculo <<modelo>>
+participant ":ModeloAlertaProximidade" as Alerta <<modelo>>
+participant ":ServicoNotificacao" as Notif <<servico notificacao>>
+
+note over Passageiro, Notif
+  Escopo entregue (homolog): o monitoramento calcula o alerta e o app o exibe enquanto esta aberto.
+  A entrega com a tela bloqueada (aviso no aparelho) e a US #195 (ver UC195).
+  O calculo do tempo depende do mapeamento de paradas da US #173 (ver UC173).
+end note
+
+== Monitoramento periodico (rotina interna do servico, sem requisicao do passageiro) ==
+
+loop a cada ciclo do monitoramento
+  activate Monitor
+
+  Monitor -> Viagem : listarViagensAtivasComParadaDestino()
+  activate Viagem
+  Viagem --> Monitor : viagens(usuario, linha, prefixoVeiculo, sentido, paradaDestino)
+  deactivate Viagem
+
+  alt nenhuma viagem ativa com parada de destino
+    Monitor -> Monitor : encerrarCiclo()
+
+  else ha viagens a avaliar
+    Monitor -> Veiculo : obterPosicoesDasLinhas(linhasDasViagens)
+    activate Veiculo
+    Veiculo --> Monitor : posicoesPorLinha
+    deactivate Veiculo
+
+    loop para cada viagem (falha em uma nao interrompe as demais)
+      Monitor -> Pref : obterPreferencias(usuario)
+      activate Pref
+      Pref --> Monitor : preferencias(notificacoesAtivas, alertaChegada, antecedenciaMinutos)
+      deactivate Pref
+
+      alt notificacoes ou alerta de chegada desativados
+        Monitor -> Monitor : ignorarViagem()
+
+      else alerta de chegada ativo
+        Monitor -> Monitor : localizarOnibusDaViagemPeloPrefixo(posicoesPorLinha)
+
+        alt onibus da viagem sem posicao no momento
+          note right of Monitor : Outro onibus da mesma linha nao serve.\nSem posicao do onibus da viagem, nao ha alerta impreciso.
+          Monitor -> Monitor : ignorarViagem()
+
+        else onibus da viagem com posicao
+          Monitor -> Monitor : calcularTempoAteParadaDestinoPeloTrajeto(posicao, paradaDestino)
+
+          alt sem tempo confiavel (parado, sentido oposto, ja passou da parada, sem trajeto)
+            Monitor -> Monitor : ignorarViagem()
+
+          else tempo calculado
+            alt tempo maior que a antecedencia configurada
+              Monitor -> Monitor : aguardarProximoCiclo()
+
+            else tempo dentro da antecedencia
+              Monitor -> Alerta : consultarAlertaDaParadaNaViagem(viagem, paradaDestino)
+              activate Alerta
+
+              alt alerta ainda nao disparado nesta viagem para esta parada
+                Alerta --> Monitor : nenhum()
+                Monitor -> Alerta : registrarAlerta(usuario, viagem, paradaDestino, tempo)
+                Alerta --> Monitor : alertaRegistrado
+                deactivate Alerta
+                note right of Monitor : Notifica somente apos registrar:\no registro garante o alerta uma unica vez.
+                Monitor -> Notif : alertaProximidade(usuario, linha, paradaDestino, tempo)
+                activate Notif
+                Notif --> Monitor : entregaTentada()
+                deactivate Notif
+
+              else alerta ja disparado
+                Alerta --> Monitor : jaDisparado()
+                deactivate Alerta
+                Monitor -> Monitor : ignorarViagem()
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  deactivate Monitor
+end
+
+== Ver o aviso no app (primeira consulta ao abrir a tela) ==
+
+Passageiro -> View : abrirApp()
+activate View
+
+View -> Gateway : requisicao(token)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Viagem : consultarViagemAtiva(identidadeUsuario)
+  activate Viagem
+  Viagem --> Service : viagemAtiva | nenhuma
+  deactivate Viagem
+
+  alt passageiro em viagem
+    Service -> Veiculo : obterPosicaoDoVeiculo(prefixo)
+    activate Veiculo
+    Veiculo --> Service : posicaoAoVivo | semPosicaoRecente
+    deactivate Veiculo
+
+    Service -> Alerta : consultarAlertaPendente(identidadeUsuario, viagem)
+    activate Alerta
+    note right of Alerta : Pendente = disparado, ainda nao visto\ne com menos de 15 minutos.\nSempre filtrado pelo dono da viagem.
+    Alerta --> Service : alertaPendente | nenhum
+    deactivate Alerta
+
+    Service --> Gateway : resposta(viagem, progresso, alertaPendente?)
+    deactivate Service
+    Gateway --> View : retornarResposta(viagem, alertaPendente?)
+
+    alt ha alerta pendente ainda nao dispensado
+      View -> View : exibirAvisoSeuOnibusEstaChegando(paradaDestino)
+    else sem alerta pendente
+      View -> View : exibirApenasProgressoDaViagem()
+    end
+
+  else sem viagem ativa
+    Service --> Gateway : resposta(semViagem)
+    deactivate Service
+    Gateway --> View : retornarResposta(semViagem)
+  end
+
+else token expirado ou ausente
+  Gateway --> View : notificarNaoAutorizado(401)
+
+  View -> Gateway : renovarSessao(refreshToken)
+  activate Gateway
+  Gateway -> Auth : renovarSessao(refreshToken)
+  activate Auth
+  Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+  activate Sessao
+
+  alt sessao ainda ativa
+    Sessao --> Auth : tokenValido
+    deactivate Sessao
+    Auth -> Sessao : emitirNovosTokens(usuarioId)
+    activate Sessao
+    Sessao --> Auth : novosTokens
+    deactivate Sessao
+    Auth --> Gateway : sessaoRenovada(novosTokens)
+    deactivate Auth
+    Gateway --> View : retornarResposta(sessaoRenovada)
+    deactivate Gateway
+
+    View -> Gateway : requisicao(novoToken)
+    activate Gateway
+    Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+    activate Service
+    Service --> Gateway : resposta(viagem, progresso, alertaPendente?)
+    deactivate Service
+    Gateway --> View : retornarResposta(viagem, alertaPendente?)
+    deactivate Gateway
+    View -> View : exibirAvisoSeHouver(alertaPendente)
+
+  else refresh revogado ou invalido
+    Sessao --> Auth : sessaoInexistente()
+    deactivate Sessao
+    Auth --> Gateway : erroNaoAutorizado(401)
+    deactivate Auth
+    Gateway --> View : notificarNaoAutorizado(401)
+    deactivate Gateway
+    View -> View : redirecionarParaLogin("Sua sessao expirou, entre novamente.")
+  end
+end
+
+deactivate Gateway
+deactivate View
+
+== Acompanhar enquanto em viagem (consulta a cada 20 s) ==
+
+loop enquanto em viagem
+  View -> Gateway : requisicao(token)
+  activate View
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service -> Alerta : consultarAlertaPendente(identidadeUsuario, viagem)
+  activate Alerta
+  Alerta --> Service : alertaPendente | nenhum
+  deactivate Alerta
+  Service --> Gateway : resposta(viagem, progresso, alertaPendente?)
+  deactivate Service
+  Gateway --> View : retornarResposta(viagem, alertaPendente?)
+  View -> View : exibirAvisoSeNaoDispensado(alertaPendente)
+  deactivate Gateway
+  deactivate View
+end
+
+== Dispensar o aviso ==
+
+Passageiro -> View : tocarEntendi()
+activate View
+View -> View : registrarAvisoComoDispensado()
+
+View -> Gateway : requisicao(token, viagemId)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+
+Service -> Alerta : marcarComoEntregue(identidadeUsuario, viagemId)
+activate Alerta
+note right of Alerta : Idempotente. Mexe apenas nos alertas\ndo proprio usuario; viagem alheia\nnao muda nada nem revela que existe.
+Alerta --> Service : alertaEntregue | nadaPendente
+deactivate Alerta
+
+Service --> Gateway : resposta(semConteudo)
+deactivate Service
+Gateway --> View : retornarResposta(semConteudo)
+deactivate Gateway
+View -> View : ocultarAviso()
+deactivate View
+
+@enduml

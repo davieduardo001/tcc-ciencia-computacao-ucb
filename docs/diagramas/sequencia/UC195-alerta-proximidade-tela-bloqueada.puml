@@ -1,0 +1,329 @@
+@startuml UC195_AlertaProximidadeTelaBloqueada
+hide footbox
+title Diagrama de Sequencia - Receber o Alerta de Proximidade com a Tela Bloqueada (US #195)
+
+actor "Passageiro" as Passageiro
+
+participant ":TelaConfiguracoes" as View <<interface usuario>>
+participant ":NavegadorDoAparelho" as Navegador <<servico externo>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ControladorAutenticacao" as Auth <<servico autenticacao>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoPush" as Service <<servico mobilidade>>
+participant ":ModeloInscricaoPush" as Inscricao <<modelo>>
+participant ":ServicoProximidade" as Monitor <<servico mobilidade>>
+participant ":ServicoNotificacao" as Notif <<servico notificacao>>
+participant ":ServicoPushDoNavegador" as PushExt <<servico externo>>
+
+note over Passageiro, PushExt
+  Esta US continua a US #172 (ver UC172): o calculo do alerta e o aviso dentro do app nao mudam.
+  Aqui entra apenas a entrega do mesmo alerta ao aparelho, mesmo com o app fechado.
+  O aviso de atraso (#27) e o de cancelamento (#28) nao usam esta entrega.
+  Nao verificado por teste automatizado: entrega real em aparelho, iPhone e bloqueio de tela.
+end note
+
+== Abrir Configuracoes: ler o estado deste aparelho (sem pedir permissao) ==
+
+Passageiro -> View : abrirConfiguracoes()
+activate View
+
+View -> Navegador : verificarSuporteEInstalacao()
+activate Navegador
+Navegador --> View : suporte(iphoneForaDoAppInstalado | semSuporte | suportado)
+deactivate Navegador
+
+alt iPhone sem o app instalado na tela inicial
+  View -> View : explicarQuePrecisaInstalarOApp()
+  note right of View : Nao oferece o botao de ativar.
+
+else navegador sem suporte a avisos
+  View -> View : exibirAvisoNaoSuportado()
+
+else navegador com suporte
+  View -> Gateway : requisicao(token)
+  activate Gateway
+
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+
+  alt token valido
+    Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+    activate Service
+
+    alt servidor com a configuracao de avisos completa e coerente
+      Service --> Gateway : resposta(disponivel, chavePublica)
+      deactivate Service
+      Gateway --> View : retornarResposta(disponivel, chavePublica)
+
+      View -> Navegador : consultarPermissaoEInscricao()
+      activate Navegador
+      Navegador --> View : estado(permissaoNegada | permitidoComInscricao | semInscricao)
+      deactivate Navegador
+
+      alt permissao bloqueada no navegador
+        View -> View : explicarComoLiberarNasConfiguracoesDoNavegador()
+        note right of View : Nao tenta pedir a permissao de novo.
+      else aparelho inscrito
+        View -> View : exibirEstadoAtivo()
+      else aparelho nao inscrito
+        View -> View : exibirBotaoAtivarAvisos()
+      end
+
+    else servidor sem configuracao de avisos
+      Service --> Gateway : resposta(indisponivel)
+      deactivate Service
+      Gateway --> View : retornarResposta(indisponivel)
+      View -> View : exibirControleIndisponivelSemErro()
+      note right of View : O aviso dentro do app continua funcionando.
+    end
+
+  else token expirado ou ausente
+    Gateway --> View : notificarNaoAutorizado(401)
+
+    View -> Gateway : renovarSessao(refreshToken)
+    activate Gateway
+    Gateway -> Auth : renovarSessao(refreshToken)
+    activate Auth
+    Auth -> Sessao : verificarTokenRenovacao(refreshToken)
+    activate Sessao
+
+    alt sessao ainda ativa
+      Sessao --> Auth : tokenValido
+      deactivate Sessao
+      Auth -> Sessao : emitirNovosTokens(usuarioId)
+      activate Sessao
+      Sessao --> Auth : novosTokens
+      deactivate Sessao
+      Auth --> Gateway : sessaoRenovada(novosTokens)
+      deactivate Auth
+      Gateway --> View : retornarResposta(sessaoRenovada)
+      deactivate Gateway
+
+      View -> Gateway : requisicao(novoToken)
+      activate Gateway
+      Gateway -> Service : encaminharRequisicaoOriginal(req, identidadeUsuario)
+      activate Service
+      Service --> Gateway : resposta(disponivel, chavePublica | indisponivel)
+      deactivate Service
+      Gateway --> View : retornarResposta(disponibilidade)
+      deactivate Gateway
+      View -> View : exibirEstadoDoControle(disponibilidade)
+
+    else refresh revogado ou invalido
+      Sessao --> Auth : sessaoInexistente()
+      deactivate Sessao
+      Auth --> Gateway : erroNaoAutorizado(401)
+      deactivate Auth
+      Gateway --> View : notificarNaoAutorizado(401)
+      deactivate Gateway
+      View -> View : redirecionarParaLogin("Sua sessao expirou, entre novamente.")
+    end
+  end
+
+  deactivate Gateway
+end
+
+deactivate View
+
+== Ativar os avisos com consentimento explicito ==
+
+Passageiro -> View : tocarAtivarAvisosComATelaBloqueada()
+activate View
+
+note right of View : A permissao so e pedida aqui,\nnunca ao abrir a tela.
+View -> Navegador : solicitarPermissaoDeNotificacao()
+activate Navegador
+Navegador --> View : permissao(concedida | negada | fechadoSemEscolher)
+deactivate Navegador
+
+alt permissao negada
+  View -> View : explicarComoLiberarNasConfiguracoesDoNavegador()
+
+else fechou o pedido sem escolher
+  View -> View : manterEstadoDesativado()
+
+else permissao concedida
+  View -> Gateway : requisicao(token)
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+  Service --> Gateway : resposta(disponivel, chavePublica)
+  deactivate Service
+  Gateway --> View : retornarResposta(chavePublica)
+  deactivate Gateway
+
+  View -> Navegador : inscreverAparelho(chavePublica)
+  activate Navegador
+  Navegador --> View : inscricaoDoAparelho(enderecoDoServicoDePush, chaves)
+  deactivate Navegador
+
+  View -> Gateway : requisicao(token, inscricaoDoAparelho)
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  alt servidor sem configuracao de avisos
+    Service --> Gateway : respostaErro(indisponivel, 503)
+    deactivate Service
+    Gateway --> View : retornarResposta(indisponivel)
+    View -> View : desfazerInscricaoLocalEExibirErro()
+
+  else servico de push nao aceito ou chaves invalidas
+    Service -> Service : validarServicoDePushEChaves(inscricaoDoAparelho)
+    note right of Service : So aceita os servicos de push dos navegadores,\npara o servidor nao ser levado a chamar enderecos arbitrarios.
+    Service --> Gateway : respostaErro(inscricaoInvalida, 422)
+    deactivate Service
+    Gateway --> View : retornarResposta(inscricaoInvalida)
+    View -> View : desfazerInscricaoLocalEExibirErro()
+
+  else inscricao valida
+    Service -> Service : validarServicoDePushEChaves(inscricaoDoAparelho)
+    Service -> Inscricao : registrarInscricao(identidadeUsuario, inscricaoDoAparelho)
+    activate Inscricao
+    note right of Inscricao : Uma por aparelho (atualiza se ja existir).\nAcima de 5 aparelhos por pessoa, as mais antigas saem.\nSem coordenadas, nome ou dados do aparelho.
+    Inscricao --> Service : inscricaoRegistrada
+    deactivate Inscricao
+    Service --> Gateway : resposta(ativa)
+    deactivate Service
+    Gateway --> View : retornarResposta(ativa)
+    View -> View : exibirEstadoAtivo()
+  end
+
+  deactivate Gateway
+end
+
+deactivate View
+
+== Receber o aviso com o app fechado (iniciado pelo monitoramento, ver UC172) ==
+
+note over Monitor
+  O monitoramento do UC172 so chega aqui quando o alerta passa pelas regras dele:
+  preferencias de notificacao ativas (US #29), onibus da viagem com posicao,
+  tempo dentro da antecedencia configurada e alerta ainda nao disparado para a parada na viagem.
+end note
+
+Monitor -> Notif : alertaProximidade(usuario, linha, paradaDestino, tempo)
+activate Notif
+
+alt envio por aviso no aparelho desligado (servidor sem configuracao)
+  Notif -> Notif : nadaAFazer()
+  note right of Notif : O alerta continua visivel dentro do app (UC172).
+
+else envio ligado
+  Notif -> Inscricao : obterInscricoesDoUsuario(usuario)
+  activate Inscricao
+  Inscricao --> Notif : inscricoes
+  deactivate Inscricao
+
+  loop para cada aparelho inscrito
+    Notif -> PushExt : enviarAviso(inscricao, titulo, linha, parada, tempo)
+    activate PushExt
+    note right of PushExt : Carga minima, sem coordenadas nem\nidentificador de usuario ou de viagem.\nValidade curta (2 minutos), urgencia alta.
+
+    alt servico de push aceitou
+      PushExt --> Notif : aceito
+      PushExt -> Passageiro : exibirNotificacao("Sua parada esta chegando", linha, parada, tempo)
+      deactivate PushExt
+
+    else inscricao inexistente ou cancelada
+      PushExt --> Notif : erroInscricaoExpirada
+      deactivate PushExt
+      Notif -> Inscricao : removerInscricao(inscricao)
+      activate Inscricao
+      Inscricao --> Notif : inscricaoRemovida
+      deactivate Inscricao
+
+    else outra falha (rede, tempo esgotado)
+      PushExt --> Notif : falha
+      deactivate PushExt
+      Notif -> Inscricao : anotarFalha(inscricao)
+      activate Inscricao
+      Inscricao --> Notif : falhaAnotada
+      deactivate Inscricao
+      note right of Notif : O aparelho continua inscrito.\nNunca desfaz nem repete o alerta ja registrado.
+    end
+  end
+end
+
+deactivate Notif
+
+Passageiro -> Navegador : tocarNotificacao()
+activate Navegador
+Navegador -> Navegador : focarJanelaAbertaOuAbrirOMapa()
+Navegador --> Passageiro : appAbertoNoMapa
+deactivate Navegador
+
+== Desativar os avisos neste aparelho ==
+
+Passageiro -> View : tocarDesativarAvisos()
+activate View
+
+View -> Gateway : requisicao(token, enderecoDaInscricao)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+
+Service -> Inscricao : removerInscricaoDoUsuario(identidadeUsuario, enderecoDaInscricao)
+activate Inscricao
+note right of Inscricao : Apaga somente a inscricao do proprio usuario.\nRepetir a chamada nao gera erro.
+Inscricao --> Service : inscricaoRemovida | nadaARemover
+deactivate Inscricao
+
+Service --> Gateway : resposta(semConteudo)
+deactivate Service
+Gateway --> View : retornarResposta(semConteudo)
+deactivate Gateway
+
+View -> Navegador : cancelarInscricaoDoAparelho()
+activate Navegador
+Navegador --> View : inscricaoCancelada
+deactivate Navegador
+note right of View : Mesmo que o servidor nao responda,\no cancelamento no navegador e feito.
+View -> View : exibirEstadoDesativado()
+deactivate View
+
+== Sair da conta: a inscricao deste aparelho sai antes da sessao ==
+
+Passageiro -> View : tocarSair()
+activate View
+
+View -> Gateway : requisicao(token, enderecoDaInscricao)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+activate Service
+Service -> Inscricao : removerInscricaoDoUsuario(identidadeUsuario, enderecoDaInscricao)
+activate Inscricao
+Inscricao --> Service : inscricaoRemovida | nadaARemover
+deactivate Inscricao
+Service --> Gateway : resposta(semConteudo)
+deactivate Service
+Gateway --> View : retornarResposta(semConteudo)
+deactivate Gateway
+note right of View : Tentativa com tempo limite curto: falhar ou\ndemorar nao impede o Passageiro de sair.
+
+View -> Navegador : cancelarInscricaoDoAparelho()
+activate Navegador
+Navegador --> View : inscricaoCancelada
+deactivate Navegador
+
+View -> Gateway : requisicaoEncerrarSessao()
+activate Gateway
+Gateway -> Auth : encerrarSessao(token)
+activate Auth
+Auth -> Sessao : removerSessao(token)
+activate Sessao
+Sessao --> Auth : sessaoRemovida
+deactivate Sessao
+Auth --> Gateway : sessaoEncerrada
+deactivate Auth
+Gateway -> Gateway : limparCookiesDeSessao()
+Gateway --> View : retornarResposta(sessaoEncerrada)
+deactivate Gateway
+
+View -> View : limparSessaoNoAparelhoERedirecionarParaLogin()
+deactivate View
+
+@enduml
