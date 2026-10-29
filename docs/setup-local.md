@@ -65,13 +65,15 @@ source venv/bin/activate  # Linux/Mac
 # Instalar dependências
 pip install -r requirements.txt
 
-# Configurar variável de ambiente
+# Configurar variáveis de ambiente (as demais têm padrão em shared/config.py)
 export DATABASE_URL="postgresql://movecity:movecity_dev@localhost:5432/movecity"
 export JWT_SECRET="seu-secret-aqui-local"
 export JWT_ALGORITHM="HS256"
 export JWT_EXPIRATION_MINUTES="60"
 export ENVIRONMENT="development"
 ```
+
+Opcionais: `CORS_ORIGINS` (padrão `http://localhost:3000`, a origem do `npm run dev`), `GOOGLE_CLIENT_ID` (login via Google) e, para o e-mail de recuperação de senha, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` e `FRONTEND_URL` (sem eles o e-mail simplesmente não é enviado). Os limites de embarque e o Web Push (`RAIO_EMBARQUE_M`, `VAPID_*`) têm padrão no código e são descritos em `docs/secrets-por-plataforma.md`.
 
 ### Rodar as Migrations
 
@@ -85,23 +87,48 @@ alembic upgrade head
 
 ### Rodar o Backend
 
-```bash
-# Rodar Auth Service (porta 8001)
-cd src/backend/auth
-uvicorn main:app --reload --host 0.0.0.0 --port 8001
+Os serviços importam `shared` e `models` como pacotes, então **sobem a partir de `src/backend`** (é assim também nos `Dockerfile`), no formato `<serviço>.main:app`. Cada um precisa de uma porta; as do exemplo são apenas uma sugestão (em produção todos escutam na 8000).
 
-# Rodar Gateway (porta 8000)
-cd src/backend/gateway
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```bash
+cd src/backend
+
+# Auth Service
+uvicorn auth.main:app --reload --port 8001
+
+# Mobilidade Service
+uvicorn mobilidade.main:app --reload --port 8002
+
+# Colaboração Service
+uvicorn colaboracao.main:app --reload --port 8003
+
+# Gateway (aponta para os serviços locais em vez das URLs do Fly.io)
+GATEWAY_AUTH_SERVICE_URL=http://localhost:8001 \
+GATEWAY_MOBILIDADE_SERVICE_URL=http://localhost:8002 \
+GATEWAY_COLABORACAO_SERVICE_URL=http://localhost:8003 \
+uvicorn gateway.main:app --reload --port 8000
 ```
 
-**Portas:**
-- Gateway: http://localhost:8000
+**Portas (sugestão):**
+- Gateway: http://localhost:8000 (é a única que o frontend acessa; `NEXT_PUBLIC_API_URL` aponta para ela)
 - Auth Service: http://localhost:8001
+- Mobilidade Service: http://localhost:8002
+- Colaboração Service: http://localhost:8003
 
-**Nota:** O Gateway valida JWT localmente. Não é necessário rodar o Auth Service para testar a validação de tokens.
+Sem as variáveis `GATEWAY_*_SERVICE_URL`, o Gateway encaminha para os serviços publicados no Fly.io (`https://movecity-<serviço>.fly.dev`).
+
+**Nota:** O Gateway valida o JWT localmente. Não é necessário rodar o Auth Service para testar a validação de tokens, mas as rotas `/api/auth/*`, `/api/mobilidade/*` e `/api/colaboracao/*` só respondem se o serviço de destino estiver no ar. Cada serviço expõe `GET /health`.
+
+### Carregar as linhas do SEMOB (opcional)
+
+A tabela `linha` do banco local começa vazia. Para populá-la com as linhas reais do DF (download de cerca de 37 MB, leva alguns minutos):
+
+```bash
+cd src/backend
+python -m mobilidade.ingestao_semob
+```
 
 ---
+
 
 ## 4. Configurar o Frontend
 
@@ -114,14 +141,15 @@ npm install
 # Configurar variáveis de ambiente
 # Criar arquivo .env.local:
 echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
-echo "NEXT_PUBLIC_MAP_TILES=https://tile.openstreetmap.org/{z}/{x}/{y}.png" >> .env.local
-echo "NEXT_PUBLIC_APP_NAME=Movecity" >> .env.local
+# Opcionais:
+#   NEXT_PUBLIC_GOOGLE_CLIENT_ID  -> login via Google
+#   NEXT_PUBLIC_CARTO_API_KEY     -> base CARTO Voyager (sem ela, o mapa usa o tile padrão do OpenStreetMap)
 
 # Rodar o frontend
 npm run dev
 ```
 
-Frontend disponível em: http://localhost:3000
+Frontend disponível em: http://localhost:3000. Testes: `npm test` (Jest).
 
 ---
 
@@ -172,23 +200,24 @@ tcc-ciencia-computacao-ucb/
 │   ├── backend/
 │   │   ├── alembic/           # Migrations do banco
 │   │   │   ├── versions/     # Arquivos de migration
-│   │   │   └── env.py        # Config do Alembic
-│   │   ├── gateway/          # API Gateway
+│   │   │   └── env.py        # Config do Alembic (lê DATABASE_URL)
+│   │   ├── gateway/          # API Gateway (proxy + validação de JWT)
 │   │   ├── auth/             # Autenticação
-│   │   ├── mobilidade/       # Dados de mobilidade
-│   │   ├── colaboracao/      # Reportes crowdsourced
-│   │   ├── models/           # Modelos ORM (SQLAlchemy)
-│   │   ├── core/             # Config, dependências
+│   │   ├── mobilidade/       # Linhas, paradas, rotas, viagens, Web Push
+│   │   ├── colaboracao/      # Ocorrências, alertas, preferências
+│   │   ├── models/           # Base declarativa compartilhada (base.py)
+│   │   ├── shared/           # Config, banco e logs comuns
 │   │   ├── alembic.ini       # Config do Alembic
-│   │   ├── requirements.txt  # Dependências Python
-│   │   ├── Dockerfile        # Deploy no Fly.io
-│   │   └── fly.toml          # Config do Fly.io
+│   │   └── requirements.txt  # Superset das dependências (CI e uso local)
+│   │                         # Cada serviço tem também Dockerfile, fly.toml e requirements.txt próprios
 │   └── frontend/
-│       ├── app/              # Next.js App Router
-│       ├── components/       # Componentes React
-│       ├── lib/              # Utilitários, hooks
+│       ├── app/              # Next.js App Router (telas e componentes)
+│       ├── lib/              # Utilitários (api.ts, push.ts, ...)
+│       ├── public/           # Ícones, service worker (sw.js)
 │       └── package.json      # Dependências Node
-├── docker-compose.yml        # PostgreSQL local
+├── scripts/                  # verificar-deploy.sh (checagem pré-deploy)
+├── prototipo-alta-fid/       # Protótipo web de alta fidelidade
+├── docker-compose.yml        # PostgreSQL + pgAdmin locais
 ├── AGENT.md                  # Ponto de entrada dos agentes de IA
 ├── CLAUDE.md                 # Aponta para o AGENT.md
 └── ai/                       # Regras, skills, agentes e configurações dos agentes de IA
@@ -290,7 +319,7 @@ Agente reporta: "12 testes passando. 0 falhas."
 | `npm install` | ✅ | `@dev-environment` |
 | `alembic upgrade head` | ✅ | `@dev-environment` ou `@backend` |
 | `alembic revision --autogenerate` | ✅ | `@backend` |
-| `uvicorn main:app --reload` | ✅ | `@dev-environment` |
+| `uvicorn <serviço>.main:app --reload` (a partir de `src/backend`) | ✅ | `@dev-environment` |
 | `pytest -v` | ✅ | `@tester` ou `@backend` |
 | `npm test` | ✅ | `@tester` ou `@frontend` |
 
