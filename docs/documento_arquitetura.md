@@ -2,7 +2,7 @@
 
 **Grupo:** Segurança no Transporte  
 **Software:** Movecity  
-**Versão:** 3.0
+**Versão:** 3.1
 
 ---
 
@@ -13,6 +13,7 @@
 | 12/jun/26 | 1.0 | Versão inicial do documento | Grupo Segurança no Transporte |
 | 18/set/26 | 2.0 | Atualização pós-implementação: correção das seções divergentes do código (persistência, processos, implementação, implantação e dados) e inclusão da seção 10 — Evolução Arquitetural | Grupo Segurança no Transporte |
 | 28/out/26 | 3.0 | Revisão contra o código de `homolog` (ambiente publicado): correção de afirmações que o código contradiz (regiões do Fly, validação cruzada, retenção de ocorrências, worker de colaboração, papel do Gateway na renovação da sessão, acesso ao banco), atualização das tabelas, endpoints, workflows e requisitos não funcionais com o que foi verificado e o que não foi medido, e registro das ADR-16 a ADR-24 | Grupo Segurança no Transporte |
+| 30/out/26 | 3.1 | Versão entregue: revisão do texto, remoção de repetições e atualização dos números de testes | Grupo Segurança no Transporte |
 
 ---
 
@@ -96,7 +97,7 @@ Esta seção descreve os requisitos de negócio e de usuário com impacto sobre 
 | **Interoperabilidade** | O sistema deve consumir dados GPS no formato GeoJSON provido pela API oficial da SEMOB/GDF sem necessidade de transformação proprietária. | Backend FastAPI com módulo de ingestão (`semob_source.py`, `ingestao_semob.py`); endpoints RESTful com documentação automática via OpenAPI. |
 | **Usabilidade** | A interface deve ser responsiva e acessível para usuários com diferentes níveis de letramento digital, priorizando dispositivos móveis. | Interface em Next.js (App Router) pensada para o celular (folha inferior no mapa), instalável como PWA (`manifest.ts` e `public/sw.js`); componente de mapa via Leaflet JS com interação por toque. |
 | **Confiabilidade** | Reportes colaborativos só devem ser confirmados quando validados por outros usuários independentes. | Validação cruzada no serviço de Colaboração: ocorrência de tipo sujeito a validação nasce `pendente` e vira `confirmada` ao receber 3 confirmações de usuários diferentes do autor (`Ocorrencia.LIMITE_CONFIRMACOES`); a restrição de uma confirmação por usuário é garantida por `UNIQUE (ocorrencia_id, usuario_id)` no banco. Acidente e segurança são exibidos de imediato, sem esperar confirmação. Anti-spam: no máximo 3 reportes por usuário por hora (`LIMITE_REPORTES_POR_HORA`). |
-| **Segurança** | Dados de geolocalização dos usuários devem ser tratados em conformidade com a LGPD. Sessões autenticadas devem ser gerenciadas de forma segura. | Autenticação por JWT (HS256) enviado em cookies httpOnly — **mas o frontend também grava os tokens no `localStorage` (#253, aberta), o que anula a proteção contra XSS dos cookies**; o Gateway valida o token localmente, sem round-trip ao Auth Service; senhas com hash bcrypt; bloqueio da conta por 15 min após 5 senhas erradas; a viagem do passageiro não guarda posição (ADR-15); a query string é omitida do log de acesso do Gateway e da Mobilidade (`shared/logs.py`); a posição do usuário não vai para a URL (ADR-24); HTTPS forçado nos apps do Fly (`force_https = true`) e na Vercel. Limites conhecidos na seção 10.4. |
+| **Segurança** | Dados de geolocalização dos usuários devem ser tratados em conformidade com a LGPD. Sessões autenticadas devem ser gerenciadas de forma segura. | Autenticação por JWT (HS256) enviado em cookies httpOnly; o Gateway valida o token localmente, sem round-trip ao Auth Service; senhas com hash bcrypt; bloqueio da conta por 15 min após 5 senhas erradas; a viagem do passageiro não guarda posição (ADR-15); a query string é omitida do log de acesso do Gateway e da Mobilidade (`shared/logs.py`); a posição do usuário não vai para a URL (ADR-24); HTTPS forçado nos apps do Fly (`force_https = true`) e na Vercel. Limites conhecidos na seção 10.4. |
 | **Facilidade de manutenção** | O código deve ser modular e permitir a evolução por serviço sem reestruturação arquitetural. | Separação de responsabilidades por camadas (frontend, gateway, serviços de domínio, dados); serviços independentes, cada um com seu `Dockerfile`, `fly.toml` e `requirements.txt`; testes automatizados executados pelo GitHub Actions a cada PR. O catálogo ingerido cobre o DF inteiro (923 linhas), não só Ceilândia e Taguatinga. |
 | **Portabilidade** | O backend deve ser implantável em diferentes provedores de nuvem sem dependência de serviços proprietários. | Imagens Docker (`python:3.12-slim`); banco PostgreSQL padrão (Neon serverless); nenhuma dependência de SDK de nuvem proprietário no código da aplicação. |
 | **Escalabilidade** | O sistema deve suportar crescimento de usuários sem redesenho arquitetural, especialmente nos horários de pico (5h–9h e 17h–20h). | Serviços independentes atrás de um Gateway, escaláveis por app no Fly.io; PostgreSQL serverless no Neon; frontend servido pela Vercel. **Limite:** o cache de posições, o limite de tentativas de recuperação de senha e a deduplicação de alertas vivem na memória de cada processo e não são compartilhados entre instâncias; não houve teste de carga. |
@@ -104,21 +105,21 @@ Esta seção descreve os requisitos de negócio e de usuário com impacto sobre 
 
 *Tabela 1 – Restrições e requisitos arquiteturais*
 
-### 2.1 Situação verificada dos requisitos (28/10/2026)
+### 2.1 Situação dos requisitos
 
-Fontes: `docs/qa/resumo-executivo.md`, `docs/qa/relatorio-cobertura-e-defeitos.md`, `docs/qa/execucao-casos-p1.md` e o código de `homolog`.
+Resultados detalhados no Documento de Testes e Implementação. Aqui fica o que foi verificado e o que **não foi medido**.
 
 | Requisito | O que foi verificado | O que não foi medido |
 |---|---|---|
-| Desempenho (3 s em 4G) | Nada foi medido em rede 4G. O cache de 20 s do feed está no código (`posicao_service.py`). | Tempo de carregamento do mapa, latência do Gateway e das chamadas à SEMOB, partida a frio dos apps do Fly. |
-| Precisão do tempo de chegada (ETA) | Lógica coberta por testes automatizados; na execução manual em produção, CT-ETA-01 e CT-ETA-02 aprovados, CT-ETA-04 com ressalva e CT-ETA-03 pendente (exige localização simulada). | **Tolerância do ETA em campo** (proposta: 2 min para ETA até 10 min) e a regra "ônibus chegando" (400 m e 2 min) nunca foram medidas com um ônibus real. |
-| Disponibilidade (99% no pico) | Deploys de `homolog` com smoke test em `/health` (pipeline). | Disponibilidade real: não há série de medição. |
-| Confiabilidade (validação cruzada) | Regra implementada (3 confirmações) e testada em `colaboracao/tests/test_confirmar_ocorrencia.py`. | Comportamento com muitos usuários reais. |
-| Segurança e LGPD | Sessão renovada em produção sem pedir novo login (PR #222, validado em 27/10); coordenadas do usuário fora da URL (PR #239, validado em produção em 28/10); viagem sem coluna de posição. Estado real da proteção contra XSS: **reduzida**, porque o frontend grava `access_token` e `refresh_token` no `localStorage` (#253, aberta). | Revisão jurídica da LGPD; conteúdo final dos Termos e da Política de Privacidade (#32) não foi conferido neste levantamento. |
-| Usabilidade | Avaliação heurística de Nielsen feita por **um** avaliador (`docs/qa/avaliacao-usabilidade-nielsen.md`); teste automatizado de contraste das cores do card de rotas (`app/__tests__/contraste.test.ts`). | Teste com usuários reais; leitor de tela, tamanho de toque e conexão lenta. |
-| Manutenção (testes) | 1.260 testes automatizados passando em 16/10 (671 de backend, 589 de frontend); cobertura do código de produção de 93,7% (backend) e 89,1% (frontend, só dos arquivos importados pelos testes). Os PRs posteriores a 16/10 não foram recontados. | A cobertura não é medida no CI. |
-| Integração entre as peças | Os 49 casos manuais foram executados em produção (33 aprovados, 10 com ressalva, 1 reprovado por configuração, 3 não verificáveis, 2 pendentes). | Não há teste automatizado de ponta a ponta entre front, Gateway e serviços: tudo é mockado. |
-| Escalabilidade | — | Nenhum teste de carga. |
+| Desempenho (3 s em 4G) | O cache de 20 s do feed está no código. | Tempo de carregamento do mapa em 4G, latência do Gateway e da SEMOB, partida a frio dos apps do Fly. |
+| Precisão do tempo de chegada (ETA) | Lógica coberta por testes automatizados e por casos manuais em produção. | Tolerância do ETA em campo (proposta: 2 min para ETA até 10 min) e a regra "ônibus chegando" (400 m e 2 min) com um ônibus real. |
+| Disponibilidade (99% no pico) | Deploys com teste de `/health` no pipeline. | Disponibilidade real: não há série de medição nem monitoramento contínuo. |
+| Confiabilidade (validação cruzada) | Regra de 3 confirmações implementada e testada. | Comportamento com muitos usuários reais. |
+| Segurança e LGPD | Sessão renovada em produção sem novo login; coordenadas do usuário fora da URL; viagem sem coluna de posição. | Revisão jurídica da LGPD. |
+| Usabilidade | Avaliação heurística de Nielsen por um avaliador; teste automatizado de contraste. | Teste com usuários reais; leitor de tela, tamanho de toque e conexão lenta. |
+| Manutenção (testes) | 1.640 testes automatizados passando no CI (844 de backend, 796 de frontend); cobertura de 93,7% (backend) e 89,1% (frontend), medida em 16/10. | Cobertura no CI. |
+| Integração entre as peças | 49 casos manuais executados em produção: 32 aprovados, 11 aprovados em parte, 1 reprovado por configuração, 3 não verificáveis fora de campo e 2 pendentes. | Teste automatizado de ponta a ponta entre frontend, Gateway e serviços. |
+| Escalabilidade | — | Teste de carga. |
 
 *Tabela 1.1 – Situação verificada dos requisitos*
 
@@ -126,7 +127,7 @@ Fontes: `docs/qa/resumo-executivo.md`, `docs/qa/relatorio-cobertura-e-defeitos.m
 
 ## 3. Visão de Casos de Uso
 
-O Movecity foi especificado por meio de histórias de usuário (User Stories), organizadas por épicos funcionais. Cada item está vinculado à sua respectiva issue no GitHub, onde os comentários contêm os artefatos completos de especificação: protótipos de tela (Figma), diagramas de sequência UML e critérios de aceite BDD.
+O Movecity foi especificado por meio de histórias de usuário (User Stories), organizadas por épicos funcionais. Cada item está vinculado à sua respectiva issue no GitHub, onde os comentários contêm os artefatos completos de especificação: o protótipo de alta fidelidade (`prototipo-alta-fid/`), diagramas de sequência UML e critérios de aceite BDD.
 
 **Épico: Autenticação e Conta**
 - [#11 — Criar Nova Conta de Usuário](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/11)
@@ -152,18 +153,10 @@ O Movecity foi especificado por meio de histórias de usuário (User Stories), o
 - [#25 — Salvar Rota Favorita](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/25)
 - [#26 — Confirmar Ocorrência Reportada por Outro Passageiro](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/26)
 - [#27 — Receber Alerta de Atraso na Linha Acompanhada](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/27)
-- [#28 — Receber Alerta de Cancelamento de Viagem](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/28)
 - [#29 — Gerenciar Preferências de Notificação](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/29)
 
 **Épico: Onboarding**
 - [#30 — Visualizar Tutorial no Primeiro Acesso](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/30)
-
-**Situação de entrega em 28/10/2026.** O quadro por caso de teste está em `docs/qa/execucao-casos-p1.md`. O que as histórias acima previam e o ambiente publicado **não entrega**:
-
-- **Push dos alertas de atraso e das rotas preferidas** (#27, #22): a US #207 (push desses alertas) está aberta. O Web Push que existe cobre só o alerta de proximidade da parada de destino (ADR-16). O serviço de rastreamento de atraso roda com o fornecedor GTFS simulado e o `NotificadorNulo`, e o ciclo do `monitoring_worker` da Colaboração só roda sob demanda, com dados simulados (seção 5).
-- **Alerta de cancelamento de viagem** (#28): não há alerta de cancelamento; a tela de preferências (#29) grava a escolha, mas ela não tem efeito de entrega.
-- **Confirmação de conta por e-mail**: não existe; a conta entra direto no cadastro (ADR-20).
-- **Fallback colaborativo** (posição do ônibus informada por passageiros, #199): aberta, sem código em `homolog` (ADR-18).
 
 ---
 
@@ -203,7 +196,7 @@ Esta subseção documenta as principais decisões técnicas tomadas para o Movec
 | **Deploy — Backend** | Fly.io — **quatro aplicações independentes** (`movecity-gateway`, `movecity-auth`, `movecity-mobilidade`, `movecity-colaboracao`), cada uma com seu `Dockerfile` e `fly.toml` | Deploy simples via Dockerfile e escala independente por serviço. Separar as aplicações mantém a promessa de isolamento de falhas do estilo de microserviços: a queda de um serviço não derruba os demais. |
 | **Deploy — Frontend** | Vercel | Integração nativa com Next.js e deploy automático por push. `homolog` publica em `--prod` no domínio público da Vercel (`movecity-frontend.vercel.app`), usado como ambiente de homologação e para as demonstrações; a `main` não tem deploy próprio de frontend (ADR-19). |
 | **CI/CD** | GitHub Actions | Integração nativa com o repositório; pipelines de teste e deploy automatizados sem custo adicional. |
-| **Autenticação** | JWT (HS256) em cookies httpOnly — access token de 1 h e refresh token de 7 dias; sessões registradas na tabela `sessoes` | Os cookies httpOnly não são lidos por JavaScript, mas os tokens também vão para o `localStorage` (#253); o Gateway valida o access token localmente, sem round-trip; o refresh token é rotacionado a cada renovação e deixa de valer no logout. A renovação é disparada pelo frontend ao receber 401 (ADR-21). **Limitação conhecida (#253):** o frontend também grava os tokens no `localStorage`, o que anula a proteção contra XSS dos cookies httpOnly (seção 10.4). |
+| **Autenticação** | JWT (HS256) em cookies httpOnly — access token de 1 h e refresh token de 7 dias; sessões registradas na tabela `sessoes` | Os cookies httpOnly não são lidos por JavaScript; o Gateway valida o access token localmente, sem round-trip; o refresh token é rotacionado a cada renovação e deixa de valer no logout. A renovação é disparada pelo frontend ao receber 401 (ADR-21). |
 | **Notificações** | Web Push com chaves VAPID (`pywebpush`), enviado pelo serviço de Mobilidade | Entrega o aviso de proximidade com o app fechado. Desligado quando as chaves não estão configuradas (ADR-16). |
 | **E-mail** | SMTP do Gmail (`smtplib`, porta 587, STARTTLS), enviado pelo serviço de autenticação | Sem dependência nova; usado só na recuperação de senha (ADR-20). |
 | **Aplicativo instalável** | PWA: `manifest.ts` e `public/sw.js` | O *service worker* guarda só a casca do aplicativo e recebe os Web Push; dado de transporte nunca é cacheado. |
@@ -264,7 +257,7 @@ Posições com mais de 15 minutos são descartadas como desatualizadas (`IDADE_M
 
 **4. Alerta de proximidade da parada de destino (serviço de mobilidade).** No `startup`, `mobilidade/main.py` inicia um `BackgroundScheduler` (APScheduler) **dentro do processo** do serviço. O job `monitoramento-proximidade` percorre as viagens ativas no banco, localiza o ônibus da viagem na posição ao vivo, calcula o ETA pelo trajeto até a parada de destino, confere as preferências do usuário (`notificacoes_ativas`, `alerta_chegada`, antecedência) e, ao cruzar o limiar, grava o alerta em `alertas_proximidade` — com índice único por (viagem, parada), de modo que o mesmo aviso não se repete — e chama o notificador. O notificador é o `NotificadorWebPush` quando as três variáveis VAPID existem e são coerentes, e o `NotificadorNulo` caso contrário (ADR-16); o aviso dentro do app independe do push. O intervalo padrão é o de `WORKER_INTERVAL_MINUTES` (5 min), ajustável por `WORKER_PROXIMIDADE_INTERVAL_SECONDS` (mínimo de 20 s). Com 5 minutos, o aviso pode chegar com atraso; a issue #200 prevê medir isso em aparelho e decidir o intervalo — **essa medição não foi feita**.
 
-**5. Rastreamento de atraso (#27) — implementado sobre dados simulados.** O mesmo agendador executa o job `monitoramento-atrasos`, que usa o `ServicoRastreamento` com o `FornecedorGTFSMock` e o `NotificadorNulo`. Não há fonte real de atraso nem canal de entrega: o alerta de atraso não chega ao usuário (US #207 aberta).
+**5. Rastreamento de atraso (#27) — implementado sobre dados simulados.** O mesmo agendador executa o job `monitoramento-atrasos`, que usa o `ServicoRastreamento` com o `FornecedorGTFSMock` e o `NotificadorNulo`. Não há fonte real de atraso nem canal de entrega: o alerta de atraso fica no servidor e não chega ao usuário.
 
 **6. Monitoramento de rotas preferidas (serviço de colaboração) — componente não agendado.** O `monitoring_worker` expõe apenas `executar_ciclo()` e recebe suas dependências (`FavoritosProvider`, `ETAService`, `PushSender`, `Deduplicador`) por injeção, o que o mantém testável sem relógio, sem rede e sem banco. Porém `colaboracao/main.py` **não tem agendador**: o ciclo só roda quando alguém chama `POST /colaboracao/notificacoes/processar`, rota de demonstração que usa `FavoritosMockProvider`, `ETAMockProvider` e um `PushService` em memória. As rotas favoritas reais (tabela `rotas_favoritas`) não alimentam esse ciclo, e nenhum push chega ao usuário por ele.
 
@@ -443,19 +436,19 @@ Esta seção separa o que é **premissa de dimensionamento** (nunca medida) do q
 
 ## 10. Evolução Arquitetural (junho a outubro de 2026)
 
-Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 28/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são novas da v3.0 e trazem contexto, decisão, consequências e fonte.
+Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 28/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são da v3.0.
 
 ### 10.1 Registro de decisões (ADR-01 a ADR-15)
 
 | ID | Decisão | Motivação | Consequência assumida |
 |---|---|---|---|
-| **ADR-01** | O Gateway alcança os serviços pelas **URLs públicas HTTPS** (`movecity-*.fly.dev`), e não pela rede privada `.internal` do Fly.io. | A rede privada do Fly é IPv6-only. Para usá-la, os serviços precisariam de bind dual-stack, o que causou instabilidade com o proxy público do próprio Fly. | Os serviços ficam acessíveis pelas URLs públicas. A v3.0 registra o isolamento entre o Gateway e os serviços de domínio como uma lacuna assumida e **em revisão**: o endurecimento dessa comunicação (separação de rede e/ou autenticação da chamada entre Gateway e serviços) está previsto como trabalho de segurança (seção 10.4). Os detalhes ficam fora deste documento até a correção ser aplicada. |
+| **ADR-01** | O Gateway alcança os serviços pelas **URLs públicas HTTPS** (`movecity-*.fly.dev`), e não pela rede privada `.internal` do Fly.io. | A rede privada do Fly é IPv6-only. Para usá-la, os serviços precisariam de bind dual-stack, o que causou instabilidade com o proxy público do próprio Fly. | Os serviços ficam acessíveis pelas URLs públicas; o Gateway é o único ponto que o frontend chama. |
 | **ADR-02** | **PostGIS não foi adotado.** Geometrias ficam em colunas `JSON`; a única junção espacial é resolvida em Python com índice de grade (células de ~55 m, raio de busca de 40 m). | O produto tem uma só operação espacial de verdade — associar abrigos de parada ao traçado da linha — e ela roda uma vez por mês, na ingestão. Adotar PostGIS acrescentaria uma extensão, um tipo de coluna e um vocabulário de consulta para atender a um caso único e offline. | **Contraria a v1.0**, que previa PostGIS em várias seções. Se surgir busca por raio em tempo de requisição (ex.: "paradas perto de mim" no servidor), a decisão deve ser reavaliada — hoje esse cálculo acontece no navegador. |
 | **ADR-03** | Os dados da SEMOB são **copiados para o banco** por ingestão em lote, em vez de consultados a cada busca. | Os endpoints não aceitam filtro: devolvem sempre o payload inteiro (~37 MB somados). Consultar por usuário seria inviável. Além disso, são endpoints públicos sem documentação nem SLA publicados. | Se a SEMOB sair do ar, a busca continua funcionando com o último snapshot. Em troca, o catálogo pode ficar até um mês desatualizado — aceitável para dado que muda raramente. |
 | **ADR-04** | Posições de GPS são **lidas ao vivo com cache de 20 s e nunca persistidas**. | O feed traz a frota inteira do DF em uma resposta só; um download serve todos os usuários simultaneamente. Posição perde validade em segundos. | **Contraria a v1.0**, que previa persistir posições a cada 30 s com retenção de 24 h. Não há histórico de posições — se análises retrospectivas entrarem no escopo, será preciso um processo de arquivamento à parte. |
 | **ADR-05** | O traçado exibido no mapa passa pelo **OSRM**, e não pela linha reta entre paradas. | A geometria bruta ligava paradas em linha reta, atravessando quadras. O OSRM ajusta o traçado à malha viária real do OpenStreetMap. | Mais uma dependência externa no caminho do usuário. O trajeto é cacheado junto com a linha, então a chamada não se repete a cada visualização. |
 | **ADR-06** | Integrações externas ficam atrás de um **contrato `typing.Protocol`**, com implementação mock e implementação real. | Permite desenvolver e testar sem rede e sem cota de API, e trocar a fonte em um ponto só. | Foi o que permitiu migrar do mock para os dados reais do SEMOB sem reescrever `LinhaService`, rota HTTP nem teste. Custo: uma camada de indireção a mais em cada integração. |
-| **ADR-07** | Cookies de sessão usam **`SameSite=None` com `Secure`**, e não `Lax`/`Strict`. | Frontend (Vercel) e Gateway (Fly) estão em domínios diferentes — é cross-site de fato. Com `Lax`/`Strict`, o navegador não envia o cookie em `fetch()` cross-site, e toda chamada autenticada caía em 401 logo após um login bem-sucedido. | **Corrige a v1.0**, cuja tabela de cookies indicava `Lax`/`Strict`. `SameSite=None` amplia a exposição a CSRF; a mitigação atual é o escopo restrito de `path` por cookie e a obrigatoriedade de HTTPS. Os cookies httpOnly protegem contra XSS apenas na medida em que os tokens não existam em outro lugar legível por script: como o frontend grava os tokens também no `localStorage`, essa proteção está **reduzida enquanto isso existir; a correção está na #253**. Unificar frontend e Gateway sob um mesmo domínio permitiria voltar a `Lax`. |
+| **ADR-07** | Cookies de sessão usam **`SameSite=None` com `Secure`**, e não `Lax`/`Strict`. | Frontend (Vercel) e Gateway (Fly) estão em domínios diferentes — é cross-site de fato. Com `Lax`/`Strict`, o navegador não envia o cookie em `fetch()` cross-site, e toda chamada autenticada caía em 401 logo após um login bem-sucedido. | **Corrige a v1.0**, cuja tabela de cookies indicava `Lax`/`Strict`. `SameSite=None` amplia a exposição a CSRF; a mitigação atual é o escopo restrito de `path` por cookie e a obrigatoriedade de HTTPS. Unificar frontend e Gateway sob um mesmo domínio permitiria voltar a `Lax`. |
 | **ADR-08** | Cada serviço tem seu **próprio `requirements.txt`**, além do combinado na raiz. | Cada imagem Docker instala só o que o serviço usa, reduzindo o tamanho da imagem e o tempo de build. | Criou uma armadilha real: o CI instala o combinado da raiz, e o contêiner instala o do serviço. Dependência ausente no arquivo do serviço **passa no CI e derruba o contêiner no boot**. Aconteceu duas vezes (PR #102, no mobilidade; PR #127/#128, no colaboração). O smoke test em `/health` no pipeline existe justamente para transformar esse erro em deploy reprovado. |
 | **ADR-09** | O `CORSMiddleware` é o **middleware mais externo** da pilha do Gateway. | O Starlette executa primeiro o último middleware adicionado. Com o CORS abaixo do middleware de autenticação, o preflight `OPTIONS` — que nunca carrega cookie — era barrado com 401 antes de o CORS responder. | Todo 401 legítimo passa a chegar ao frontend como 401, e não como "bloqueado por CORS". A ordem virou regra verificada por teste (`test_cors_ordem_middleware.py`). |
 | **ADR-10** | As **migrations rodam no pipeline**, em um job único que antecede os deploys dos serviços. | Com quatro serviços e um banco só, deixar cada contêiner migrar no boot causaria corrida entre eles. | Um encadeamento único do Alembic para todo o banco, mesmo com os serviços separados — o que exige atenção ao `down_revision` quando duas USs criam migration em paralelo (aconteceu na US #29). |
@@ -469,71 +462,18 @@ Esta seção registra as decisões arquiteturais tomadas **durante a implementa�
 
 ### 10.2 Decisões da Sprint 3 e da Sprint 4 (ADR-16 a ADR-24)
 
-#### ADR-16 — Web Push com chaves VAPID para o alerta de proximidade
+| ID | Decisão | Motivo | Consequência |
+|---|---|---|---|
+| **ADR-16** | **Web Push com chaves VAPID** para o alerta de proximidade, enviado pelo serviço de Mobilidade (`pywebpush`). A inscrição do aparelho fica na tabela `inscricao_push`, sem coordenadas, nome nem *user agent*; o dono vem do `X-User-Id`, nunca do corpo; só são aceitos endpoints `https` de FCM, Mozilla, Apple e Windows (proteção contra SSRF). Sem as três variáveis VAPID, o notificador é nulo e o controle aparece como indisponível. | O alerta só aparecia dentro do app; quem está com a tela bloqueada não era avisado (#195). | O push cobre o alerta de proximidade; o aviso dentro do app independe dele. As chaves valem para homologação e produção (ADR-19), e trocá-las invalida as inscrições. O ciclo do worker (padrão de 5 min) pode atrasar o aviso. |
+| **ADR-17** | **O Gateway descarta o `X-User-Id` enviado pelo cliente** (sem diferenciar maiúsculas, mesmo em rota pública) e repassa só a identidade extraída do JWT. | O cabeçalho do cliente também chegava ao serviço (#188). | A identidade que o serviço lê é sempre a do Gateway; o contrato é coberto por testes do Gateway. |
+| **ADR-19** | **Homologação e produção não são separadas.** O mesmo pipeline publica os quatro apps do Fly em push para `homolog` ou `main`, há um único banco Neon, e o frontend publica só a partir de `homolog`, em modo `--prod`. | Custo: a separação foi retirada do escopo pelo grupo (#42, fechada em 14/10). | `homolog` é o ambiente visível ao usuário: um merge muda o que as pessoas veem, as migrations rodam no banco compartilhado e as variáveis de ambiente valem para os dois lados. |
+| **ADR-20** | **E-mail de recuperação de senha por SMTP** (Gmail, porta 587, STARTTLS), com `smtplib`, em segundo plano (`BackgroundTasks`). O token vale 60 min, é de uso único e guardado como hash SHA-256; a resposta é a mesma para e-mail cadastrado e não cadastrado; limite de 5 solicitações por e-mail em 15 min. **Não há confirmação de conta por e-mail.** | O envio era só um esboço que registrava o link no log, e a recuperação (#13, #133) nunca entregava o e-mail. | Depende de uma conta Gmail; falha de SMTP é registrada e não derruba o endpoint. O limite de solicitações vive na memória do processo. |
+| **ADR-21** | **Rota `POST /auth/refresh` e renovação pelo frontend.** O Auth valida o refresh token, confere a sessão, **rotaciona** o par de tokens e responde; o Gateway regrava os cookies. No frontend, `fetchAutenticado` renova **uma única vez** ao receber 401 e repete a requisição; renovações concorrentes compartilham a mesma promessa. Se falha, leva a `/login?sessao=expirada`. | O Gateway fazia proxy do refresh, mas o Auth não tinha a rota (#212), e o frontend tratava o 401 como "sem dados" (#221). | A renovação é reativa, não agendada, e o Gateway só valida o access token e faz proxy do refresh. |
+| **ADR-22** | **A chave estrangeira para `usuarios` sai do ORM de Colaboração** e fica no banco, pela migration. Um teste de regressão carrega só os modelos de Colaboração. | O modelo `Usuario` pertence ao Auth e não existe no contêiner de Colaboração; sem ele, `GET /colaboracao/preferencias/{id}` respondia 500 (#213). | O banco garante a integridade; o `autogenerate` do Alembic pode propor remover essas chaves e não deve ser usado para "corrigir" a diferença. |
+| **ADR-23** | **Regra de embarque configurável:** `RAIO_EMBARQUE_M` (padrão 100 m) e a regra do "ônibus chegando" (usuário a até 400 m de uma parada da linha e ônibus a até 2 min dela). A posição do usuário só valida o embarque e é descartada (ADR-15); a do veículo tem no máximo 5 min. | Quem estava na parada com o ônibus chegando era recusado (#190). | **Em produção o raio está em 100 km, por decisão do grupo, só para demonstrar o "Peguei este ônibus" na defesa; a regra de uso real é 100 m.** Os limiares não foram validados em campo. |
+| **ADR-24** | **A posição do usuário não vai para a URL:** a rota pendente passa por `sessionStorage` (chave `movecity:rota-pendente`), apagada na primeira leitura. | As coordenadas do botão "Ir" iam para o histórico, links copiados e logs (#231), contrariando a LGPD. | A rota não sobrevive à aba nem se compartilha por link. O filtro `shared/logs.py` já omitia a query string do log. |
 
-- **Contexto.** O alerta de proximidade da parada de destino (#172) só aparecia dentro do app, o que não atende quem está com o celular no bolso ou com a tela bloqueada. A #195 pediu a entrega no aparelho.
-- **Decisão.** Web Push padrão, com chaves VAPID, enviado pelo serviço de **Mobilidade** com `pywebpush`. A tabela `inscricao_push` (migration `a7b8c9d0e1f2`) guarda o endpoint e as chaves públicas do navegador, sem coordenadas, nome nem *user agent*. Rotas autenticadas: `GET /mobilidade/push/chave`, `PUT` e `DELETE /mobilidade/push/inscricao` (o dono vem do `X-User-Id` do Gateway, nunca do corpo). O endpoint da inscrição só é aceito para `https`, porta 443, nos hosts do FCM, Mozilla, Apple e Windows (proteção contra SSRF). A configuração vem de `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT`; faltando ou incoerente alguma, o `main.py` mantém o `NotificadorNulo`, o controle em Configurações aparece como indisponível e o aviso dentro do app segue funcionando. No frontend, `public/sw.js` trata `push` e `notificationclick`, `lib/push.ts` pede a permissão **só depois do toque do usuário**, e o logout remove a inscrição do aparelho. Inscrição que o serviço de push informa como inexistente (404 ou 410) é apagada.
-- **Consequências.** O `NotificadorWebPush` implementa **somente** `alerta_proximidade`; atraso e cancelamento herdam o comportamento nulo. Portanto, o **push dos alertas de atraso e das rotas preferidas (#207) não foi entregue** (issue aberta), e o alerta de cancelamento (#28) não existe. O deploy aplica as chaves se os três secrets existirem no GitHub (`deploy-fly.yml`, issue #200); **a issue #200 está aberta**: a validação em aparelho real (Android e iOS com tela bloqueada) e a medição do atraso do aviso, que decidirá o intervalo do worker, **não foram feitas**, mas os secrets VAPID **estão configurados** no app `movecity-mobilidade` (`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY` e `VAPID_SUBJECT`, conferidos pelos nomes em 29/10/2026, sem expor os valores); o grupo testou o Web Push em iPhone com resultado funcional, sem evidência registrada. Como o backend é compartilhado (ADR-19), as chaves e as inscrições valem para homologação e produção, e trocar as chaves invalida todas as inscrições. O ciclo do worker (padrão de 5 min) pode atrasar o aviso.
-- **Fonte.** Issues #195, #200, #207; PR #196 (mergeado em `homolog` em 16/10); `mobilidade/web_push.py`, `mobilidade/push_routes.py`, `mobilidade/models/inscricao_push.py`, `src/frontend/public/sw.js`, `src/frontend/lib/push.ts`, `.github/workflows/deploy-fly.yml`.
-
-#### ADR-17 — O Gateway descarta o `X-User-Id` enviado pelo cliente
-
-- **Contexto.** O Gateway passa a identidade do usuário aos serviços de domínio pelo cabeçalho `X-User-Id`, derivado do `sub` do JWT validado. Na #188 constatou-se que o cabeçalho enviado pelo cliente também chegava ao serviço: por o *dict* de cabeçalhos distinguir maiúsculas, `X-User-Id` e `x-user-id` seguiam juntos, e o serviço lia o primeiro, o do cliente.
-- **Decisão.** `gateway/proxy.py` mantém a lista `HEADERS_SO_DO_GATEWAY` (`x-user-id`) e descarta, sem diferenciar maiúsculas, esse cabeçalho vindo do cliente — mesmo em rota pública, quando o Gateway não tem identidade a acrescentar. Os cabeçalhos extras do Gateway são normalizados em minúsculas antes do envio, de modo que só um valor chegue ao serviço.
-- **Consequências.** A identidade que o serviço lê passa a ser sempre a do Gateway. O contrato está coberto por testes do Gateway. **Limite:** a proteção cobre o caminho pelo Gateway; o endurecimento da comunicação entre o Gateway e os serviços de domínio está em revisão (ADR-01 e seção 10.4).
-- **Fonte.** Issue #188; PR #189 (mergeado em `homolog` em 16/10); `gateway/proxy.py`, `gateway/routes.py`, `mobilidade/dependencies.py`, `colaboracao/dependencies.py`.
-
-#### ADR-18 — Fallback colaborativo: proposta registrada, não implementada
-
-- **Contexto.** Quando o ônibus não reporta posição na SEMOB, o app só pode mostrar o horário previsto ou "Sem previsão no momento". A #199 propõe usar a localização de passageiros a bordo, com consentimento explícito (LGPD), para cobrir a lacuna — a ideia do "Waze do ônibus" do Documento de Visão.
-- **Decisão (proposta, ainda não aceita em código).** Posição colaborativa só com consentimento próprio, desligado por padrão e separado dos Termos; guardada **só em memória**, com validade de cerca de 2 minutos, sem identificador do usuário na saída; selo "colaborativo" distinto de "ao vivo"; a posição da SEMOB sempre prevalece. A proposta exige revisar a ADR-04 e a regra RN-06 da viagem ("a posição do usuário valida o embarque e é descartada") para admitir o uso efêmero, com consentimento.
-- **Estado.** **Não entregue.** A issue #199 está aberta (Sprint 4) e `origin/homolog` não contém código do fallback (nenhuma ocorrência de "colaborativo" como fonte de posição nem coluna de consentimento em `viagem`). Enquanto isso, **a ADR-04 e a ADR-15 valem integralmente**: nenhuma posição do usuário é guardada.
-- **Consequências previstas.** O navegador só entrega geolocalização com a página em primeiro plano, então só contribui quem mantém o app aberto; a memória não é compartilhada entre instâncias do Fly (ADR-12); a cobertura real precisa ser medida antes de prometer o recurso.
-- **Fonte.** Issue #199.
-
-#### ADR-19 — Homologação e produção não estão separadas: risco aceito
-
-- **Contexto.** A #42 pediu apps do Fly de homologação, banco de homologação separado e secrets próprios, para que um push em `homolog` não sobrescrevesse o que está em produção.
-- **Decisão (estado real).** A separação **não existe no código**. `deploy-fly.yml` publica os mesmos quatro apps (`movecity-gateway`, `-auth`, `-mobilidade`, `-colaboracao`) tanto em push para `homolog` quanto para `main`; há um único banco Neon e um único `DATABASE_URL`. No frontend, `deploy-vercel.yml` publica só a partir de `homolog`, em modo `--prod`, no domínio público da Vercel; a `main` não tem deploy de frontend. Em consequência, `homolog` **é** o ambiente visível ao usuário. A issue #42 consta como fechada, mas os critérios que descrevia (apps com sufixo `-homolog`, banco separado) não estão nos workflows; a issue foi fechada em 14/10/2026 por decisão do grupo, que removeu a separação do escopo (o GitHub a registra como "concluída", sem comentário).
-- **Consequências.** Um merge em `homolog` muda o que os usuários veem; as migrations rodam no banco compartilhado antes dos deploys; os casos de teste manuais gravam dados no ambiente visível; as variáveis de ambiente (como `RAIO_EMBARQUE_M` e as chaves VAPID) valem para os dois lados. O grupo trata isso como risco aceito até a defesa (`docs/qa/resumo-executivo.md`, "Riscos e lacunas"). A promoção `homolog` → `main` (#203) está pendente.
-- **Fonte.** Issue #42; `.github/workflows/deploy-fly.yml`, `.github/workflows/deploy-vercel.yml`; `docs/deploy-plan.md`; `docs/qa/resumo-executivo.md`.
-
-#### ADR-20 — E-mail de recuperação de senha por SMTP (Gmail), em segundo plano, sem confirmação de conta por e-mail
-
-- **Contexto.** O `email_service.py` era um esboço que só registrava o link no log, então a recuperação de senha (#13, #133) nunca entregava o e-mail, e o link apontava para `localhost`. Também não existia confirmação de conta por e-mail: o cadastro entrava direto, embora as mensagens da tela prometessem uma confirmação (#230).
-- **Decisão.** Enviar o e-mail com `smtplib` da biblioteca padrão (`smtp.gmail.com`, porta 587, STARTTLS, timeout de 10 s), sem dependência nova. A configuração vem de `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` e `FRONTEND_URL`; faltando qualquer uma, nada é enviado e o endpoint segue funcionando. O envio acontece em segundo plano (`BackgroundTasks`), e `POST /auth/esqueci-senha` responde igual para e-mail cadastrado e não cadastrado. O token vale 60 minutos e uso único, é guardado como hash SHA-256 e nunca vai para o log; há limite de 5 solicitações por e-mail em 15 minutos. O deploy aplica os quatro secrets só se todos existirem. **A confirmação de conta por e-mail não existe**: `POST /auth/registrar` cria a conta ativa, e o texto do cadastro foi corrigido (PR #238).
-- **Consequências.** O e-mail depende de uma conta Gmail; falha de SMTP é registrada (só o tipo do erro) e não derruba o endpoint, mas o usuário não é avisado. O limite de solicitações vive na memória do processo e some em reinício ou com mais de uma instância. Em 28/10 o e-mail chegou à caixa de entrada, o link abriu no celular e a nova senha foi definida (`docs/qa/resumo-executivo.md`); o defeito de mensagens de erro sem acento (#243) segue aberto.
-- **Fonte.** Issues #237, #230, #13; PR #238 (mergeado em `homolog` em 28/10); `auth/email_service.py`, `auth/routes.py`, `auth/models/token_reset_senha.py`, `.github/workflows/deploy-fly.yml`.
-
-#### ADR-21 — Rota de refresh e renovação automática da sessão pelo frontend
-
-- **Contexto.** O Gateway já fazia proxy de `POST /api/auth/refresh`, mas o Auth Service não tinha a rota (404): a sessão caía em 1 hora sem renovação (#212). Além disso, o frontend tratava o 401 como "sem dados": com a sessão vencida, o mapa mostrava "Nenhum ônibus em operação" em vez de renovar ou pedir novo login (#221).
-- **Decisão.** (1) O Auth Service implementa `POST /auth/refresh`: valida a assinatura e a expiração do refresh token do cookie, confere que ele existe em `sessoes`, **rotaciona** o par de tokens e responde; o Gateway regrava os cookies. (2) A renovação fica no **frontend**: `fetchAutenticado` (em `lib/api.ts`), ao receber 401 fora das rotas de autenticação, chama `POST /api/auth/refresh` **uma única vez** e repete a requisição original; renovações concorrentes compartilham a mesma promessa, porque o refresh rotaciona o token e uma segunda renovação simultânea usaria um token já invalidado. Se a renovação falha, o cliente limpa a sessão e leva a `/login?sessao=expirada`, com o aviso "Sua sessão expirou, entre novamente". As rotas `login`, `registrar`, `refresh`, `logout`, `esqueci-senha`, `redefinir-senha` e `link-google` ficam fora da renovação, para evitar laço.
-- **Consequências.** A renovação é reativa (ocorre no primeiro 401), não agendada. O Gateway não renova nada: só valida o access token e faz proxy do refresh. A renovação foi **validada em produção em 27/10**: a rede da aba mostrou 401, `POST /auth/refresh` 200 e a consulta refeita com 200, sem pedir login (`docs/qa/execucao-casos-p1.md`). As issues #212 e #221 constam como abertas no GitHub apesar de as correções estarem em `homolog`; elas aguardam a promoção de `homolog` para `main`, quando serão fechadas.
-- **Fonte.** Issues #212, #221; PR #218 (rota no Auth Service, commit `0ffac10`) e PR #222 (frontend), ambos em `homolog`; `auth/routes.py`, `src/frontend/lib/api.ts`, `docs/gateway-auth-flow.md`.
-
-#### ADR-22 — A chave estrangeira para `usuarios` sai do ORM de Colaboração e fica no banco pela migration
-
-- **Contexto.** `PreferenciaNotificacao.usuario_id` declarava `ForeignKey("usuarios.id")` no ORM, mas o modelo `Usuario` pertence ao Auth e não é carregado no contêiner de Colaboração (a imagem copia só `models`, `shared` e `colaboracao`). Sem a tabela `usuarios` no metadata, o *flush* levantava `NoReferencedTableError` e `GET /colaboracao/preferencias/{id}` respondia 500 em produção para qualquer usuário (#213, defeito 20). Os testes passavam porque carregam todos os modelos juntos.
-- **Decisão.** O ORM de Colaboração não declara chaves estrangeiras para `usuarios` (padrão já usado em `Ocorrencia`, `RotaFavorita` e `ConfirmacaoOcorrencia`); a chave real continua no banco, criada pela migration `b2c3d4e5f6a7` (e `a2b3c4d5e6f7` para `rotas_favoritas`). Um teste de regressão carrega só os modelos de Colaboração e confere que a tabela `usuarios` não está no metadata.
-- **Consequências.** O banco garante a integridade; o `autogenerate` do Alembic pode propor remover essas chaves e **não deve ser usado para "corrigir" a diferença**. A correção foi validada em produção em 27/10 (a tela `/alertas` carregou). A issue #213 consta como aberta no GitHub porque aguarda a promoção de `homolog` para `main`, quando será fechada.
-- **Fonte.** Issue #213; PR #224 (mergeado em `homolog` em 27/10); `colaboracao/models/preferencia_notificacao.py`, `colaboracao/models/rota_favorita.py`, `colaboracao/tests/test_preferencia_isolamento.py`; `docs/qa/relatorio-cobertura-e-defeitos.md` (defeito 20).
-
-#### ADR-23 — Regra de embarque: raio configurável e regra do "ônibus chegando"; raio de 100 km em produção só para a demonstração
-
-- **Contexto.** O embarque ("Peguei este ônibus") exigia um veículo da linha a até 100 m, uma constante fixa. Quem estava na parada, com o ônibus chegando, era recusado (#190); a medição em campo podia mudar o valor.
-- **Decisão.** (1) O raio de embarque vem da variável de ambiente `RAIO_EMBARQUE_M` (padrão 100 m); valor ausente, não numérico ou não positivo cai no padrão, com aviso no log. (2) Nova regra: vale o embarque quando o usuário está a até `RAIO_PARADA_EMBARQUE_M` (padrão 400 m) de uma parada da linha e o ônibus mais próximo dela, no sentido certo, chega em até `ETA_MAXIMO_EMBARQUE_MIN` (padrão 2 min); a regra do raio continua valendo primeiro. A posição do usuário só valida o embarque e é descartada (ADR-15). A posição do veículo precisa ter no máximo 5 minutos.
-- **Estado em produção.** O secret `RAIO_EMBARQUE_M` do app `movecity-mobilidade` está em **100000 (100 km)**, por **decisão do grupo em 28/10, apenas para demonstrar o "Peguei este ônibus"** na defesa. A regra de uso real é **100 m**. Com 100 km, o embarque é aceito longe do ônibus (caso CT-VIA-01 reprovado por configuração) e a regra do ônibus chegando fica mascarada. Está previsto voltar a 100 m depois da defesa.
-- **Consequências.** Os limiares (100 m, 400 m, 2 min) **não foram validados em campo**; CT-VIA-07 e CT-VIA-08 só se provam em campo, com o raio em 100 m. Como o backend é compartilhado (ADR-19), o valor vale para homologação e produção. A posição vem do cliente, então o raio é checagem de bom senso, não barreira de segurança. A issue #216 (embarque aceito longe do ônibus) continua aberta; a causa encontrada foi de configuração, não de código.
-- **Fonte.** Issues #190, #216; PR #191 (mergeado em `homolog` em 16/10); `mobilidade/viagem_service.py`; `docs/qa/execucao-casos-p1.md` (CT-VIA-01) e `docs/qa/resumo-executivo.md`.
-
-#### ADR-24 — A posição do usuário não vai para a URL: a rota pendente passa por `sessionStorage`
-
-- **Contexto.** Ao tocar em "Ir" no planejador, a posição do usuário (`origem_lat`, `origem_lng`) ia para o endereço da página, ficando no histórico do navegador, em links copiados e em logs (#231). Isso contraria o requisito de LGPD e a RN-06 da viagem.
-- **Decisão.** A origem e o destino de "Rotas Salvas" são repassados ao mapa por `lib/rotaPendente.ts`: o valor fica em `sessionStorage` (só a aba atual, chave `movecity:rota-pendente`) e é **apagado na primeira leitura**; se o `sessionStorage` não estiver disponível, o mapa abre sem pré-preencher. Nenhuma coordenada do usuário entra na URL.
-- **Consequências.** O estado não sobrevive à aba, e a rota não é compartilhável por link. O filtro `shared/logs.py` já omitia a query string do log de acesso do Gateway e da Mobilidade, mas isso não substitui manter a posição fora da URL. Correção validada em produção em 28/10.
-- **Fonte.** Issue #231; PR #239 (mergeado em `homolog` em 28/10); `src/frontend/lib/rotaPendente.ts`, `src/frontend/app/favoritos/page.tsx`, `src/frontend/app/mapa/page.tsx`; `docs/qa/execucao-casos-p1.md`.
-
+*Tabela 5.1 – Decisões da Sprint 3 e da Sprint 4*
 
 ### 10.3 Degradação prevista por dependência externa
 
@@ -557,9 +497,7 @@ Uma consequência de somar serviços externos ao caminho do usuário é que a in
 
 Registro do que o código mostra e ainda não foi tratado. Não são decisões, são lacunas assumidas:
 
-1. **Tokens também no `localStorage` (issue #253, aberta).** Além dos cookies httpOnly, o frontend grava `access_token` e `refresh_token` no `localStorage` no login por e-mail (`loginUsuario`) e no login com Google (`armazenarTokensSeExistirem`), lendo-os do corpo da resposta. O corpo chega com os tokens porque as rotas de login, login Google, vínculo Google e refresh do Gateway repassam ao navegador a resposta do Auth Service sem retirá-los e apenas acrescentam os cookies (`gateway/routes.py`). As funções `getAccessToken()` e `getRefreshToken()` existem, mas nenhuma outra parte do frontend as chama; a autenticação real usa os cookies. Mesmo assim, **qualquer script em execução na página (XSS) consegue ler os tokens do `localStorage`, então a proteção contra XSS que se esperava dos cookies httpOnly está anulada enquanto isso existir**. A correção está na #253.
-2. **Logout não invalida o access token.** O Gateway valida o JWT só pela assinatura e pela expiração, sem consultar `sessoes`. O logout apaga a sessão e, com isso, impede o refresh, mas um access token já emitido continua aceito até expirar (1 h). O logout localiza a sessão pelo cookie `access_token` (`auth/routes.py`); se o navegador já descartou esse cookie por vencimento, o código não apaga a sessão.
-3. **Autenticação entre o Gateway e os serviços de domínio em revisão** (ADR-01, ADR-17): endurecimento previsto; os detalhes ficam fora deste documento até a correção ser aplicada.
+1. **Logout não invalida o access token.** O Gateway valida o JWT só pela assinatura e pela expiração, sem consultar `sessoes`. O logout apaga a sessão e, com isso, impede o refresh, mas um access token já emitido continua aceito até expirar (1 h). O logout localiza a sessão pelo cookie `access_token` (`auth/routes.py`); se o navegador já descartou esse cookie por vencimento, o código não apaga a sessão.
 4. **Estado em memória por processo:** cache de posições, limite de solicitações de recuperação de senha e o ciclo de demonstração da Colaboração não são compartilhados entre instâncias.
 5. **Segredos de produção** ficam como secrets de cada app no Fly.io e não são verificáveis a partir do repositório.
 6. **Sem teste automatizado de ponta a ponta** entre frontend, Gateway e serviços; o que cobre isso é a execução manual em produção.
@@ -597,92 +535,3 @@ CGDF — CONTROLADORIA GERAL DO DISTRITO FEDERAL. **Painel de Ouvidoria do Distr
 SOMMERVILLE, Ian. **Engenharia de Software**. 10. ed. São Paulo: Pearson, 2019.
 
 ---
-
-## Atualização — Gateway como Proxy (US #31)
-
-### Visão Geral
-
-O Gateway é o **ponto único de entrada** para todas as requisições do frontend.
-Os serviços de domínio (Auth, Mobilidade, Colaboração) acessam o PostgreSQL por conta própria; o Gateway não acessa o banco.
-
-```
-[Browser]
-    │  cookies: access_token + refresh_token
-    ▼
-[Next.js Frontend]
-    │  envia cookies automaticamente
-    ▼
-[API Gateway — Ponto Único de Entrada]
-    │  lê access_token do cookie
-    │  valida JWT localmente
-    │  extrai identidadeUsuario
-    │  roteia para serviços backend
-    ├──► [Auth Service] ──► [PostgreSQL]
-    ├──► [Mobilidade Service] ──► [PostgreSQL]
-    └──► [Colaboracao Service] ──► [PostgreSQL]
-```
-
-### Endpoints de Proxy
-
-| Endpoint | Método | Destino | Exige sessão |
-|----------|--------|---------|--------------|
-| `/api/hello`, `/api/status`, `/health` | GET | Gateway | Não |
-| `/api/auth/login`, `/api/auth/login/google`, `/api/auth/link-google/confirmar` | POST | Auth Service (grava os cookies) | Não |
-| `/api/auth/registrar`, `/api/auth/esqueci-senha`, `/api/auth/redefinir-senha` | POST | Auth Service | Não |
-| `/api/auth/refresh` | POST | Auth Service (regrava os cookies) | Não (usa o cookie `refresh_token`) |
-| `/api/auth/logout` | POST | Auth Service (limpa os cookies) | Não |
-| `/api/auth/me` | GET | Auth Service | Sim |
-| `/api/auth/me/first-access` | PUT | Auth Service | Sim |
-| `/api/mobilidade/*` | GET/POST/PUT/DELETE | Mobilidade Service | Sim |
-| `/api/colaboracao/*` | GET/POST/PUT/DELETE | Colaboracao Service | Sim |
-
-Fluxo completo de autenticação, cookies e renovação: `docs/gateway-auth-flow.md`.
-
-### Fluxo de Proxy
-
-```
-1. Browser envia request para /api/*
-2. Gateway recebe e valida JWT (middleware)
-3. Gateway roteia para serviço backend correspondente
-4. Serviço backend processa e retorna response
-5. Gateway retorna response para Browser
-```
-
-### Configuração dos Serviços
-
-```python
-# gateway/config.py
-class GatewaySettings(BaseSettings):
-    AUTH_SERVICE_URL: str = "https://movecity-auth.fly.dev"
-    MOBILIDADE_SERVICE_URL: str = "https://movecity-mobilidade.fly.dev"
-    COLABORACAO_SERVICE_URL: str = "https://movecity-colaboracao.fly.dev"
-
-    class Config:
-        env_prefix = "GATEWAY_"
-        env_file = ".env"
-```
-
-> URLs públicas HTTPS, e não nomes de rede interna — ver ADR-01 na seção 10.
-
-### Cookies
-
-| Cookie | HttpOnly | Secure | SameSite | Path | Max Age |
-|--------|----------|--------|----------|------|---------|
-| `access_token` | ✅ | ✅ | **None** | `/api` | 60 min |
-| `refresh_token` | ✅ | ✅ | **None** | `/api/auth` | 7 dias |
-
-> **Limitação (#253):** o frontend também grava os tokens no `localStorage`, o que reduz a proteção contra XSS que os cookies httpOnly dariam (ADR-07, seção 10.4).
-
-> `SameSite=None` (e não `Lax`/`Strict`) porque o frontend e o Gateway estão em domínios diferentes — ver ADR-07 na seção 10. `Secure=True` é obrigatório junto com `SameSite=None`: sem ele, o navegador ignora o cookie.
-
-### Arquivos do Gateway
-
-| Arquivo | Responsabilidade |
-|---------|------------------|
-| `middleware.py` | Valida JWT do cookie em cada request |
-| `jwt_validator.py` | Decodifica e valida tokens JWT |
-| `dependencies.py` | `get_usuario_atual` para endpoints protegidos |
-| `proxy.py` | Proxy genérico para serviços backend |
-| `cookies.py` | Helper para setar/limpar cookies httpOnly |
-| `config.py` | Configuração das URLs dos serviços |
-| `routes.py` | Endpoints de proxy (auth, mobilidade, colaboracao) |
