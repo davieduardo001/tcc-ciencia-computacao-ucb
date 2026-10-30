@@ -660,5 +660,6 @@ def main(tipo, template, md_path, saida_path, hoje='28/out/26', versao='3.0'):
 if __name__ == '__main__':
     tipo, template, md_path, saida = sys.argv[1:5]
     hoje = sys.argv[5] if len(sys.argv) > 5 else '28/out/26'
+    versao = sys.argv[6] if len(sys.argv) > 6 else '3.0'
     MD_BASE = os.path.dirname(os.path.abspath(md_path))
-    main(tipo, template, md_path, saida, hoje=hoje)
+    main(tipo, template, md_path, saida, hoje=hoje, versao=versao)
