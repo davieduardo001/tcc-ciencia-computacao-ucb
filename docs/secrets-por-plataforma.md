@@ -105,15 +105,15 @@ EOF
 
 Guarde a privada no gerenciador de senhas do time. **Gere o par uma vez só:** trocar as chaves depois invalida todas as inscrições existentes, e cada pessoa precisa ativar de novo em Configurações.
 
-**2. Configurar no Fly, manualmente** (o `set` reinicia as máquinas do serviço; faça com o par já gerado):
+**2. Cadastrar no GitHub** (o pipeline aplica no Fly; não use `fly secrets set` na mão). Sem imprimir o valor, direto do gerador:
 
 ```bash
-fly secrets set \
-  VAPID_PRIVATE_KEY="<privada>" \
-  VAPID_PUBLIC_KEY="<publica>" \
-  VAPID_SUBJECT="mailto:contato-do-time@exemplo.com" \
-  --app movecity-mobilidade
+gh secret set VAPID_PRIVATE_KEY   # cole a privada no prompt
+gh secret set VAPID_PUBLIC_KEY
+gh secret set VAPID_SUBJECT       # mailto:contato-do-time@exemplo.com
 ```
+
+O job `deploy-mobilidade` do `deploy-fly.yml` roda `flyctl secrets set --stage` com os três antes do `flyctl deploy`, então as chaves entram no mesmo release. O passo só roda se **os três** secrets existirem; se faltar algum, ele é pulado, o deploy conclui e o push segue desligado. Os valores não aparecem nos logs (ficam em variáveis de ambiente mascaradas e a saída do `flyctl` é descartada). Para trocar o contato ou as chaves, atualize o secret no GitHub e dispare o workflow (`workflow_dispatch`).
 
 **3. Validar:**
 1. Logado no app, abra `GET /api/mobilidade/push/chave` (ou a tela de Configurações): deve responder `"disponivel": true` e a chave pública.
@@ -127,6 +127,26 @@ fly secrets set \
 - **iPhone:** só recebe push com o Movecity instalado na tela inicial (PWA) e iOS 16.4 ou superior. A tela de Configurações explica isso.
 - **Atraso do aviso.** O worker verifica a cada 5 min por padrão. Quem escolhe avisar com 5 min de antecedência recebe, em média, 2,5 min antes. Se isso se confirmar em campo, defina `WORKER_PROXIMIDADE_INTERVAL_SECONDS=60`: o feed de posições é cacheado por 20 s, então não adianta ir abaixo disso. O padrão não foi alterado sem medição.
 - **LGPD.** A tabela `inscricao_push` guarda só endpoint, chaves da inscrição e dono. A mensagem não leva coordenadas nem identificadores. A inscrição é apagada quando a pessoa desativa, sai da conta ou o serviço de push informa que ela expirou.
+
+### E-mail de recuperação de senha (SMTP, issue #237)
+
+O serviço de **autenticação** (app `movecity-auth` no Fly) envia o e-mail de "Esqueci minha senha" por SMTP (`smtp.gmail.com`, porta 587, STARTTLS). São quatro secrets do GitHub, repassados ao Fly pelo job `deploy-auth` do `deploy-fly.yml`:
+
+| Secret | Secret? | Para que serve |
+|--------|---------|----------------|
+| `SMTP_USER` | Não (mas não publique) | Conta Gmail usada para autenticar no SMTP. |
+| `SMTP_PASSWORD` | **Sim** | **Senha de app** do Google (16 caracteres) dessa conta. Nunca a senha normal da conta. |
+| `SMTP_FROM` | Não | Remetente exibido, por exemplo `Movecity <conta@gmail.com>`. |
+| `FRONTEND_URL` | Não | URL do frontend em produção, sem barra final (`https://movecity-frontend.vercel.app`). Compõe o link `FRONTEND_URL/redefinir-senha?token=...`. |
+
+**Como gerar a senha de app:**
+1. Na conta Google que enviará os e-mails, ative a **verificação em duas etapas** (necessária para criar senhas de app).
+2. Acesse https://myaccount.google.com/apppasswords, dê um nome (por exemplo `movecity`) e gere a senha.
+3. Copie a senha na hora: o Google não a mostra de novo.
+
+**Como cadastrar:** cada pessoa digita o valor no próprio terminal, com `gh secret set SMTP_PASSWORD` (o `gh` pede o valor de forma oculta). Repita para `SMTP_USER`, `SMTP_FROM` e `FRONTEND_URL`. O valor da senha **nunca** vai para chat, issue, PR, arquivo ou histórico do shell.
+
+**Comportamento:** o passo do deploy só roda se **os quatro** secrets existirem; se faltar algum, é pulado e o serviço apenas registra no log que o e-mail não foi enviado (o endpoint continua respondendo normalmente). Os valores não aparecem nos logs. O link do e-mail expira em 60 minutos. Para trocar a senha de app, gere outra, atualize o secret e dispare o workflow (`workflow_dispatch`).
 
 **URLs dos apps:** `https://movecity-gateway.fly.dev` (única que o navegador acessa), `https://movecity-auth.fly.dev`, `https://movecity-mobilidade.fly.dev`, `https://movecity-colaboracao.fly.dev`
 

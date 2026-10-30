@@ -87,11 +87,21 @@ function arrastar(alca: HTMLElement, dy: number) {
   );
 }
 
-describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
-  it("começa aberta", () => {
+describe("PlanejadorViagem — folha de três alturas (issues #132 e #217)", () => {
+  beforeEach(() => {
+    mockViagem = null;
+    // Sem relógio real, o gesto sintético não gera velocidade.
+    jest.spyOn(performance, "now").mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("começa na altura média", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
 
-    expect(container.querySelector(".plan-painel")).not.toHaveClass("recolhida");
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-medio");
     expect(screen.getByRole("button", { name: /Recolher opções/ })).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -103,19 +113,19 @@ describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
     const painel = container.querySelector(".plan-painel")!;
 
     fireEvent.click(screen.getByRole("button", { name: /Recolher opções/ }));
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
 
     fireEvent.click(screen.getByRole("button", { name: /Abrir opções/ }));
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-medio");
   });
 
-  it("arrastar para baixo além do limiar recolhe a folha", () => {
+  it("arrastar para baixo além do limiar leva ao mínimo e fica lá", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
     const painel = container.querySelector(".plan-painel")!;
 
-    arrastar(container.querySelector(".plan-alca") as HTMLElement, 120);
+    arrastar(container.querySelector(".plan-alca") as HTMLElement, 700);
 
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
   });
 
   it("arrasto curto não muda o estado", () => {
@@ -124,20 +134,53 @@ describe("PlanejadorViagem — folha arrastável (issue #132)", () => {
 
     arrastar(container.querySelector(".plan-alca") as HTMLElement, 20);
 
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-medio");
   });
 
-  it("arrastar para cima reabre a folha recolhida", () => {
+  it("arrastar para cima, a partir do mínimo, vai ao máximo e permanece", () => {
     const { container } = render(<PlanejadorViagem {...props} />);
     const painel = container.querySelector(".plan-painel")!;
     const alca = container.querySelector(".plan-alca") as HTMLElement;
 
     fireEvent.click(screen.getByRole("button", { name: /Recolher opções/ }));
-    expect(painel).toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-minimo");
 
-    arrastar(alca, -120);
+    arrastar(alca, -900);
 
-    expect(painel).not.toHaveClass("recolhida");
+    expect(painel).toHaveClass("snap-maximo");
+  });
+
+  it("ao embarcar a folha vai para o mínimo", () => {
+    const { container, rerender } = render(<PlanejadorViagem {...props} />);
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-medio");
+
+    mockViagem = { numeroLinha: "0.110" };
+    rerender(<PlanejadorViagem {...props} />);
+
+    expect(container.querySelector(".plan-painel")).toHaveClass("snap-minimo");
+  });
+
+  it("em viagem deixa Cheguei e Reportar ocorrência em foco", () => {
+    mockViagem = { numeroLinha: "0.110" };
+    render(<PlanejadorViagem {...props} />);
+
+    expect(screen.getByRole("button", { name: /Cheguei/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Reportar ocorrência/ })).toHaveAttribute(
+      "href",
+      "/ocorrencias/reportar?linha=0.110"
+    );
+  });
+
+  it("sem viagem não mostra o rodapé", () => {
+    render(<PlanejadorViagem {...props} />);
+
+    expect(screen.queryByRole("button", { name: /Cheguei/ })).not.toBeInTheDocument();
+  });
+
+  it("oculta fica montada mas escondida", () => {
+    const { container } = render(<PlanejadorViagem {...props} oculta />);
+
+    expect(container.querySelector(".plan-painel")).toHaveAttribute("hidden");
   });
 });
 
@@ -354,57 +397,90 @@ describe("PlanejadorViagem — botão de favorito (US #25)", () => {
 // Card #179 (④a) — rótulos legíveis e estados do resultado
 // ---------------------------------------------------------------------------
 
-function opcaoComParadas(embarqueNome: string, desembarqueNome: string) {
+function opcaoComPontos(
+  embarque: { nome: string; codigo?: string | null; metros?: number },
+  desembarque: { nome: string; codigo?: string | null; metros?: number }
+) {
   const perna = pernaMockCompleta("0.110");
-  perna.embarque.parada_nome = embarqueNome;
-  perna.desembarque.parada_nome = desembarqueNome;
+  perna.embarque = {
+    ...perna.embarque,
+    parada_nome: embarque.nome,
+    parada_codigo: embarque.codigo ?? null,
+    caminhada_metros: embarque.metros ?? 0,
+  } as typeof perna.embarque;
+  perna.desembarque = {
+    ...perna.desembarque,
+    parada_nome: desembarque.nome,
+    parada_codigo: desembarque.codigo ?? null,
+    caminhada_metros: desembarque.metros ?? 0,
+  } as typeof perna.desembarque;
   return { ...opcaoMock, pernas: [perna] };
 }
 
-describe("PlanejadorViagem — rótulo de parada sem nome (card #179)", () => {
-  it("parada sem nome na fonte vira 'Parada sem nome', e não coordenada crua", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("", "")]}
-        opcaoSelecionada={0}
-      />
+function renderizarComPontos(opcao: ReturnType<typeof opcaoComPontos>) {
+  render(
+    <PlanejadorViagem
+      {...props}
+      origem={origemMock}
+      destino={destinoMock}
+      opcoes={[opcao]}
+      opcaoSelecionada={0}
+    />
+  );
+}
+
+describe("PlanejadorViagem — referência da parada sem nome (card #179, #232)", () => {
+  it("sem nome, com código e distância: mostra código e metros, não 'Parada sem nome'", () => {
+    renderizarComPontos(
+      opcaoComPontos(
+        { nome: "", codigo: "PR-12243", metros: 14 },
+        { nome: "", codigo: "PR-99", metros: 30 }
+      )
     );
 
-    expect(screen.getAllByText("Parada sem nome")).toHaveLength(2);
-    expect(screen.queryByText(/Ponto em/)).not.toBeInTheDocument();
+    expect(screen.getByText("Parada PR-12243, a 14 m de você")).toBeInTheDocument();
+    expect(screen.getByText("Parada PR-99, a 30 m do destino")).toBeInTheDocument();
+    expect(screen.queryByText("Parada sem nome")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/-15.8300|-48.0400/);
   });
 
-  it("a coordenada continua disponível no title, pra quem precisar conferir", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("", "Parada B")]}
-        opcaoSelecionada={0}
-      />
+  it("sem nome e sem código: usa só a distância de caminhada", () => {
+    renderizarComPontos(opcaoComPontos({ nome: "", metros: 14 }, { nome: "Parada B" }));
+
+    expect(screen.getByText("Parada a 14 m de você")).toBeInTheDocument();
+  });
+
+  it("sem nome, só com código: mostra o código", () => {
+    renderizarComPontos(
+      opcaoComPontos({ nome: "", codigo: "PR-12243" }, { nome: "Parada B" })
     );
 
-    expect(screen.getByText("Parada sem nome")).toHaveAttribute("title", "-15.83000, -48.04000");
+    expect(screen.getByText("Parada PR-12243")).toBeInTheDocument();
+  });
+
+  it("sem nome, sem código e sem distância: cai em 'Parada sem nome', sem inventar nome", () => {
+    renderizarComPontos(opcaoComPontos({ nome: "" }, { nome: "" }));
+
+    expect(screen.getAllByText("Parada sem nome")).toHaveLength(2);
+    expect(screen.queryByText(/Ponto em/)).not.toBeInTheDocument();
+  });
+
+  it("o texto de acessibilidade traz a referência, e a coordenada só como complemento", () => {
+    renderizarComPontos(
+      opcaoComPontos({ nome: "", codigo: "PR-12243", metros: 14 }, { nome: "Parada B" })
+    );
+
+    expect(screen.getByText("Parada PR-12243, a 14 m de você")).toHaveAttribute(
+      "title",
+      "Parada PR-12243, a 14 m de você (coordenadas -15.83000, -48.04000)"
+    );
   });
 
   it("parada com nome mostra o nome, sem title", () => {
-    render(
-      <PlanejadorViagem
-        {...props}
-        origem={origemMock}
-        destino={destinoMock}
-        opcoes={[opcaoComParadas("W3 Sul 502", "Rodoviária")]}
-        opcaoSelecionada={0}
-      />
-    );
+    renderizarComPontos(opcaoComPontos({ nome: "W3 Sul 502", metros: 14 }, { nome: "Rodoviária" }));
 
     expect(screen.getByText("W3 Sul 502")).not.toHaveAttribute("title");
-    expect(screen.queryByText("Parada sem nome")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Parada sem nome|a 14 m de você/)).not.toBeInTheDocument();
   });
 });
 

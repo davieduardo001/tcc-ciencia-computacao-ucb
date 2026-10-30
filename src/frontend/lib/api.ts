@@ -1,3 +1,5 @@
+import { caminhoAtual, irPara } from "./navegacao";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ServiceStatus {
@@ -302,6 +304,96 @@ export function clearTokens(): void {
   localStorage.removeItem("refresh_token");
 }
 
+// ---------------------------------------------------------------------------
+// Issue #221 — Renovação transparente da sessão
+// ---------------------------------------------------------------------------
+
+/** A sessão acabou (refresh também falhou) e o usuário já foi mandado ao login. */
+export class SessaoExpiradaError extends Error {
+  constructor() {
+    super("Sua sessão expirou, entre novamente.");
+    this.name = "SessaoExpiradaError";
+  }
+}
+
+export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou, entre novamente";
+export const LOGIN_SESSAO_EXPIRADA = "/login?sessao=expirada";
+
+// Rotas de auth públicas ou que já tratam a própria sessão: um 401 aqui
+// significa "credencial errada" ou "sem refresh", nunca "renove e repita".
+// Sem esta exclusão, um refresh 401 dispararia outro refresh (loop).
+const ROTAS_SEM_RENOVACAO =
+  /\/api\/auth\/(login|registrar|refresh|logout|esqueci-senha|redefinir-senha|link-google)/;
+
+const PAGINAS_PUBLICAS = ["/login", "/cadastro", "/recuperar-senha", "/redefinir-senha"];
+
+// Uma única renovação em andamento. O refresh ROTACIONA o par de tokens:
+// duas renovações concorrentes fariam a segunda usar um refresh_token já
+// invalidado pela primeira e derrubariam a sessão.
+let renovacaoEmAndamento: Promise<boolean> | null = null;
+
+async function renovarSessao(): Promise<boolean> {
+  try {
+    const resposta = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return resposta.ok;
+  } catch {
+    return false;
+  }
+}
+
+function renovarSessaoUmaVez(): Promise<boolean> {
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = renovarSessao().finally(() => {
+      renovacaoEmAndamento = null;
+    });
+  }
+  return renovacaoEmAndamento;
+}
+
+function encerrarSessaoNoCliente(): void {
+  clearTokens();
+  try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
+  const caminho = caminhoAtual();
+  if (PAGINAS_PUBLICAS.some((p) => caminho.startsWith(p))) return;
+  try {
+    irPara(LOGIN_SESSAO_EXPIRADA);
+  } catch { /* best-effort */ }
+}
+
+function urlDe(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+/**
+ * fetch para chamadas autenticadas ao Gateway. Em 401 (fora das rotas de
+ * auth) tenta UMA renovação via POST /api/auth/refresh e repete a
+ * requisição. Se a renovação falhar, limpa a sessão do cliente e manda ao
+ * login com aviso (a menos que `redirecionar: false`), devolvendo a
+ * resposta 401 original — cada chamador decide como reportar.
+ */
+export async function fetchAutenticado(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  opcoes: { redirecionar?: boolean } = {}
+): Promise<Response> {
+  const resposta = await fetch(input, init);
+  if (resposta.status !== 401 || ROTAS_SEM_RENOVACAO.test(urlDe(input))) {
+    return resposta;
+  }
+
+  if (await renovarSessaoUmaVez()) {
+    return fetch(input, init);
+  }
+
+  if (opcoes.redirecionar !== false) encerrarSessaoNoCliente();
+  return resposta;
+}
+
 export interface UsuarioAtual {
   id: string;
   nome: string;
@@ -318,10 +410,11 @@ export interface UsuarioAtual {
  */
 export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
   try {
-    const response = await fetch(`${API_URL}/api/auth/me`, {
-      credentials: "include",
-      cache: "no-store",
-    });
+    const response = await fetchAutenticado(
+      `${API_URL}/api/auth/me`,
+      { credentials: "include", cache: "no-store" },
+      { redirecionar: false }
+    );
 
     if (!response.ok) {
       return null;
@@ -377,7 +470,7 @@ export async function logoutUsuario(): Promise<void> {
  * Usado para pular ou rever o tutorial de onboarding.
  */
 export async function atualizarFirstAccess(firstAccess: boolean): Promise<void> {
-  const response = await fetch(`${API_URL}/api/auth/me/first-access`, {
+  const response = await fetchAutenticado(`${API_URL}/api/auth/me/first-access`, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -424,7 +517,7 @@ export interface LinhaResumo {
  */
 export async function sugerirLinhas(termo: string): Promise<LinhaResumo[]> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/linhas?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -504,7 +597,7 @@ export interface OpcaoViagem {
  */
 export async function buscarLugares(termo: string): Promise<Lugar[]> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/lugares?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -525,7 +618,7 @@ export async function nomearLugar(
   lng: number
 ): Promise<Lugar | null> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/lugares/reverso?lat=${lat}&lng=${lng}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -558,7 +651,7 @@ export async function calcularRotas(
     destino_lng: String(destino.lng),
   });
 
-  const response = await fetch(`${API_URL}/api/mobilidade/rotas?${params}`, {
+  const response = await fetchAutenticado(`${API_URL}/api/mobilidade/rotas?${params}`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -584,7 +677,7 @@ export async function calcularRotas(
 export async function buscarLinha(
   numero: string
 ): Promise<LinhaDetalhada | null> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}`,
     { credentials: "include", cache: "no-store" }
   );
@@ -646,13 +739,16 @@ export async function buscarDetalhesParada(
   lat: number,
   lng: number
 ): Promise<DetalhesParada | null> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/mobilidade/paradas?lat=${lat}&lng=${lng}`,
     { credentials: "include", cache: "no-store" }
   );
 
   if (response.status === 404) {
     return null;
+  }
+  if (response.status === 401) {
+    throw new SessaoExpiradaError();
   }
   if (!response.ok) {
     throw new BuscarParadaError(
@@ -712,7 +808,7 @@ export class BuscarParadasError extends Error {}
 export async function buscarParadas(termo: string): Promise<ResultadoBuscaParada> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/paradas/busca?q=${encodeURIComponent(termo)}`,
       { credentials: "include", cache: "no-store" }
     );
@@ -788,7 +884,7 @@ export async function buscarChegadasParada(
   codigo: string
 ): Promise<ChegadasDaParada | null> {
   try {
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/paradas/${encodeURIComponent(codigo)}/chegadas`,
       { credentials: "include", cache: "no-store" }
     );
@@ -889,7 +985,7 @@ export async function buscarChegadasDaRota(
   pernas: PernaParaChegadas[]
 ): Promise<ChegadasDaRota | null> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/rotas/chegadas`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/rotas/chegadas`, {
       method: "POST",
       credentials: "include",
       cache: "no-store",
@@ -981,10 +1077,13 @@ export async function buscarPosicoesDaLinha(
     const params = coordenadasUsuario
       ? `?lat=${coordenadasUsuario.lat}&lng=${coordenadasUsuario.lng}`
       : "";
-    const response = await fetch(
+    const response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/linhas/${encodeURIComponent(numero)}/posicoes${params}`,
       { credentials: "include", cache: "no-store" }
     );
+    // 401 não é "linha sem ônibus": a sessão acabou (já houve tentativa de
+    // renovação). Sobe o erro para a tela não mostrar um vazio enganoso.
+    if (response.status === 401) throw new SessaoExpiradaError();
     if (!response.ok) return vazio;
 
     const data = await response.json();
@@ -1021,7 +1120,8 @@ export async function buscarPosicoesDaLinha(
       veiculos,
       proximoHorarioPrevisto: data.proximo_horario_previsto ?? null,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof SessaoExpiradaError) throw err;
     return vazio;
   }
 }
@@ -1070,7 +1170,7 @@ export class ReportarOcorrenciaError extends Error {
 export async function reportarOcorrencia(
   dados: OcorrenciaPayload
 ): Promise<OcorrenciaRegistrada> {
-  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/ocorrencias`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -1126,6 +1226,9 @@ export interface OcorrenciaListada {
   contadorConfirmacoes: number;
   criadoEm: string;
   expiraEm: string;
+  /** US #26: true quando o usuário autenticado é o autor desta ocorrência.
+   * Usado para esconder o botão de confirmação (Cenário 2). */
+  ehAutor: boolean;
 }
 
 export class ListarOcorrenciasError extends Error {
@@ -1148,7 +1251,7 @@ export async function listarOcorrencias(linha?: string): Promise<OcorrenciaLista
   const termo = linha?.trim();
   const query = termo ? `?linha=${encodeURIComponent(termo)}` : "";
 
-  const response = await fetch(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/ocorrencias${query}`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -1171,7 +1274,80 @@ export async function listarOcorrencias(linha?: string): Promise<OcorrenciaLista
     contadorConfirmacoes: item.contador_confirmacoes,
     criadoEm: item.criado_em,
     expiraEm: item.expira_em,
+    ehAutor: item.eh_autor ?? false,
   })) as OcorrenciaListada[];
+}
+
+
+// ---------------------------------------------------------------------------
+// US #26 — Confirmar Ocorrência Reportada por Outro Passageiro
+// ---------------------------------------------------------------------------
+
+export interface ConfirmacaoOcorrenciaResponse {
+  ocorrencia_id: string;
+  status: StatusOcorrencia;
+  contador_confirmacoes: number;
+  mensagem: string;
+}
+
+export class ConfirmarOcorrenciaError extends Error {
+  /** HTTP status retornado pelo servidor. */
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * US #26 — Confirma uma ocorrência reportada por outro passageiro.
+ *
+ * Lança `ConfirmarOcorrenciaError` em qualquer falha, com o status HTTP
+ * para que o frontend possa exibir a mensagem correta:
+ *   401 — não autenticado
+ *   403 — autor tentando confirmar a própria ocorrência
+ *   404 — ocorrência não encontrada
+ *   409 — já confirmou esta ocorrência
+ *   422 — ocorrência expirada ou inativa
+ */
+export async function confirmarOcorrencia(
+  ocorrenciaId: string
+): Promise<ConfirmacaoOcorrenciaResponse> {
+  const response = await fetchAutenticado(
+    `${API_URL}/api/colaboracao/ocorrencias/${encodeURIComponent(ocorrenciaId)}/confirmar`,
+    {
+      method: "POST",
+      credentials: "include",
+    }
+  );
+
+  if (response.status === 401) {
+    throw new ConfirmarOcorrenciaError("Faça login para confirmar ocorrências.", 401);
+  }
+  if (response.status === 403) {
+    throw new ConfirmarOcorrenciaError(
+      "Você não pode confirmar uma ocorrência que reportou.",
+      403
+    );
+  }
+  if (response.status === 404) {
+    throw new ConfirmarOcorrenciaError("Ocorrência não encontrada.", 404);
+  }
+  if (response.status === 409) {
+    throw new ConfirmarOcorrenciaError("Você já confirmou esta ocorrência.", 409);
+  }
+  if (response.status === 422) {
+    throw new ConfirmarOcorrenciaError("Este alerta não está mais ativo.", 422);
+  }
+  if (!response.ok) {
+    throw new ConfirmarOcorrenciaError(
+      "Não foi possível confirmar a ocorrência. Tente novamente.",
+      response.status
+    );
+  }
+
+  return response.json();
 }
 
 
@@ -1254,7 +1430,7 @@ export function limparCacheFavoritos(): void {
 export async function salvarFavorito(
   dados: RotaFavoritaPayload
 ): Promise<RotaFavorita> {
-  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/favoritos`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -1303,7 +1479,7 @@ export async function salvarFavorito(
  * não é por usuário — mostrá-lo exporia as rotas de quem usou o aparelho antes.
  */
 export async function listarFavoritosRemoto(): Promise<RotaFavorita[]> {
-  const response = await fetch(`${API_URL}/api/colaboracao/favoritos`, {
+  const response = await fetchAutenticado(`${API_URL}/api/colaboracao/favoritos`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -1339,7 +1515,7 @@ export async function listarFavoritos(): Promise<RotaFavorita[]> {
  * Lança erro em caso de falha (403, 404, rede).
  */
 export async function removerFavorito(id: string): Promise<void> {
-  const response = await fetch(
+  const response = await fetchAutenticado(
     `${API_URL}/api/colaboracao/favoritos/${encodeURIComponent(id)}`,
     {
       method: "DELETE",
@@ -1446,7 +1622,7 @@ function paradaDaViagem(p: {
  */
 export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/viagens/ativa`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/viagens/ativa`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -1522,6 +1698,8 @@ export interface EmbarquePayload {
   lat: number;
   lng: number;
   paradaDestinoCodigo?: string;
+  /** Popup de um ônibus: só esse veículo confirma o embarque (issue #216). */
+  veiculoPrefixo?: string;
 }
 
 /**
@@ -1531,7 +1709,7 @@ export interface EmbarquePayload {
 export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/viagens`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/viagens`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1540,6 +1718,7 @@ export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
         lat: dados.lat,
         lng: dados.lng,
         parada_destino_codigo: dados.paradaDestinoCodigo,
+        ...(dados.veiculoPrefixo ? { veiculo_prefixo: dados.veiculoPrefixo } : {}),
       }),
     });
   } catch {
@@ -1557,7 +1736,7 @@ export async function definirDestinoDaViagem(
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/destino`,
       {
         method: "PUT",
@@ -1578,7 +1757,7 @@ export async function definirDestinoDaViagem(
 export async function encerrarViagem(viagemId: string): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/encerrar`,
       { method: "POST", credentials: "include" }
     );
@@ -1601,7 +1780,7 @@ export async function encerrarViagem(viagemId: string): Promise<void> {
  */
 export async function confirmarAvisoDeProximidade(viagemId: string): Promise<void> {
   try {
-    await fetch(
+    await fetchAutenticado(
       `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/alerta-proximidade/visto`,
       { method: "POST", credentials: "include" }
     );
@@ -1630,7 +1809,7 @@ export interface ConfiguracaoPush {
  */
 export async function obterConfiguracaoPush(): Promise<ConfiguracaoPush> {
   try {
-    const response = await fetch(`${API_URL}/api/mobilidade/push/chave`, {
+    const response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/chave`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -1655,7 +1834,7 @@ export async function obterConfiguracaoPush(): Promise<ConfiguracaoPush> {
 export async function registrarInscricaoPush(inscricao: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/inscricao`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1684,7 +1863,7 @@ export async function registrarInscricaoPush(inscricao: unknown): Promise<void> 
 export async function removerInscricaoPush(endpoint: string): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/mobilidade/push/inscricao`, {
+    response = await fetchAutenticado(`${API_URL}/api/mobilidade/push/inscricao`, {
       method: "DELETE",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1696,4 +1875,135 @@ export async function removerInscricaoPush(endpoint: string): Promise<void> {
   if (!response.ok) {
     throw new PushError("Não foi possível desativar os avisos. Tente novamente.");
   }
+}
+
+// ---------------------------------------------------------------------------
+// US #29 — Preferências de Notificação
+// ---------------------------------------------------------------------------
+
+export const ANTECEDENCIAS_ALERTA = [5, 10, 30, 60] as const;
+export type AntecedenciaAlerta = (typeof ANTECEDENCIAS_ALERTA)[number];
+export type TipoNotificacao = "chegada" | "cancelamento";
+
+export interface PreferenciasNotificacao {
+  antecedenciaMinutos: number;
+  /** Chave geral: false = "desativar todas" (os tipos individuais são preservados). */
+  notificacoesAtivas: boolean;
+  alertaChegada: boolean;
+  alertaCancelamento: boolean;
+}
+
+export class PreferenciasError extends Error {
+  /** HTTP status retornado pelo servidor, quando disponível. */
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+interface PreferenciasResposta {
+  antecedencia_minutos: number;
+  notificacoes_ativas: boolean;
+  alerta_chegada: boolean;
+  alerta_cancelamento: boolean;
+}
+
+/**
+ * As rotas exigem o `usuario_id` da URL igual ao do usuário logado; o
+ * cabeçalho de identidade (X-User-Id) quem injeta é o Gateway, a partir
+ * do cookie. Por isso o id vem de `buscarUsuarioAtual` (/api/auth/me).
+ */
+async function chamarPreferencias(
+  usuarioId: string,
+  sufixo: string,
+  init: { method: "GET" | "PUT"; corpo?: unknown },
+  falhaPadrao: string
+): Promise<PreferenciasNotificacao> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/colaboracao/preferencias/${encodeURIComponent(usuarioId)}${sufixo}`,
+      {
+        method: init.method,
+        credentials: "include",
+        cache: "no-store",
+        ...(init.corpo !== undefined && {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(init.corpo),
+        }),
+      }
+    );
+  } catch {
+    throw new PreferenciasError("Sem conexão. Verifique sua internet e tente novamente.");
+  }
+
+  if (response.status === 401) {
+    throw new PreferenciasError("Sua sessão expirou. Entre novamente.", 401);
+  }
+  if (response.status === 403) {
+    throw new PreferenciasError("Você não tem acesso a essas preferências.", 403);
+  }
+  if (!response.ok) {
+    throw new PreferenciasError(falhaPadrao, response.status);
+  }
+
+  const dados: PreferenciasResposta = await response.json();
+  return {
+    antecedenciaMinutos: dados.antecedencia_minutos,
+    notificacoesAtivas: dados.notificacoes_ativas,
+    alertaChegada: dados.alerta_chegada,
+    alertaCancelamento: dados.alerta_cancelamento,
+  };
+}
+
+/** Carrega as preferências (o servidor cria o padrão — 30 min, tudo ativo — se não existirem). */
+export function buscarPreferencias(usuarioId: string): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "",
+    { method: "GET" },
+    "Não foi possível carregar suas preferências. Tente novamente."
+  );
+}
+
+/** Cenário 1 — antecedência dos alertas de chegada (5, 10, 30 ou 60 min). */
+export function salvarAntecedencia(
+  usuarioId: string,
+  antecedenciaMinutos: number
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "/antecedencia",
+    { method: "PUT", corpo: { antecedencia_minutos: antecedenciaMinutos } },
+    "Não foi possível salvar a antecedência. Tente novamente."
+  );
+}
+
+/** Cenário 2 — liga/desliga um tipo de notificação sem mexer nos outros. */
+export function atualizarTipoNotificacao(
+  usuarioId: string,
+  tipo: TipoNotificacao,
+  ativo: boolean
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    `/tipo/${tipo}`,
+    { method: "PUT", corpo: { ativo } },
+    "Não foi possível salvar a preferência. Tente novamente."
+  );
+}
+
+/** Cenário 3 — chave geral: `false` desativa todas, `true` reativa. */
+export function alternarTodasNotificacoes(
+  usuarioId: string,
+  ativas: boolean
+): Promise<PreferenciasNotificacao> {
+  return chamarPreferencias(
+    usuarioId,
+    "/desativar-todas",
+    { method: "PUT", corpo: { ativas } },
+    "Não foi possível salvar a preferência. Tente novamente."
+  );
 }

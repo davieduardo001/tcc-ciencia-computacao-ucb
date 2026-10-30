@@ -1721,7 +1721,7 @@
     right: 0;
     width: auto;
     max-width: none;
-    height: 62vh;
+    /* A altura vem de .snap-minimo/.snap-medio/.snap-maximo (issue #217). */
     /* 100% de .ms-content: a área útil já exclui as duas barras. */
     max-height: 100%;
     border: none;
@@ -1732,16 +1732,8 @@
   }
 
   /* Card #179 — com o resultado na tela, o formulário recolhe numa linha
-     "Origem → Destino [Editar]" e a folha cai pra ~48%: antes ela seguia
-     com 62vh, formulário inteiro, e a rota ficava numa faixa de ~220px. */
-  .plan-painel.com-resultado {
-    height: 48vh;
-  }
-
-  .plan-painel.com-resultado.editando {
-    height: 62vh;
-  }
-
+     "Origem → Destino [Editar]". A altura agora é a do encaixe da folha
+     (issue #217), escolhida pelo usuário, e não mais fixa por estado. */
   .plan-painel.com-resultado:not(.editando) .plan-formulario {
     display: none;
   }
@@ -1758,13 +1750,6 @@
 
   .plan-atalho {
     min-height: 44px;
-  }
-
-  /* Recolhida: sobra a faixa da alça e do cabeçalho, para ver o trajeto
-     no mapa e puxar de volta quando for escolher. */
-  .plan-painel.recolhida,
-  .plan-painel.com-resultado.recolhida {
-    height: 96px;
   }
 
   /* Durante o arrasto a altura vem do inline style; manter a transição
@@ -2016,12 +2001,6 @@
     background: rgba(7, 33, 44, 0.35);
     z-index: calc(var(--z-nav) - 1);
     cursor: pointer;
-  }
-
-  /* Perfil passou a morar na barra de baixo; manter o ícone na barra de
-     cima duplicaria a mesma entrada na mesma tela. */
-  .ms-actions .ms-icon-btn[title="Perfil"] {
-    display: none;
   }
 }
 
@@ -2928,5 +2907,154 @@
     width: auto;
     height: auto;
     max-height: 62vh;
+  }
+}
+
+/* ===== Folha inferior de três alturas (issue #217) =====
+   Rota, linha e parada usam a mesma folha. As alturas só valem no celular;
+   acima de 920px cada painel segue como coluna lateral (.plan-painel e
+   .mapa-painel-linha). Fica no fim do arquivo para vencer, na cascata, as
+   regras de posição dos painéis (inclusive as de .com-viagem). */
+.folha-inferior[hidden] {
+  display: none;
+}
+
+.folha-rodape {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .folha-inferior {
+    position: absolute;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+    border: none;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -16px 40px -18px rgba(14, 42, 63, 0.55);
+    transition: height 0.35s cubic-bezier(0.3, 1, 0.35, 1);
+    /* O botão "+" invade 34px da área acima da barra: sem esta folga o
+       último item ficava atrás dele. */
+    padding-bottom: calc(34px + var(--safe-bottom));
+    overflow-y: auto;
+  }
+
+  .folha-inferior.arrastando {
+    transition: none;
+  }
+
+  .folha-inferior.snap-minimo {
+    height: 96px;
+  }
+
+  .folha-inferior.snap-medio {
+    height: 62vh;
+  }
+
+  .folha-inferior.snap-maximo {
+    height: calc(100% - 8px);
+  }
+
+  /* Altura nunca passa da área útil; em viagem, também não sobe sob a faixa. */
+  .folha-inferior,
+  .ms-content.com-viagem .folha-inferior {
+    top: auto;
+    max-height: calc(100% - 8px);
+  }
+
+  .ms-content.com-viagem .folha-inferior {
+    max-height: calc(100% - var(--viagem-faixa) - 8px);
+  }
+
+  /* Só a alça e o cabeçalho arrastam; o corpo rola livre. */
+  .folha-cabecalho {
+    touch-action: none;
+    cursor: grab;
+  }
+
+  /* Mínimo: só alça e cabeçalho, sem o resto vazando. */
+  .folha-inferior.snap-minimo {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  /* Em viagem a folha traz "Cheguei" e "Reportar ocorrência": o mínimo
+     cresce o bastante para deixá-los à vista (ALTURA_MINIMA_COM_RODAPE). */
+  .folha-inferior.com-rodape {
+    padding-bottom: 0;
+  }
+
+  .folha-inferior.com-rodape.snap-minimo {
+    height: 200px;
+  }
+
+  /* Ação fixa no pé da folha. O padding de baixo desvia do "+", que invade
+     34px da área acima da barra. */
+  .folha-rodape {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    padding: 10px 14px 44px;
+    background: #fff;
+    border-top: 1px solid var(--border-2);
+    z-index: 3;
+  }
+
+  .folha-inferior.snap-minimo .folha-rodape {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  /* Botões flutuantes acompanham a altura da folha e somem no máximo. */
+  .ms-content[data-folha] .mapa-controles {
+    bottom: calc(var(--folha-altura, 0px) + 12px);
+    transition: bottom 0.35s cubic-bezier(0.3, 1, 0.35, 1);
+  }
+
+  .ms-content[data-folha="maximo"] .mapa-controles {
+    display: none;
+  }
+
+  .plan-rodape-viagem-acoes {
+    display: flex;
+    gap: 10px;
+  }
+
+  .plan-rodape-cheguei,
+  .plan-rodape-reportar {
+    flex: 1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .plan-rodape-cheguei {
+    border: none;
+    background: var(--mc-teal);
+    color: #fff;
+  }
+
+  .plan-rodape-cheguei:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .plan-rodape-reportar {
+    border: 1px solid var(--border-2);
+    background: #fff;
+    color: var(--text);
   }
 }

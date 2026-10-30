@@ -4,11 +4,13 @@ import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MapPin, Navigation } from "lucide-react";
+import { consumirRotaPendente } from "@/lib/rotaPendente";
 import AppShell from "./AppShell";
 import BuscaParada from "./BuscaParada";
 import FavoritosDestaque from "./FavoritosDestaque";
 import PlanejadorViagem, { Extremo, PontoEscolhido } from "./PlanejadorViagem";
 import { useChegadasDaRota } from "./useChegadasDaRota";
+import { useEhMobile } from "./useEhMobile";
 import {
   buscarLinha,
   BuscarLinhaError,
@@ -38,13 +40,6 @@ const DEBOUNCE_SUGESTOES_MS = 250;
 /** Rótulo de um ponto escolhido no mapa/por link cujo nome ainda não existe
  *  (ou nunca vai existir, se a geocodificação reversa falhar). */
 const ROTULO_PONTO_NO_MAPA = "Ponto no mapa";
-
-/** Converte um query param em coordenada; `null` se não for número finito. */
-function lerCoordenada(valor: string | null): number | null {
-  if (valor === null || valor.trim() === "") return null;
-  const n = Number(valor);
-  return Number.isFinite(n) ? n : null;
-}
 
 /** Chave lógica da rota favorita (mesma regra de duplicata do backend). */
 function chaveFavorito(f: RotaFavorita): string {
@@ -79,6 +74,9 @@ function MapaConteudo() {
 
   // US #20 — planejamento de viagem origem → destino.
   const [planejadorAberto, setPlanejadorAberto] = useState(false);
+  // Issue #217 — o painel da parada vive no MapaInterativo; ele avisa aqui.
+  const [paradaAberta, setParadaAberta] = useState(false);
+  const ehMobile = useEhMobile();
   const [origem, setOrigem] = useState<PontoEscolhido | null>(null);
   const [destino, setDestino] = useState<PontoEscolhido | null>(null);
   const [opcoes, setOpcoes] = useState<OpcaoViagem[] | null>(null);
@@ -114,13 +112,6 @@ function MapaConteudo() {
   // cá com origem/destino já preenchidos.
   const searchParams = useSearchParams();
   const painel = searchParams.get("painel");
-  // US #25 — query params injetados pelo clique em favorito.
-  const origemLatParam = searchParams.get("origem_lat");
-  const origemLngParam = searchParams.get("origem_lng");
-  const destinoLatParam = searchParams.get("destino_lat");
-  const destinoLngParam = searchParams.get("destino_lng");
-  const origemNomeParam = searchParams.get("origem_nome");
-  const destinoNomeParam = searchParams.get("destino_nome");
 
   useEffect(() => {
     if (painel === "rotas") {
@@ -129,41 +120,17 @@ function MapaConteudo() {
   }, [painel]);
 
   // US #25 — ao abrir o planejador via favorito (/favoritos → "Ir"),
-  // pré-preenche origem/destino pelos query params e pede o cálculo.
+  // pré-preenche origem/destino com a rota pendente (sessionStorage, lida e
+  // apagada aqui) e pede o cálculo. Coordenadas nunca passam pela URL
+  // (LGPD, RN-06).
   useEffect(() => {
     if (painel !== "rotas") return;
-    const origemLat = lerCoordenada(origemLatParam);
-    const origemLng = lerCoordenada(origemLngParam);
-    const destinoLat = lerCoordenada(destinoLatParam);
-    const destinoLng = lerCoordenada(destinoLngParam);
-    if (
-      origemLat === null ||
-      origemLng === null ||
-      destinoLat === null ||
-      destinoLng === null
-    ) {
-      return;
-    }
-    setOrigem({
-      nome: origemNomeParam ?? ROTULO_PONTO_NO_MAPA,
-      lat: origemLat,
-      lng: origemLng,
-    });
-    setDestino({
-      nome: destinoNomeParam ?? ROTULO_PONTO_NO_MAPA,
-      lat: destinoLat,
-      lng: destinoLng,
-    });
+    const rota = consumirRotaPendente();
+    if (!rota) return;
+    setOrigem(rota.origem);
+    setDestino(rota.destino);
     setRotaPendente(true);
-  }, [
-    painel,
-    origemLatParam,
-    origemLngParam,
-    destinoLatParam,
-    destinoLngParam,
-    origemNomeParam,
-    destinoNomeParam,
-  ]);
+  }, [painel]);
 
   const handleBuscarLinha = useCallback(async (termo: string) => {
     const numero = termo.trim();
@@ -394,6 +361,19 @@ function MapaConteudo() {
 
   const buscaVisivel = buscaParadaAberta && !planejadorAberto;
 
+  // Issue #217 — no celular só uma folha aparece por vez. Parada e linha têm
+  // prioridade sobre o planejador, que continua montado (origem, destino e
+  // rotas vivem aqui) e reaparece quando elas fecham. No desktop as colunas
+  // coexistem, como sempre.
+  const folhaAtiva: "planejador" | "parada" | "linha" | null = paradaAberta
+    ? "parada"
+    : linha
+      ? "linha"
+      : planejadorAberto
+        ? "planejador"
+        : null;
+  const planejadorOculto = ehMobile && folhaAtiva !== "planejador";
+
   const viagem =
     opcoes && opcaoSelecionada !== null ? opcoes[opcaoSelecionada] : null;
 
@@ -425,6 +405,7 @@ function MapaConteudo() {
         linha={linha}
         erroBusca={erroBusca}
         onFecharLinha={handleFecharLinha}
+        onPainelParadaChange={setParadaAberta}
         viagem={viagem}
         chegadasDaRota={chegadasDaRota}
         origemViagem={origem}
@@ -468,6 +449,7 @@ function MapaConteudo() {
           onFavoritoSalvo={handleFavoritoSalvo}
           chegadasDaRota={chegadasDaRota}
           localizacao={localizacao}
+          oculta={planejadorOculto}
         />
       ) : (
         !buscaVisivel && (

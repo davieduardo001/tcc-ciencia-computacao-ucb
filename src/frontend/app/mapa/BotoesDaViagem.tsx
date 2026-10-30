@@ -44,6 +44,7 @@ export function BotaoPegueiOnibus({ numeroLinha, prefixo, posicaoDoUsuario }: Bo
       numeroLinha,
       lat: posicaoDoUsuario!.lat,
       lng: posicaoDoUsuario!.lng,
+      veiculoPrefixo: prefixo,
     });
     if (!resultado.ok) {
       setMensagem(resultado.mensagem ?? "Não foi possível registrar o embarque.");

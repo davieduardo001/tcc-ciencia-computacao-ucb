@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 
 
@@ -22,6 +22,13 @@ class RegistrarInput(BaseModel):
     email: str
     senha: str
     termos_aceitos: bool
+
+    @field_validator("termos_aceitos")
+    @classmethod
+    def _exigir_aceite_dos_termos(cls, valor: bool) -> bool:
+        if valor is not True:
+            raise ValueError("É necessário aceitar os Termos de Uso e a Política de Privacidade.")
+        return valor
 
 
 class RegistrarResponse(BaseModel):

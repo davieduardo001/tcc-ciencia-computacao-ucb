@@ -20,12 +20,14 @@ import SaidasDoTerminal from "./SaidasDoTerminal";
 import { BotaoDescerNestaParada, BotaoPegueiOnibus } from "./BotoesDaViagem";
 import TempoNaParada, { SEM_DADO } from "./TempoNaParada";
 import FaixaDaViagem from "./FaixaDaViagem";
+import FolhaInferior from "./FolhaInferior";
 import { useViagem } from "./ViagemContext";
-import { Bus, Crosshair, Layers, List, TriangleAlert, X } from "lucide-react";
+import { Bus, Crosshair, Layers, List, TriangleAlert } from "lucide-react";
 import {
   buscarDetalhesParada,
   buscarPosicoesDaLinha,
   BuscarParadaError,
+  SessaoExpiradaError,
   ChegadaNoPonto,
   ChegadasDaPerna,
   DetalhesParada,
@@ -364,6 +366,9 @@ interface MapaInterativoProps {
   linha?: LinhaDetalhada | null;
   erroBusca?: string | null;
   onFecharLinha?: () => void;
+  /** Issue #217 — avisa a página quando o painel de uma parada abre ou
+   * fecha: no celular só uma folha aparece por vez. */
+  onPainelParadaChange?: (aberto: boolean) => void;
   /** US #20 — itinerário escolhido no planejador, pra desenhar no mapa. */
   viagem?: OpcaoViagem | null;
   /** Issue #190 — quando o ônibus de cada trecho de `viagem` chega às
@@ -394,6 +399,7 @@ export default function MapaInterativo({
   linha,
   erroBusca,
   onFecharLinha,
+  onPainelParadaChange,
   viagem,
   chegadasDaRota = null,
   origemViagem,
@@ -435,6 +441,11 @@ export default function MapaInterativo({
     carregando: boolean;
     erro: string | null;
   } | null>(null);
+
+  const paradaAberta = detalheParada !== null;
+  useEffect(() => {
+    onPainelParadaChange?.(paradaAberta);
+  }, [paradaAberta, onPainelParadaChange]);
 
   // Card #179 (⑤b) — quando cada linha chega NESTA parada. Só liga quando o
   // painel tem o código de uma parada física (o hook cuida do polling e de
@@ -560,13 +571,21 @@ export default function MapaInterativo({
     async function atualizar() {
       // Uma chamada por linha, em paralelo. O backend cacheia o feed do
       // SEMOB, então isso não multiplica o download da origem.
-      const porLinha = await Promise.all(
-        // Arrow explícita: passar a função direto pro map mandaria
-        // índice e array como argumentos extras.
-        numeros.map((numero) =>
-          buscarPosicoesDaLinha(numero, coordenadasRef.current)
-        )
-      );
+      let porLinha: Awaited<ReturnType<typeof buscarPosicoesDaLinha>>[];
+      try {
+        porLinha = await Promise.all(
+          // Arrow explícita: passar a função direto pro map mandaria
+          // índice e array como argumentos extras.
+          numeros.map((numero) =>
+            buscarPosicoesDaLinha(numero, coordenadasRef.current)
+          )
+        );
+      } catch (err) {
+        // Issue #221 — sessão encerrada (o login já foi acionado): não
+        // transforma 401 em "nenhum ônibus em operação".
+        if (err instanceof SessaoExpiradaError) return;
+        throw err;
+      }
       if (!ativo) return;
       setVeiculos(porLinha.flatMap((resultado) => resultado.veiculos));
       setProximoHorarioPrevisto(
@@ -610,6 +629,12 @@ export default function MapaInterativo({
       });
     } catch (err) {
       if (consulta !== consultaDetalheRef.current) return;
+      // Issue #221 — sessão encerrada: o login já foi acionado; não mostra
+      // erro genérico de parada.
+      if (err instanceof SessaoExpiradaError) {
+        setDetalheParada(null);
+        return;
+      }
       setDetalheParada({
         parada,
         detalhes: null,
@@ -972,8 +997,10 @@ export default function MapaInterativo({
       {/* US #18 — painel de detalhes da parada selecionada. Tem prioridade
           sobre o painel da linha; fechar (Cenário 3) devolve a ele. */}
       {detalheParada && (
-        <aside className="mapa-painel-linha">
-          <div className="mapa-painel-cabecalho">
+        <FolhaInferior
+          className="mapa-painel-linha"
+          classeCabecalho="mapa-painel-cabecalho"
+          titulo={
             <div>
               <strong>
                 {detalheParada.detalhes?.nome ??
@@ -985,16 +1012,11 @@ export default function MapaInterativo({
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              className="mapa-botao-icone"
-              title="Fechar"
-              onClick={fecharDetalheParada}
-            >
-              <X size={16} />
-            </button>
-          </div>
-
+          }
+          rotuloAlca="detalhes da parada"
+          rotuloFechar="Fechar detalhes da parada"
+          onFechar={fecharDetalheParada}
+        >
           <div className="mapa-painel-corpo">
             {detalheParada.carregando && (
               <p className="mapa-painel-sem-veiculo">
@@ -1090,26 +1112,23 @@ export default function MapaInterativo({
               </>
             )}
           </div>
-        </aside>
+        </FolhaInferior>
       )}
 
       {!detalheParada && linha && (
-        <aside className="mapa-painel-linha">
-          <div className="mapa-painel-cabecalho">
+        <FolhaInferior
+          className="mapa-painel-linha"
+          classeCabecalho="mapa-painel-cabecalho"
+          titulo={
             <div>
               <strong>{linha.nome}</strong>
               <span className="mapa-painel-sentido">{linha.sentido}</span>
             </div>
-            <button
-              type="button"
-              className="mapa-botao-icone"
-              title="Fechar"
-              onClick={onFecharLinha}
-            >
-              <X size={16} />
-            </button>
-          </div>
-
+          }
+          rotuloAlca="detalhes da linha"
+          rotuloFechar="Fechar detalhes da linha"
+          onFechar={onFecharLinha ?? (() => {})}
+        >
           <div className="mapa-painel-corpo">
             {/* US #16 — cenários 1 e 3 */}
             <div className="mapa-painel-aovivo" role="status">
@@ -1178,7 +1197,7 @@ export default function MapaInterativo({
               ))}
             </div>
           </div>
-        </aside>
+        </FolhaInferior>
       )}
     </div>
   );

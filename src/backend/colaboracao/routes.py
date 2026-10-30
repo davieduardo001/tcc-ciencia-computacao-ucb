@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from shared.database import get_db
@@ -16,7 +17,7 @@ from colaboracao.monitoring_worker import MonitoramentoWorker
 from colaboracao.providers.eta_mock import ETAMockProvider
 from colaboracao.providers.favoritos_mock import FavoritosMockProvider
 from colaboracao.push_service import PushService
-from colaboracao.models import PreferenciaNotificacao, Ocorrencia, RotaFavorita
+from colaboracao.models import PreferenciaNotificacao, Ocorrencia, RotaFavorita, ConfirmacaoOcorrencia
 from colaboracao.schemas import (
     PreferenciaNotificacaoResponse,
     AntecedenciaInput,
@@ -28,6 +29,7 @@ from colaboracao.schemas import (
     OcorrenciaListaResponse,
     RotaFavoritaInput,
     RotaFavoritaResponse,
+    ConfirmacaoOcorrenciaResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,23 @@ def processar_ciclo_notificacoes():
 # US #29 — Preferências de Notificação
 # ---------------------------------------------------------------------------
 
-def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNotificacao:
+def _usuario_dono_das_preferencias(
+    usuario_id: uuid.UUID,
+    usuario_autenticado: uuid.UUID = Depends(get_usuario_atual_id),
+) -> uuid.UUID:
+    """
+    O `usuario_id` da URL precisa ser o do usuário autenticado (X-User-Id,
+    injetado pelo Gateway). Impede ler ou alterar preferências alheias.
+    """
+    if usuario_id != usuario_autenticado:
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado: as preferências pertencem a outro usuário.",
+        )
+    return usuario_id
+
+
+def _obter_ou_criar_preferencias(usuario_id, db: Session) -> PreferenciaNotificacao:
     preferencia = (
         db.query(PreferenciaNotificacao)
         .filter(PreferenciaNotificacao.usuario_id == usuario_id)
@@ -121,7 +139,7 @@ def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNot
     if not preferencia:
         preferencia = PreferenciaNotificacao(
             id=uuid.uuid4(),
-            usuario_id=uuid.UUID(usuario_id) if isinstance(usuario_id, str) else usuario_id,
+            usuario_id=usuario_id,
             antecedencia_minutos=30,
             notificacoes_ativas=True,
             alerta_chegada=True,
@@ -130,13 +148,23 @@ def _obter_ou_criar_preferencias(usuario_id: str, db: Session) -> PreferenciaNot
             atualizado_em=datetime.utcnow(),
         )
         db.add(preferencia)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # A FK para usuarios.id existe só no banco (migration), não no
+            # ORM: um usuario_id sem registro em usuarios viola a constraint
+            # no commit e vira 404 em vez de 500.
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         db.refresh(preferencia)
     return preferencia
 
 
 @router.get("/preferencias/{usuario_id}", response_model=PreferenciaNotificacaoResponse)
-def carregar_preferencias(usuario_id: str, db: Session = Depends(get_db)):
+def carregar_preferencias(
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     preferencia = _obter_ou_criar_preferencias(usuario_id, db)
     return PreferenciaNotificacaoResponse(
         id=str(preferencia.id),
@@ -149,7 +177,11 @@ def carregar_preferencias(usuario_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/preferencias/{usuario_id}/antecedencia", response_model=PreferenciaNotificacaoResponse)
-def salvar_antecedencia(usuario_id: str, dados: AntecedenciaInput, db: Session = Depends(get_db)):
+def salvar_antecedencia(
+    dados: AntecedenciaInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     if dados.antecedencia_minutos not in PreferenciaNotificacao.ANTECEDENCIAS_PERMITIDAS:
         raise HTTPException(
             status_code=400,
@@ -173,7 +205,12 @@ def salvar_antecedencia(usuario_id: str, dados: AntecedenciaInput, db: Session =
 
 
 @router.put("/preferencias/{usuario_id}/tipo/{tipo}", response_model=PreferenciaNotificacaoResponse)
-def atualizar_tipo_notificacao(usuario_id: str, tipo: str, dados: TipoNotificacaoInput, db: Session = Depends(get_db)):
+def atualizar_tipo_notificacao(
+    tipo: str,
+    dados: TipoNotificacaoInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     if tipo not in ("chegada", "cancelamento"):
         raise HTTPException(
             status_code=400,
@@ -202,7 +239,11 @@ def atualizar_tipo_notificacao(usuario_id: str, tipo: str, dados: TipoNotificaca
 
 
 @router.put("/preferencias/{usuario_id}/desativar-todas", response_model=PreferenciaNotificacaoResponse)
-def desativar_todas_notificacoes(usuario_id: str, dados: ToggleNotificacoesInput, db: Session = Depends(get_db)):
+def desativar_todas_notificacoes(
+    dados: ToggleNotificacoesInput,
+    usuario_id: uuid.UUID = Depends(_usuario_dono_das_preferencias),
+    db: Session = Depends(get_db),
+):
     preferencia = _obter_ou_criar_preferencias(usuario_id, db)
     preferencia.notificacoes_ativas = dados.ativas
     preferencia.atualizado_em = datetime.utcnow()
@@ -346,6 +387,7 @@ def listar_ocorrencias(
             contador_confirmacoes=o.contador_confirmacoes,
             criado_em=o.criado_em,
             expira_em=o.expira_em,
+            eh_autor=(o.usuario_id == _usuario_id),
         )
         for o in ocorrencias
     ]
@@ -504,3 +546,110 @@ def remover_favorito(
 
     db.delete(favorito)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# US #26 — Confirmar Ocorrência Reportada por Outro Passageiro
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/ocorrencias/{ocorrencia_id}/confirmar",
+    response_model=ConfirmacaoOcorrenciaResponse,
+    status_code=200,
+)
+def confirmar_ocorrencia(
+    ocorrencia_id: uuid.UUID,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Confirma uma ocorrência reportada por outro passageiro (US #26).
+
+    Regras:
+    - Requer autenticação (X-User-Id validado pelo Gateway).
+    - O autor original não pode confirmar a própria ocorrência (403).
+    - Cada usuário confirma uma ocorrência no máximo uma vez (409).
+      A UNIQUE constraint do banco garante isso mesmo sob concorrência.
+    - Ocorrências inexistentes retornam 404.
+    - Ocorrências expiradas ou inativas retornam 422.
+    - Ao atingir Ocorrencia.LIMITE_CONFIRMACOES (3), o status muda para
+      "confirmada". A transição é atômica (mesma transação do INSERT).
+
+    O caminho externo é:
+      POST /api/colaboracao/ocorrencias/{ocorrencia_id}/confirmar
+    (o Gateway proxy /colaboracao/* já encaminha com X-User-Id injetado)
+    """
+    agora = datetime.utcnow()
+
+    # 1. Verifica existência.
+    ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == ocorrencia_id).first()
+    if ocorrencia is None:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada.")
+
+    # 2. Verifica se ainda está ativa.
+    if ocorrencia.status == "expirada" or ocorrencia.expira_em <= agora:
+        raise HTTPException(
+            status_code=422,
+            detail="ocorrencia_inativa",
+        )
+
+    # 3. Impede que o autor confirme a própria ocorrência.
+    if ocorrencia.usuario_id == usuario_id:
+        raise HTTPException(
+            status_code=403,
+            detail="autor_nao_pode_confirmar",
+        )
+
+    # 4. Tenta inserir a confirmação. A UNIQUE constraint (ocorrencia_id,
+    #    usuario_id) garante que confirmações duplicadas — mesmo concorrentes
+    #    — sejam rejeitadas pelo banco antes de qualquer incremento.
+    confirmacao = ConfirmacaoOcorrencia(
+        id=uuid.uuid4(),
+        ocorrencia_id=ocorrencia_id,
+        usuario_id=usuario_id,
+        criado_em=agora,
+    )
+    db.add(confirmacao)
+
+    try:
+        db.flush()  # dispara a constraint sem commitar — detecta duplicata cedo
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="confirmacao_duplicada",
+        )
+
+    # 5. Incrementa o contador direto no banco (UPDATE ... SET c = c + 1), sem
+    #    ler-e-somar em Python: duas confirmações simultâneas de usuários
+    #    diferentes não perdem incremento, porque o UPDATE trava a linha.
+    #    O valor novo é relido na mesma transação e capturado em variáveis
+    #    Python antes do commit (StaticPool do SQLite desvincula instâncias
+    #    após commit).
+    filtro = Ocorrencia.id == ocorrencia_id
+    db.query(Ocorrencia).filter(filtro).update(
+        {Ocorrencia.contador_confirmacoes: Ocorrencia.contador_confirmacoes + 1},
+        synchronize_session=False,
+    )
+    novo_contador = db.query(Ocorrencia.contador_confirmacoes).filter(filtro).scalar()
+    novo_status = ocorrencia.status
+    if novo_contador >= Ocorrencia.LIMITE_CONFIRMACOES:
+        novo_status = "confirmada"
+        db.query(Ocorrencia).filter(filtro).update(
+            {Ocorrencia.status: novo_status}, synchronize_session=False
+        )
+    ocorrencia_id_str = str(ocorrencia_id)
+
+    db.commit()
+
+    return ConfirmacaoOcorrenciaResponse(
+        ocorrencia_id=ocorrencia_id_str,
+        status=novo_status,
+        contador_confirmacoes=novo_contador,
+        mensagem=(
+            "Ocorrência confirmada pela comunidade."
+            if novo_status == "confirmada"
+            else "Confirmação registrada."
+        ),
+    )
