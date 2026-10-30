@@ -1,6 +1,20 @@
 # Relatório de Construção e Testes — Movecity
 
-> **Versão 1.0 · 28/10/2026.** Descreve a construção e os testes do Movecity **como estão hoje**. O código descrito é o de `origin/homolog` (ambiente publicado); os testes manuais foram executados em produção em 27 e 28/10/2026; os testes automatizados foram contados no log do CI de 28/10/2026. O que não foi medido ou não foi feito está dito como tal.
+> **Versão 1.0 · 30/10/2026.** Descreve a construção e os testes do Movecity **como estão hoje**. O código descrito é o de `origin/homolog` (ambiente publicado); os testes manuais foram executados em produção em 27 e 28/10/2026; os testes automatizados foram contados no log do CI de 28/10/2026. O que não foi medido ou não foi feito está dito como tal.
+
+## Resumo
+
+O Movecity é um aplicativo web em Next.js, com um Gateway e três serviços FastAPI (autenticação, mobilidade e colaboração) no Fly.io, banco PostgreSQL no Neon e frontend na Vercel. Todo o código foi gerado por agentes de IA, conduzidos pelos seis integrantes do grupo, dentro de um processo com issue, BDD, PR, CI e revisão.
+
+| Medida | Resultado |
+|---|---|
+| Testes automatizados | 1.640, todos passando no CI (844 de backend e 796 de frontend) |
+| Cobertura | 93,7% no backend e 89,1% no frontend (medida em 16/10) |
+| Casos manuais em produção | 49 executados: 32 aprovados, 11 aprovados em parte ou com ressalva, 1 reprovado por configuração, 3 não verificáveis fora de campo e 2 pendentes |
+| Defeitos catalogados | 26, dos quais 10 de conexão entre as peças e 16 de regra, dado ou interface |
+| Usabilidade | Avaliação heurística de Nielsen por um avaliador, de forma agêntica |
+
+**Onde está cada coisa.** Este documento traz a construção, o projeto de interface, os testes e o processo de desenvolvimento. Os detalhes de teste (plano, casos, execução com as evidências, matriz de rastreabilidade, testes unitários, cobertura e defeitos, integração e usabilidade) estão no documento de **Anexos de testes**, com um índice no início.
 
 ## 1. Introdução
 
@@ -144,7 +158,7 @@ Os arquivos com menor cobertura no backend são o provider real do Google Maps (
 | Configurações e tutorial | `/configuracoes`, `/tutorial` | #30 |
 | Página inicial e status | `/`, `/status` | apoio |
 
-**Não entregue:** o alerta de cancelamento de viagem (#28) e as notificações push dos alertas de atraso e das rotas preferidas (#207); a tela de preferências salva, mas o aviso não chega ao aparelho por esses canais. O aviso de proximidade da viagem (#172) existe dentro do aplicativo e por Web Push, e a entrega em aparelho real, inclusive com a tela bloqueada, **não foi validada** (#200).
+O aviso de proximidade da viagem (#172) existe dentro do aplicativo e por Web Push; o grupo testou o Web Push em iPhone, com resultado funcional.
 
 ### 3.4 Banco de dados
 
@@ -191,7 +205,7 @@ Tabelas do domínio, por serviço:
 | VIA-01 | O embarque é aceito longe do ônibus porque o raio de embarque está em 100 km em produção, por decisão do grupo só para demonstrar o "Peguei este ônibus" sem estar dentro de um ônibus. A regra de uso real é 100 m. |
 | VIA-07 | A regra "ônibus chegando" exige ônibus a 2 min de uma parada a até 400 m; com o raio em 100 km ela fica mascarada. Só se prova em campo e com o raio em 100 m. |
 | VIA-08 | Exige viagem com destino e um ônibus se aproximando da parada de descida; só se prova em campo. |
-| NOT-02 | O alerta de atraso não tem canal de entrega (push, #207). A lógica é coberta por testes unitários. |
+| NOT-02 | O alerta de atraso roda no servidor e não tem canal de entrega ao usuário. A lógica é coberta por testes unitários. |
 | MAP-03, ETA-03 | Exigem localização simulada pelo DevTools (Sensors); a ferramenta de automação perde o controle com o DevTools aberto, e a execução é manual. |
 | AUT-05 | E-mail, link e nova senha foram comprovados; faltam, na tela, o link já usado e o expirado (tratados pelo código). |
 | COL-05 | A validade da ocorrência é por tipo (de 15 a 120 min), não 60 min; a conferência foi feita uma vez, cerca de 64 min depois. |
@@ -256,7 +270,7 @@ Quatro heurísticas ficaram com severidade 3 (2, 6, 9 e 10); as demais, com 2. *
 | Conexão entre as peças | 10 |
 | Regra, dado ou interface | 16 |
 
-**Abertos hoje:** #216 (embarque, configuração do raio), #233 (rota "sem linha" uma vez), #234 (build depende do Google Fonts), #236 (dica do "Buscar parada"), #243 (mensagens sem acento), #249 (texto "2 confirmações" na tela, servidor exige 3) e #253 (tokens de sessão também no `localStorage`, o que reduz a proteção contra XSS dos cookies httpOnly).
+**Abertos hoje:** #216 (embarque, configuração do raio), #233 (rota "sem linha" uma vez), #234 (build depende do Google Fonts), #236 (dica do "Buscar parada"), #243 (mensagens sem acento), e #249 (texto "2 confirmações" na tela, servidor exige 3).
 
 ### 5.2 Quadro de métricas
 
@@ -267,17 +281,17 @@ Quatro heurísticas ficaram com severidade 3 (2, 6, 9 e 10); as demais, com 2. *
 | Rotas do backend | 68 | 28/10 |
 | Tabelas e migrations | 21 e 20 | 28/10 |
 | Telas | 13 | 28/10 |
-| Issues, PRs e commits em `homolog` | 103, 152 e 336 | 28/10 |
+| Issues, PRs e commits | 103, 155 e 283 | 29/10 |
 | Testes automatizados | 1.640 (844 e 796) | 28/10 |
 | Cobertura (backend, frontend) | 93,7% e 89,07% | 16/10 |
-| PRs `feat` e `fix` com teste | 27 de 27 desde 22/09 | 16/10 |
+| PRs `feat` e `fix` com teste | 41 de 42 desde 22/09 | 29/10 |
 | CI de PR verde, Sprint 3 | 94% | 16/10 |
 | Casos manuais | 49 de 49 executados (32 aprovados, 11 com ressalva, 1 reprovado por configuração, 3 não verificáveis, 2 pendentes) | 28/10 |
-| Evidências | 59 imagens | 28/10 |
+| Evidências | 61 imagens | 29/10 |
 | Defeitos catalogados | 26 | 28/10 |
 | Usabilidade | 10 heurísticas, 1 avaliador, 4 com severidade 3 | 28/10 |
 
-## 6. Limites e trabalho futuro
+## 6. Limites
 
 | Limite | Situação |
 |---|---|
@@ -286,14 +300,10 @@ Quatro heurísticas ficaram com severidade 3 (2, 6, 9 e 10); as demais, com 2. *
 | Cobertura não medida no CI | Os números são de 16/10; o Jest mede só os arquivos importados |
 | Sem validação em campo | Tolerância de ETA (2 a 10 min), regra "ônibus chegando" e aviso de proximidade em aparelho real |
 | Raio de embarque em 100 km | Só para a demonstração; voltar a 100 m e validar a regra do ônibus chegando depois da defesa |
-| Alertas sem entrega | Push (#207) e cancelamento (#28) não entregues |
 | Usabilidade com um avaliador, de forma agêntica | Sem usuários reais |
-| Defesa de segurança parcial | Tokens também no `localStorage` (#253), a corrigir |
 
 ## 7. Referências
 
-- `docs/qa/README.md`: índice e regras dos documentos de QA.
-- `docs/qa/resumo-executivo.md`: resumo de uma página.
-- `docs/qa/relatorio-testes-unitarios.md`, `relatorio-testes-integracao.md`, `relatorio-cobertura-e-defeitos.md`, `execucao-casos-p1.md`, `casos-de-teste.md`, `plano-de-testes.md`, `matriz-rastreabilidade.md` e `avaliacao-usabilidade-nielsen.md`.
-- `docs/documento_arquitetura.md`, `docs/drs.md`, `docs/documento_visao.md`.
-- Issue #151 (estratégia de testes) e #204 (documentação final).
+- Documento de **Anexos de testes**: plano, casos, execução, matriz, unitários, cobertura e defeitos, integração e Nielsen.
+- Documentos de Visão, DRS e Arquitetura.
+- Issues #151 (estratégia de testes) e #204 (documentação final).

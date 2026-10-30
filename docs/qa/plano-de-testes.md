@@ -11,7 +11,7 @@ Plano de QA para validar, a cada sprint, as User Stories entregues. Os casos est
 
 **Dentro do escopo:** as USs entregues em `homolog` e `main` (autenticação, mapa e rastreamento, ETA, rotas, colaboração, alertas, viagem), mais as correções do card #179, o bug #188 e as correções da execução de 27 e 28/10 (#211 a #232, #237). Estado da execução em 28/10/2026: ver o [quadro geral](execucao-casos-p1.md#quadro-geral-dos-49-casos-atualizado-em-2810).
 
-**Fora do escopo:** testes de carga; validação com ônibus reais em campo (planejada pela equipe, ver a seção 6); as USs #28, #115, #118, #199 e #207, que não têm código entregue (as duas últimas e a #28 estão abertas na Sprint 4; #115 e #118 são trabalho futuro). As USs #21 e #26 foram entregues depois da escrita dos casos e ainda não têm caso manual dedicado (ver a [matriz](matriz-rastreabilidade.md), nota 3).
+**Fora do escopo:** testes de carga; validação com ônibus reais em campo (planejada pela equipe, ver a seção 6); as USs sem código na `homolog`. As USs #21 e #26 foram entregues depois da escrita dos casos e ainda não têm caso manual dedicado (ver a [matriz](matriz-rastreabilidade.md), nota 3).
 
 ## 2. Níveis de teste
 
