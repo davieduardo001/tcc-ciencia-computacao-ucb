@@ -121,8 +121,30 @@ describe("AppShell", () => {
     const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
     expect(within(inferior).getByText("Perfil")).toBeInTheDocument();
 
-    // O botão de perfil da topbar continua no DOM (o CSS o esconde no mobile).
-    expect(screen.getByTitle("Perfil")).toBeInTheDocument();
+    // A barra de cima não tem botão de perfil (o bloco do usuário fica no menu lateral).
+    expect(screen.queryByTitle("Perfil")).not.toBeInTheDocument();
+    const topbar = document.querySelector(".ms-topbar") as HTMLElement;
+    expect(within(topbar).queryByRole("button", { name: /perfil/i })).not.toBeInTheDocument();
+  });
+
+  it("bloco do usuário do menu lateral mantém Sair e Rever o guia", async () => {
+    buscarUsuarioAtualMock.mockResolvedValue({
+      id: "1",
+      nome: "Ana Passageira",
+      email: "ana@teste.com",
+      avatarUrl: null,
+    });
+
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    expect(await within(sidebar).findByTitle("Sair")).toBeInTheDocument();
+    expect(within(sidebar).getByTitle("Rever o guia")).toBeInTheDocument();
+    expect(within(sidebar).getByText("ana@teste.com")).toBeInTheDocument();
   });
 
   it("marca o destino atual da navegação inferior com aria-current", () => {
@@ -173,7 +195,7 @@ describe("AppShell", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("ação ainda não entregue ('Alertas') explica que está em breve", async () => {
+  it("ação 'Alertas' do arco navega para /alertas (US #29)", () => {
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>
@@ -185,9 +207,23 @@ describe("AppShell", () => {
     const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
     fireEvent.click(within(inferior).getByText("Alertas"));
 
-    const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByText("Alertas")).toBeInTheDocument();
-    expect(within(dialogo).getByText("Em breve")).toBeInTheDocument();
+    expect(pushMock).toHaveBeenCalledWith("/alertas");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("'Alertas' é link para /alertas na sidebar e no sino do topo (US #29)", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    expect(within(sidebar).getByRole("link", { name: "Alertas" })).toHaveAttribute(
+      "href",
+      "/alertas"
+    );
+    expect(screen.getByTitle("Alertas")).toHaveAttribute("href", "/alertas");
   });
 
   it("sidebar de desktop também linka para Ocorrências — único acesso em telas >920px (US #23)", () => {
@@ -218,14 +254,15 @@ describe("AppShell", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("mostra o selo 'Em breve' na sidebar para itens indisponíveis", () => {
+  it("não mostra selo 'Em breve' na sidebar: todos os itens têm tela (US #29)", () => {
     render(
       <AppShell active="mapa">
         <div>conteúdo</div>
       </AppShell>
     );
 
-    expect(screen.getAllByText("Em breve").length).toBeGreaterThan(0);
+    const sidebar = document.querySelector(".ms-sidebar") as HTMLElement;
+    expect(within(sidebar).queryByText("Em breve")).not.toBeInTheDocument();
   });
 
   it("mostra 'Visitante' quando não há sessão autenticada", async () => {

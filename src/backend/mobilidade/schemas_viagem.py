@@ -17,6 +17,10 @@ class EmbarqueRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     parada_destino_codigo: str | None = Field(default=None, min_length=1, max_length=12)
+    # Issue #216 — o popup de um ônibus específico manda o prefixo dele: o
+    # embarque só vale se ESSE veículo estiver perto. Sem prefixo (embarque
+    # pela rota), vale qualquer ônibus da linha, como antes.
+    veiculo_prefixo: str | None = Field(default=None, min_length=1, max_length=20)
 
     @field_validator("numero_linha")
     @classmethod

@@ -18,6 +18,22 @@ describe("Login", () => {
     delete (window as unknown as { google?: unknown }).google;
   });
 
+  it("mostra o aviso de sessão expirada quando vem de ?sessao=expirada (#221)", () => {
+    window.history.pushState({}, "", "/login?sessao=expirada");
+    render(<Login />);
+    expect(
+      screen.getByText("Sua sessão expirou, entre novamente")
+    ).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
+  });
+
+  it("não mostra o aviso de sessão expirada num acesso normal (#221)", () => {
+    render(<Login />);
+    expect(
+      screen.queryByText("Sua sessão expirou, entre novamente")
+    ).not.toBeInTheDocument();
+  });
+
   function capturarCallbackGoogle(): (response: { credential: string }) => void {
     let callback: (response: { credential: string }) => void = () => {};
     window.google = {

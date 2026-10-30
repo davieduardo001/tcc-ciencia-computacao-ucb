@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FavoritosPage from "../page";
+import { consumirRotaPendente } from "@/lib/rotaPendente";
 import {
   listarFavoritosRemoto,
   removerFavorito,
@@ -67,6 +68,7 @@ describe("FavoritosPage", () => {
     removerFavoritoMock.mockReset();
     lerFavoritosCacheMock.mockReset();
     pushMock.mockReset();
+    sessionStorage.clear();
     lerFavoritosCacheMock.mockReturnValue([]);
   });
 
@@ -187,18 +189,19 @@ describe("FavoritosPage", () => {
 
     fireEvent.click(screen.getByLabelText(`Abrir rota ${FAV_A.label} no mapa`));
 
-    expect(pushMock).toHaveBeenCalledWith(
-      expect.stringContaining("/mapa?")
-    );
-    expect(pushMock).toHaveBeenCalledWith(
-      expect.stringContaining("painel=rotas")
-    );
-    expect(pushMock).toHaveBeenCalledWith(
-      expect.stringContaining("origem_lat=-15.8305")
-    );
-    expect(pushMock).toHaveBeenCalledWith(
-      expect.stringContaining("destino_lat=-15.7939")
-    );
+    expect(pushMock).toHaveBeenCalledWith("/mapa?painel=rotas");
+    const url = pushMock.mock.calls[0][0] as string;
+    expect(url).not.toContain("origem_lat");
+    expect(url).not.toContain("origem_lng");
+    expect(url).not.toContain("destino_lat");
+    expect(url).not.toContain("destino_lng");
+    expect(url).not.toContain("-15.8305");
+
+    // Os pontos seguem por sessionStorage, para o mapa recalcular a rota.
+    expect(consumirRotaPendente()).toEqual({
+      origem: { nome: "Casa", lat: -15.8305, lng: -48.0425 },
+      destino: { nome: "Trabalho", lat: -15.7939, lng: -47.8828 },
+    });
   });
 
   it("exibe banner offline e mantém o cache quando o servidor não responde", async () => {

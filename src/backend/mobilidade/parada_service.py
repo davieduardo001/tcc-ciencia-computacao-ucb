@@ -74,15 +74,17 @@ class ParadaEncontrada:
 
 def _proximos_horarios(todos: list[str], agora: str) -> list[str]:
     """
-    Os N próximos horários a partir de `agora` ("HH:MM"). Se o dia já
-    esgotou os horários restantes, completa com os primeiros do dia
-    seguinte — melhor sugerir o primeiro horário de amanhã do que não
-    mostrar nada quando ainda faltam vagas na lista.
+    As N próximas saídas de HOJE a partir de `agora` ("HH:MM", fuso de
+    Brasília, o mesmo da lista `todos`, que já é do tipo de dia corrente).
+
+    Issue #215: antes, quando restavam menos de N saídas no dia, a lista era
+    completada com as primeiras da manhã — que já passaram — e o painel
+    mostrava "06:00 · 06:20 · 06:40" às 07:58. As saídas de amanhã também não
+    entram: o tipo de dia pode ser outro (RN-08) e não temos a grade dele
+    aqui. Sem saída restante, a lista fica vazia e o front diz "sem saída
+    prevista hoje". Uma saída exatamente às `agora` ainda conta.
     """
-    ordenados = sorted(set(todos))
-    depois = [h for h in ordenados if h >= agora]
-    antes = [h for h in ordenados if h < agora]
-    return (depois + antes)[:QTD_PROXIMOS_HORARIOS]
+    return [h for h in sorted(set(todos)) if h >= agora][:QTD_PROXIMOS_HORARIOS]
 
 
 def vinculos_por_linha(db: Session, parada_id: int) -> dict[str, tuple[RotaParada, Rota]]:

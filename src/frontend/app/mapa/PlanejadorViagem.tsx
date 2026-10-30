@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   KeyboardEvent,
   useCallback,
@@ -14,6 +15,7 @@ import {
   ArrowUpDown,
   Bus,
   Crosshair,
+  Flag,
   Footprints,
   LoaderCircle,
   MapPin,
@@ -23,6 +25,7 @@ import {
   Search,
   SearchX,
   Star,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import {
@@ -31,11 +34,13 @@ import {
   Lugar,
   OpcaoViagem,
   PernaViagem,
+  PontoEmbarque,
   RotaFavorita,
   SalvarFavoritoError,
   salvarFavorito,
 } from "@/lib/api";
 import BadgeLinha from "./BadgeLinha";
+import FolhaInferior, { SnapFolha } from "./FolhaInferior";
 import { BotaoPegueiNaRota } from "./BotoesDaViagem";
 import SeloFonte from "./SeloFonte";
 import TempoNaParada, { SEM_DADO, temTempo } from "./TempoNaParada";
@@ -95,6 +100,9 @@ interface PlanejadorViagemProps {
   chegadasDaRota?: ChegadasDaPerna[] | null;
   /** Issue #190 — posição do usuário, para "Peguei este ônibus" no trecho. */
   localizacao?: { lat: number; lng: number } | null;
+  /** Issue #217 — no celular só uma folha aparece por vez: o planejador
+   * continua montado (guarda origem, destino e rotas) mas fica escondido. */
+  oculta?: boolean;
 }
 
 function CampoLugar({
@@ -296,18 +304,37 @@ function CampoLugar({
 /**
  * 582 dos 7.142 abrigos do SEMOB vêm sem nome utilizável na fonte (só o
  * CEP). Nesses casos o backend manda string vazia de propósito. Coordenada
- * crua ("Ponto em -15.8131, -48.0123") não diz nada a quem vai embarcar, e
- * o metro de caminhada já está ao lado — por isso o rótulo é um texto
- * humano; a coordenada fica só no `title`, pra quem precisar conferir.
+ * crua não diz nada a quem vai embarcar, e "Parada sem nome" também não
+ * ajuda a achar o ponto. Então, sem nome, a referência é o que o card já
+ * sabe de verdade: o código da parada e a distância de caminhada. Nunca se
+ * inventa um nome; só sobra "Parada sem nome" quando não há nem código nem
+ * distância.
  */
 const ROTULO_PARADA_SEM_NOME = "Parada sem nome";
 
-function rotuloDoPonto(nome: string): string {
-  return nome || ROTULO_PARADA_SEM_NOME;
+/** `de` completa "a N m ...": de você (embarque inicial) ou do destino. */
+export function rotuloDoPonto(
+  ponto: Pick<PontoEmbarque, "parada_nome" | "parada_codigo" | "caminhada_metros">,
+  de: "voce" | "destino" | null = null
+): string {
+  if (ponto.parada_nome) return ponto.parada_nome;
+  const codigo = ponto.parada_codigo ? ` ${ponto.parada_codigo}` : "";
+  const distancia =
+    de && ponto.caminhada_metros > 0
+      ? ` a ${ponto.caminhada_metros} m ${de === "voce" ? "de você" : "do destino"}`
+      : "";
+  if (!codigo && !distancia) return ROTULO_PARADA_SEM_NOME;
+  // Com código e distância: "Parada PR-12243, a 14 m de você".
+  return `Parada${codigo}${codigo && distancia ? "," : ""}${distancia}`;
 }
 
-function dicaDoPonto(nome: string, lat: number, lng: number): string | undefined {
-  return nome ? undefined : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+/** Texto de acessibilidade (title): o rótulo e, sem nome, as coordenadas só como complemento. */
+function dicaDoPonto(
+  ponto: PontoEmbarque,
+  de: "voce" | "destino" | null
+): string | undefined {
+  if (ponto.parada_nome) return undefined;
+  return `${rotuloDoPonto(ponto, de)} (coordenadas ${ponto.lat.toFixed(5)}, ${ponto.lng.toFixed(5)})`;
 }
 
 function ResumoOpcao({ opcao, destaques }: { opcao: OpcaoViagem; destaques: Destaque[] }) {
@@ -511,6 +538,13 @@ function LinhaDoTempo({
   // faixa de viagem do mapa.
   const { viagem } = useViagem();
   const emViagem = viagem !== null;
+  // A distância só é "de você" no embarque da 1ª perna e "do destino" no
+  // desembarque da última; nas baldeações o metro é de outro trecho.
+  const deQuem = (perna: PernaViagem, ponto: "embarque" | "desembarque") => {
+    const indice = pernas.indexOf(perna);
+    if (ponto === "embarque") return indice === 0 ? ("voce" as const) : null;
+    return indice === pernas.length - 1 ? ("destino" as const) : null;
+  };
   const chegadaDaPerna = (perna: PernaViagem) => chegadas?.[pernas.indexOf(perna)] ?? null;
 
   return (
@@ -538,13 +572,9 @@ function LinhaDoTempo({
                 <p className="plan-tempo-titulo">
                   Embarque em{" "}
                   <strong
-                    title={dicaDoPonto(
-                      passo.perna.embarque.parada_nome,
-                      passo.perna.embarque.lat,
-                      passo.perna.embarque.lng
-                    )}
+                    title={dicaDoPonto(passo.perna.embarque, deQuem(passo.perna, "embarque"))}
                   >
-                    {rotuloDoPonto(passo.perna.embarque.parada_nome)}
+                    {rotuloDoPonto(passo.perna.embarque, deQuem(passo.perna, "embarque"))}
                   </strong>
                 </p>
                 <p className="plan-tempo-linha">
@@ -581,13 +611,9 @@ function LinhaDoTempo({
               <p className="plan-tempo-titulo">
                 Desça em{" "}
                 <strong
-                  title={dicaDoPonto(
-                    passo.perna.desembarque.parada_nome,
-                    passo.perna.desembarque.lat,
-                    passo.perna.desembarque.lng
-                  )}
+                  title={dicaDoPonto(passo.perna.desembarque, deQuem(passo.perna, "desembarque"))}
                 >
-                  {rotuloDoPonto(passo.perna.desembarque.parada_nome)}
+                  {rotuloDoPonto(passo.perna.desembarque, deQuem(passo.perna, "desembarque"))}
                 </strong>
               </p>
             )}
@@ -618,94 +644,6 @@ function LinhaDoTempo({
   );
 }
 
-/** Limites da folha, em pixels. O mínimo é a faixa que fica visível
- *  quando ela está recolhida: alça mais o cabeçalho. */
-const ALTURA_MINIMA = 96;
-const LIMIAR_ARRASTO = 46;
-
-/**
- * Folha arrastável do mobile (issue #132).
- *
- * A folha é a camada do meio da tela: fica sobre o mapa e sob a barra de
- * navegação. Recolhida, deixa o trajeto visível e mantém a alça ao
- * alcance do polegar; arrastada para cima, volta a mostrar as opções.
- *
- * O estado só muda se houve movimento de verdade (mais de 3 px). Sem
- * isso, um toque na alça registraria como arrasto de zero pixel e a
- * folha oscilaria sozinha.
- */
-function useFolhaArrastavel() {
-  const ref = useRef<HTMLElement>(null);
-  const [recolhida, setRecolhida] = useState(false);
-  const [altura, setAltura] = useState<number | null>(null);
-  const [arrastando, setArrastando] = useState(false);
-  const arrasto = useRef<{ y0: number; altura0: number; moveu: boolean } | null>(
-    null
-  );
-  const suprimirClique = useRef(false);
-
-  const aoMover = useCallback((evento: PointerEvent) => {
-    const atual = arrasto.current;
-    if (!atual || !ref.current) return;
-
-    const dy = evento.clientY - atual.y0;
-    if (Math.abs(dy) > 3) atual.moveu = true;
-
-    const teto = window.innerHeight * 0.82;
-    setAltura(Math.max(ALTURA_MINIMA, Math.min(teto, atual.altura0 - dy)));
-  }, []);
-
-  const aoSoltar = useCallback(
-    (evento: PointerEvent) => {
-      const atual = arrasto.current;
-      window.removeEventListener("pointermove", aoMover);
-      window.removeEventListener("pointerup", aoSoltar);
-      window.removeEventListener("pointercancel", aoSoltar);
-      arrasto.current = null;
-      setArrastando(false);
-      setAltura(null);
-
-      if (!atual || !atual.moveu) return;
-
-      const dy = evento.clientY - atual.y0;
-      if (dy < -LIMIAR_ARRASTO) setRecolhida(false);
-      else if (dy > LIMIAR_ARRASTO) setRecolhida(true);
-
-      // O pointerup dispara um clique logo em seguida; sem isso, arrastar
-      // também alternaria o estado, desfazendo o que o arrasto acabou de
-      // decidir.
-      suprimirClique.current = true;
-      window.setTimeout(() => {
-        suprimirClique.current = false;
-      }, 60);
-    },
-    [aoMover]
-  );
-
-  const aoPressionar = useCallback(
-    (evento: React.PointerEvent) => {
-      if (!ref.current) return;
-      arrasto.current = {
-        y0: evento.clientY,
-        altura0: ref.current.offsetHeight,
-        moveu: false,
-      };
-      setArrastando(true);
-      window.addEventListener("pointermove", aoMover);
-      window.addEventListener("pointerup", aoSoltar);
-      window.addEventListener("pointercancel", aoSoltar);
-    },
-    [aoMover, aoSoltar]
-  );
-
-  const aoClicar = useCallback(() => {
-    if (suprimirClique.current) return;
-    setRecolhida((estava) => !estava);
-  }, []);
-
-  return { ref, recolhida, altura, arrastando, aoPressionar, aoClicar };
-}
-
 export default function PlanejadorViagem({
   origem,
   destino,
@@ -728,9 +666,29 @@ export default function PlanejadorViagem({
   onFavoritoSalvo,
   chegadasDaRota = null,
   localizacao = null,
+  oculta = false,
 }: PlanejadorViagemProps) {
   const podeBuscar = Boolean(origem && destino) && !calculando;
-  const folha = useFolhaArrastavel();
+  const { viagem, ocupado, encerrar } = useViagem();
+  const emViagem = viagem !== null;
+
+  // Issue #217 — a folha guarda a altura onde o usuário a soltou. Embarcar
+  // leva a folha ao mínimo: o foco passa a ser a viagem, não a lista de rotas.
+  const [snap, setSnap] = useState<SnapFolha>("medio");
+  const estavaEmViagem = useRef(emViagem);
+  useEffect(() => {
+    if (emViagem && !estavaEmViagem.current) setSnap("minimo");
+    estavaEmViagem.current = emViagem;
+  }, [emViagem]);
+
+  const [erroEncerrar, setErroEncerrar] = useState<string | null>(null);
+  async function aoTocarCheguei() {
+    setErroEncerrar(null);
+    const resultado = await encerrar();
+    if (!resultado.ok) {
+      setErroEncerrar(resultado.mensagem ?? "Não foi possível encerrar a viagem.");
+    }
+  }
   const idBase = useId();
 
   // Mobile: depois de calcular, o formulário recolhe numa linha
@@ -803,39 +761,49 @@ export default function PlanejadorViagem({
         : `${opcoes.length} ${opcoes.length === 1 ? "opção encontrada" : "opções encontradas"}.`;
 
   return (
-    <aside
-      ref={folha.ref}
-      className={`plan-painel${folha.recolhida ? " recolhida" : ""}${
-        folha.arrastando ? " arrastando" : ""
-      }${comResultado ? " com-resultado" : ""}${editando ? " editando" : ""}`}
-      style={folha.altura !== null ? { height: `${folha.altura}px` } : undefined}
+    <FolhaInferior
+      snap={snap}
+      onSnapChange={setSnap}
+      oculta={oculta}
+      className={`plan-painel${comResultado ? " com-resultado" : ""}${
+        editando ? " editando" : ""
+      }`}
+      titulo={<strong>Para onde você vai?</strong>}
+      rotuloAlca="opções de viagem"
+      rotuloFechar="Fechar planejador de viagem"
+      onFechar={onFechar}
+      rodape={
+        emViagem ? (
+          <div className="plan-rodape-viagem">
+            {erroEncerrar && (
+              <p className="mapa-viagem-erro" role="alert">
+                {erroEncerrar}
+              </p>
+            )}
+            <div className="plan-rodape-viagem-acoes">
+              <button
+                type="button"
+                className="plan-rodape-cheguei"
+                onClick={aoTocarCheguei}
+                disabled={ocupado}
+              >
+                <Flag size={15} aria-hidden="true" />
+                Cheguei
+              </button>
+              <Link
+                className="plan-rodape-reportar"
+                href={`/ocorrencias/reportar?linha=${encodeURIComponent(
+                  viagem.numeroLinha
+                )}`}
+              >
+                <TriangleAlert size={15} aria-hidden="true" />
+                Reportar ocorrência
+              </Link>
+            </div>
+          </div>
+        ) : undefined
+      }
     >
-      {/* Alça da folha (mobile). O botão existe porque arrastar não é
-          acessível por teclado — quem navega assim alterna por aqui. */}
-      <button
-        type="button"
-        className="plan-alca"
-        aria-expanded={!folha.recolhida}
-        aria-label={folha.recolhida ? "Abrir opções de viagem" : "Recolher opções de viagem"}
-        onPointerDown={folha.aoPressionar}
-        onClick={folha.aoClicar}
-      >
-        <span className="plan-alca-traco" aria-hidden="true" />
-      </button>
-
-      <div className="plan-cabecalho">
-        <strong>Para onde você vai?</strong>
-        <button
-          type="button"
-          className="mapa-botao-icone"
-          title="Fechar"
-          aria-label="Fechar planejador de viagem"
-          onClick={onFechar}
-        >
-          <X size={16} />
-        </button>
-      </div>
-
       {/* Só no mobile (o CSS esconde no desktop): o formulário some depois
           de calcular e este resumo o substitui. */}
       {comResultado && (
@@ -1076,6 +1044,6 @@ export default function PlanejadorViagem({
           </p>
         </div>
       )}
-    </aside>
+    </FolhaInferior>
   );
 }
