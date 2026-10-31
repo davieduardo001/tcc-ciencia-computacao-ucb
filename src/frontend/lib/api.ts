@@ -2049,6 +2049,10 @@ export async function removerInscricaoPush(endpoint: string): Promise<void> {
 // US #29 — Preferências de Notificação
 // ---------------------------------------------------------------------------
 
+/** Confirmações de outros passageiros para a ocorrência virar "confirmada".
+ * Espelha Ocorrencia.LIMITE_CONFIRMACOES do servidor (RN-015). */
+export const LIMITE_CONFIRMACOES = 3;
+
 export const ANTECEDENCIAS_ALERTA = [5, 10, 30, 60] as const;
 export type AntecedenciaAlerta = (typeof ANTECEDENCIAS_ALERTA)[number];
 export type TipoNotificacao = "chegada" | "cancelamento";

@@ -9,6 +9,7 @@ import {
   TipoPlano,
 } from "@/lib/api";
 import BadgeLinha from "./BadgeLinha";
+import { rotuloDoPonto } from "./PlanejadorViagem";
 
 /**
  * US #115 — "Planejar por horário": sair às X ou chegar até X.
@@ -90,10 +91,10 @@ function OpcaoDoPlano({ opcao, tipo }: { opcao: OpcaoPlanejada; tipo: TipoPlano 
             )}
             <p>
               <BadgeLinha numero={perna.numero} /> sobe às{" "}
-              <strong>{horaDe(perna.embarca_em)}</strong> em {perna.embarque.parada_nome}
+              <strong>{horaDe(perna.embarca_em)}</strong> em {rotuloDoPonto(perna.embarque)}
               <br />
               desce às <strong>{horaDe(perna.desembarca_em)}</strong> em{" "}
-              {perna.desembarque.parada_nome}
+              {rotuloDoPonto(perna.desembarque)}
             </p>
           </li>
         ))}
