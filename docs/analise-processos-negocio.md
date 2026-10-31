@@ -1241,7 +1241,7 @@ Essas nove disfunções constituem a linha de base contra a qual o TO-BE com o M
 - Nome e funcionalidades vigentes do aplicativo oficial de informação ao usuário do STPC/DF. A pesquisa do projeto o identifica como "DF no Ponto" (`docs/pesquisa-integracao-onibus-df.md`), sem API pública para desenvolvedores; a vigência de cada funcionalidade modelada em 3.2 não foi confirmada.
 - Fluxo interno de decisão de cancelamento de viagem nas empresas operadoras, idealmente validado em entrevista com profissional da área. É a premissa de N05 e de D1; não foi validada.
 - **Limiar de validação cruzada:** o código exige **3 confirmações de outros usuários** (`LIMITE_CONFIRMACOES = 3`, `colaboracao/models/ocorrencia.py`), com "acidente" e "segurança" exibidos de imediato. A tela de reporte também diz "mínimo 2 confirmações" (#249, aberta) e um caso de teste manual registra "2 confirmações" (CT-COL-01), enquanto o servidor exige 3; o Documento de Visão (v1.1) já registra 3. Falta corrigir o texto da tela.
-- **Segurança da sessão (#253, aberta):** o frontend grava os tokens em `localStorage`, o que anula a proteção do cookie httpOnly que a arquitetura declara; a correção não foi feita.
+- **Segurança da sessão (#253):** o frontend gravava os tokens em `localStorage`, o que anulava a proteção do cookie httpOnly; corrigido em 31/10 (PR #269).
 - Issues #26, #29 e #200 seguem abertas com código mergeado; o grupo decide se as fecha ou se registra o que falta.
 - Conferência de como os PRs do orquestrador foram mergeados frente à regra de aprovação formal (4.10).
 

@@ -52,7 +52,7 @@ Dos 18 casos P1, 4 reprovaram na primeira execução (AUT-01, AUT-03, PAR-01 e P
 | Alertas sem entrega | A tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28) |
 | Avaliação de usabilidade por um avaliador, de forma agêntica | Decisão do grupo (28/10): sem repetição por outras pessoas. O método pede 3 a 5 avaliadores independentes e não houve teste com usuários reais; declarar na defesa |
 | Cobertura não é medida no CI | E o Jest mede só os arquivos importados (3 de 43 ficam de fora); os números são de 16/10 |
-| **Tokens de sessão também no `localStorage`** | O frontend grava `access_token` e `refresh_token` em `localStorage` (código sem uso), o que expõe os tokens a XSS e reduz a proteção do cookie httpOnly. Issue #253 aberta; declarar na defesa |
+| **Tokens de sessão também no `localStorage`** | O frontend grava `access_token` e `refresh_token` em `localStorage` (código sem uso), o que expõe os tokens a XSS e reduz a proteção do cookie httpOnly. **Corrigido em 31/10** (#253, PR #269): o frontend não grava mais token e o Gateway não o devolve no corpo; validado em produção |
 | Issues abertas | #216 (embarque: causa de configuração), #233 (investigar "nenhuma linha liga esses dois pontos"), #234 (build depende do Google Fonts), #236 (dica do "Buscar parada"), #243 (mensagens sem acento) |
 
 ## Próximos passos

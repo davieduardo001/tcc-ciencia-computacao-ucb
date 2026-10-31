@@ -306,7 +306,7 @@ def esqueci_senha(
     if not _verificar_rate_limit(dados.email):
         raise HTTPException(
             status_code=429,
-            detail="Muitas solicitacoes. Tente novamente mais tarde.",
+            detail="Muitas solicitações. Tente novamente mais tarde.",
         )
 
     usuario = db.query(Usuario).filter(Usuario.email == dados.email).first()
@@ -320,7 +320,7 @@ def esqueci_senha(
         logger.info("Token de reset gerado e envio de e-mail agendado.")
 
     return RespostaGenerica(
-        mensagem="Se o e-mail estiver cadastrado, voce recebera um link de redefinicao."
+        mensagem="Se o e-mail estiver cadastrado, você receberá um link de redefinição."
     )
 
 
@@ -332,13 +332,13 @@ def redefinir_senha(
     if dados.nova_senha != dados.confirmacao_senha:
         raise HTTPException(
             status_code=400,
-            detail="As senhas nao coincidem.",
+            detail="As senhas não coincidem.",
         )
 
     if len(dados.nova_senha) < 8:
         raise HTTPException(
             status_code=400,
-            detail="A senha deve ter no minimo 8 caracteres.",
+            detail="A senha deve ter no mínimo 8 caracteres.",
         )
 
     token_obj = (
@@ -350,14 +350,14 @@ def redefinir_senha(
     if not token_obj or not token_obj.valido:
         raise HTTPException(
             status_code=400,
-            detail="Este link nao e mais valido ou expirou.",
+            detail="Este link não é mais válido ou expirou.",
         )
 
     usuario = db.query(Usuario).filter(Usuario.id == token_obj.usuario_id).first()
     if not usuario:
         raise HTTPException(
             status_code=400,
-            detail="Usuario nao encontrado.",
+            detail="Usuário não encontrado.",
         )
 
     usuario.senha_hash = hash_senha(dados.nova_senha)
