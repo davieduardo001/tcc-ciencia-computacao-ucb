@@ -7,6 +7,8 @@ import {
   buscarLugares,
   calcularRotas,
   CalcularRotaError,
+  planejarViagem,
+  PlanejarViagemError,
   nomearLugar,
   buscarPosicoesDaLinha,
   buscarChegadasParada,
@@ -171,6 +173,52 @@ describe("api.ts — sugerirLinhas (autocomplete, US #17)", () => {
 describe("api.ts — rota origem → destino (US #20)", () => {
   afterEach(() => {
     jest.resetAllMocks();
+  });
+
+  it("planejarViagem manda coordenadas, tipo, horário e dia como query params", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ opcoes: [], motivo: "fora_do_horario", mensagem: "x" }),
+    }) as jest.Mock;
+
+    const plano = await planejarViagem(
+      { lat: -15.8195, lng: -48.1096 },
+      { lat: -15.7939, lng: -47.8828 },
+      "chegada",
+      "08:00",
+      "2026-11-02"
+    );
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain("/api/mobilidade/planejar?");
+    expect(url).toContain("origem_lat=-15.8195");
+    expect(url).toContain("destino_lng=-47.8828");
+    expect(url).toContain("tipo=chegada");
+    expect(url).toContain("horario=08%3A00");
+    expect(url).toContain("data=2026-11-02");
+    expect(options.credentials).toBe("include");
+    expect(plano.motivo).toBe("fora_do_horario");
+  });
+
+  it("planejarViagem não manda 'data' quando ela não é informada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ opcoes: [] }),
+    }) as jest.Mock;
+
+    await planejarViagem({ lat: 1, lng: 2 }, { lat: 3, lng: 4 }, "saida", "07:10");
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).not.toContain("data=");
+  });
+
+  it("planejarViagem lança PlanejarViagemError quando o servidor falha", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 }) as jest.Mock;
+
+    await expect(
+      planejarViagem({ lat: 1, lng: 2 }, { lat: 3, lng: 4 }, "saida", "07:10")
+    ).rejects.toBeInstanceOf(PlanejarViagemError);
   });
 
   it("calcularRotas manda as quatro coordenadas como query params", async () => {

@@ -42,6 +42,7 @@ import {
 import BadgeLinha from "./BadgeLinha";
 import FolhaInferior, { SnapFolha } from "./FolhaInferior";
 import { BotaoPegueiNaRota } from "./BotoesDaViagem";
+import PlanoPorHorario from "./PlanoPorHorario";
 import SeloFonte from "./SeloFonte";
 import TempoNaParada, { SEM_DADO, temTempo } from "./TempoNaParada";
 import { useViagem } from "./ViagemContext";
@@ -884,6 +885,8 @@ export default function PlanejadorViagem({
         {anuncio}
       </p>
 
+      {origem && destino && <PlanoPorHorario origem={origem} destino={destino} />}
+
       {calculando && (
         <div className="plan-esqueletos" aria-hidden="true">
           <div className="plan-esqueleto" />
@@ -1039,8 +1042,8 @@ export default function PlanejadorViagem({
           <p className="plan-ressalva">
             <strong>Ao vivo</strong> vale só para a espera pelo primeiro ônibus
             (posição real). O tempo dentro do ônibus e as baldeações são
-            estimados por velocidade e intervalo médios, sem horário de tabela.
-            Planejamento por horário de partida está em desenvolvimento.
+            estimados por velocidade e intervalo médios. Para saber a que horas
+            sair ou chegar, use &ldquo;Planejar por horário&rdquo;.
           </p>
         </div>
       )}

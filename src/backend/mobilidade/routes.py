@@ -1,6 +1,7 @@
 import uuid
+from typing import Literal
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
@@ -30,6 +31,7 @@ from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
 from mobilidade.posicao_service import FUSO_SEMOB, PosicaoService
 from mobilidade.posicoes_colaborativas import ServicoPosicoesColaborativas
+from mobilidade.planejamento_horario import planejar as planejar_por_horario
 from mobilidade.rota_service import RotaService
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
@@ -44,7 +46,10 @@ from mobilidade.schemas import (
     LinhaResponse,
     LinhaResumoResponse,
     LugarResponse,
+    OpcaoPlanejadaResponse,
     OpcaoViagemResponse,
+    PernaPlanejadaResponse,
+    PlanoViagemResponse,
     ParadaDetalheResponse,
     PosicaoVeiculoResponse,
     PosicoesLinhaResponse,
@@ -248,6 +253,85 @@ async def calcular_rotas(
             )
         )
     return respostas
+
+
+_MENSAGEM_SEM_PLANO = {
+    "sem_opcoes": "Nenhuma linha atende esta origem e este destino.",
+    "sem_tabela_de_horarios": "As linhas deste trajeto ainda não têm tabela de horários no SEMOB.",
+    "fora_do_horario": "Nenhum ônibus atende este trajeto neste horário. Tente outro horário ou outro dia.",
+}
+
+
+@router.get("/planejar", response_model=PlanoViagemResponse)
+async def planejar_viagem(
+    origem_lat: float = Query(..., ge=-90, le=90),
+    origem_lng: float = Query(..., ge=-180, le=180),
+    destino_lat: float = Query(..., ge=-90, le=90),
+    destino_lng: float = Query(..., ge=-180, le=180),
+    tipo: Literal["saida", "chegada"] = Query(...),
+    horario: str = Query(..., pattern=r"^([01]\d|2[0-3]):[0-5]\d$"),
+    data: date | None = Query(None, description="AAAA-MM-DD; padrão: hoje (Brasília)"),
+    db: Session = Depends(get_db),
+):
+    """
+    US #115 — Planejar Viagem por Horário de Partida/Chegada.
+
+    Cenário 1: `tipo=saida` ("sair às 7h10") → opções com o horário de
+               cada perna.
+    Cenário 2: `tipo=chegada` ("chegar até 8h00") → o horário de saída
+               necessário.
+    Cenário 3: cada perna traz `espera_min`; na baldeação é a espera no
+               ponto de troca.
+    Cenário 4: a tabela usada é a do dia da semana de `data`.
+    Cenário 5: sem opção, `motivo` + `mensagem` explicam por quê.
+
+    As opções vêm da US #20 (mesma busca por geometria); o horário de
+    passagem em cada parada é estimado (`estimado=true`).
+    """
+    dia = data or datetime.now(FUSO_SEMOB).date()
+    horas, minutos = horario.split(":")
+    referencia = datetime(dia.year, dia.month, dia.day, int(horas), int(minutos), tzinfo=FUSO_SEMOB)
+
+    opcoes = await run_in_threadpool(
+        _rota_service.calcular, db, (origem_lat, origem_lng), (destino_lat, destino_lng)
+    )
+    resultado = await run_in_threadpool(
+        planejar_por_horario, db, _rota_service, opcoes, tipo, referencia
+    )
+
+    def ponto(p):
+        return {**p.__dict__, "parada_codigo": None}
+
+    planejadas = [
+        OpcaoPlanejadaResponse(
+            pernas=[
+                PernaPlanejadaResponse(
+                    numero=perna.numero,
+                    sentido=perna.sentido,
+                    nome=perna.nome,
+                    embarque=ponto(perna.embarque),
+                    desembarque=ponto(perna.desembarque),
+                    embarca_em=horario_perna.embarca_em.isoformat(),
+                    desembarca_em=horario_perna.desembarca_em.isoformat(),
+                    espera_min=horario_perna.espera_min,
+                )
+                for perna, horario_perna in zip(opcao.pernas, plano.pernas)
+            ],
+            baldeacoes=opcao.baldeacoes,
+            saida_casa=plano.saida_casa.isoformat(),
+            chegada_destino=plano.chegada_destino.isoformat(),
+            duracao_total_min=plano.duracao_total_min,
+            caminhada_metros=opcao.caminhada_metros,
+        )
+        for opcao, plano in resultado.opcoes
+    ]
+    return PlanoViagemResponse(
+        tipo=tipo,
+        referencia=referencia.isoformat(),
+        opcoes=planejadas,
+        motivo=resultado.motivo,
+        mensagem=_MENSAGEM_SEM_PLANO.get(resultado.motivo) if resultado.motivo else None,
+    )
 
 
 @router.post("/rotas/chegadas", response_model=ChegadasDaRotaResponse)

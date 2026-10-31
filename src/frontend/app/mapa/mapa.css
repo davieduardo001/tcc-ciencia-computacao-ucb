@@ -3148,3 +3148,120 @@
     color: var(--text);
   }
 }
+
+/* ===== Planejar por horário (US #115) ===== */
+.plano-horario {
+  margin: 8px 0 4px;
+}
+
+.plano-horario-abrir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--primary-700);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-700);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plano-horario-corpo {
+  margin-top: 10px;
+}
+
+.plano-horario-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.plano-horario-tipo {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 13.5px;
+}
+
+.plano-horario-tipo label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.plano-horario-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plano-horario-campo input {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1.5px solid var(--border, #d0d5dd);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: transparent;
+}
+
+.plano-horario-lista {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plano-horario-opcao {
+  padding: 12px;
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 12px;
+}
+
+.plano-horario-resumo {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.plano-horario-pernas {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.plano-horario-pernas p {
+  margin: 0 0 6px;
+}
+
+.plano-horario-espera {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.plano-horario-vazio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.plano-horario-vazio p {
+  margin: 0;
+}
