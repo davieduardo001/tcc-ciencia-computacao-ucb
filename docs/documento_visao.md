@@ -60,11 +60,12 @@ O detalhamento de cada requisito, com critérios de aceite, está no [DRS](drs.m
 
 | Necessidade | Funcionalidade | Prioridade | Responsável |
 | :--- | :--- | :--- | :--- |
-| Saber onde está o ônibus (combate ao "ônibus fantasma") | Mapa com a localização do usuário, busca de linha por número, trajeto e paradas, posição dos ônibus atualizada sozinha (US #14, #15, #16, #17) | Alta | @Kelvin963 (#14–#16), @davieduardo001 (#17) |
+| Saber onde está o ônibus (combate ao "ônibus fantasma") | Mapa com a localização do usuário, busca de linha por número, trajeto e paradas, posição dos ônibus atualizada sozinha (US #14, #15, #16, #17) e, quando o ônibus não aparece no GPS oficial, posição informada por passageiros a bordo, com consentimento (US #199) | Alta | @Kelvin963 (#14–#16), @davieduardo001 (#17), @ngualbertolopes (#199) |
 | Saber quanto falta para o ônibus chegar | Tempo estimado de chegada (ETA) no ônibus, na parada e na rota, sempre com a origem do número: ao vivo, previsto ou "sem previsão" (US #19, #159, #173) | Alta | @louisassis (#19), @Vitoria-Albuquerque (#159), @davieduardo001 (#173) |
 | Chegar de um ponto a outro | Rota por ônibus com baldeação, paradas de subir e descer, busca de parada por nome ou endereço e detalhes da parada (US #18, #20, #21, #190) | Alta | @louisassis (#18, #20, #21), @davieduardo001 (#190) |
+| Saber a que horas sair de casa | Planejamento por horário: "sair às 7h10" ou "chegar até 8h00", com o horário de cada ônibus e a espera na baldeação (US #115) | Média | @davieduardo001 |
 | Acompanhar a viagem e não perder a parada | "Peguei este ônibus", acompanhamento em viagem e alerta de proximidade, dentro do app e por Web Push com a tela bloqueada (US #171, #172, #195) | Alta | @Kelvin963 (#171, entregue por @Vitoria-Albuquerque), @gualbertonathalia (#172, concluída por @davieduardo001), @davieduardo001 (#195) |
-| Ser avisado de atraso e das rotas de interesse | Alerta de atraso, notificações de rotas preferidas e preferências de notificação (US #22, #27, #29) | Alta | @gualbertonathalia |
+| Ser avisado de atraso e das rotas de interesse | Alerta de atraso, notificações de rotas preferidas, alerta de cancelamento de viagem e preferências de notificação (US #22, #27, #28, #29) | Alta | @gualbertonathalia (#22, #27, #29), @Kelvin963 (#28) |
 | Contribuir com informação de campo | Reporte de ocorrência, lista de ocorrências e confirmação por outros passageiros, estilo Waze (US #23, #24, #26) | Média | @Vitoria-Albuquerque |
 | Voltar rápido a trajetos frequentes | Rota favorita (US #25) | Média | @Vitoria-Albuquerque |
 | Acesso seguro e simples | Cadastro, login por e-mail e senha ou Google, recuperação de senha por e-mail e sessão com renovação automática (US #10, #11, #12, #13, #31, #133) | Alta | @brenouchihar (#10, #11, #13, #133), @davieduardo001 (#12, #31) |
@@ -83,7 +84,7 @@ O detalhamento de cada requisito, com critérios de aceite, está no [DRS](drs.m
 
 **Fluxo de dados:**
 1. A API do GDF (SEMOB) fornece as posições GPS dos ônibus; o backend as lê ao vivo (cache de 20 s) e não as grava.
-2. O backend combina a posição ao vivo com o catálogo de linhas e paradas para calcular ETA, rotas e viagem. Os reportes dos usuários ficam em tabela própria e aparecem na lista de ocorrências; não alteram o ETA nem a posição dos ônibus.
+2. O backend combina a posição ao vivo com o catálogo de linhas e paradas para calcular ETA, rotas e viagem. Quando uma linha não tem ônibus no feed, a posição informada por passageiros a bordo, com consentimento, entra no lugar, sempre com o selo "colaborativo"; a posição da SEMOB sempre vale mais. O planejamento por horário aplica a tabela de saídas da SEMOB às opções de rota. Os reportes dos usuários ficam em tabela própria e aparecem na lista de ocorrências; não alteram o ETA nem a posição dos ônibus.
 3. O frontend renderiza as informações no mapa via Leaflet JS.
 4. Os reportes colaborativos são validados por cruzamento: atraso, não passou, lotação, obra na via e ônibus quebrou ficam "aguardando confirmação" até receberem **3 confirmações de outros passageiros**; acidente e segurança aparecem confirmados de imediato. O autor não confirma o próprio reporte.
 
@@ -92,7 +93,7 @@ O detalhamento de cada requisito, com critérios de aceite, está no [DRS](drs.m
 | :--- | :--- | :--- | :--- |
 | **Desempenho** | Carregamento em até 3 s em conexões 4G | Alta | Meta; não medida em rede 4G. |
 | **Disponibilidade** | 99% nos horários de pico (5h–9h, 17h–20h) | Alta | Meta; sem monitoramento de uptime. |
-| **LGPD** | Proteção rigorosa de dados de geolocalização | Alta | A posição do usuário não é guardada: a viagem não tem coluna de posição e a posição enviada no embarque é descartada; nenhuma coordenada do usuário vai para o endereço das páginas. Sem auditoria formal. |
+| **LGPD** | Proteção rigorosa de dados de geolocalização | Alta | Nenhuma coordenada do usuário vai para o banco: a viagem não tem coluna de posição, a posição enviada no embarque é descartada e nenhuma coordenada vai para o endereço das páginas. A única exceção é a posição colaborativa (US #199), só com consentimento explícito e revogável: ela fica na memória do servidor por até 2 minutos e nunca é gravada; no banco ficam só o instante e a versão do texto aceito. Sem auditoria formal. |
 | **Validação cruzada** | Reporte colaborativo precisa de confirmação de outros passageiros | Média | Implementada com 3 confirmações (o planejamento inicial previa 2). |
 
 ### 5.4 Restrições e premissas
@@ -100,10 +101,12 @@ O detalhamento de cada requisito, com critérios de aceite, está no [DRS](drs.m
 - **Dados da SEMOB** por ingestão mensal em lote e posição ao vivo; os endpoints são públicos, sem documentação nem SLA.
 - **Sem ambiente de homologação separado**, por custo: a `homolog` publica na produção da Vercel, e backend e banco são compartilhados.
 - **Plataforma:** aplicativo web instalável (PWA); no iPhone, o aviso com a tela bloqueada exige instalar o app na tela inicial.
+- **Posição colaborativa:** as leituras ficam na memória do processo do serviço de mobilidade. Com mais de uma máquina no Fly.io, o fallback pode não aparecer para quem consulta em outra máquina; trocar por armazenamento compartilhado é uma mudança só de implementação.
+- **Horário planejado:** o horário de passagem em cada parada é estimado (saída do terminal pela tabela da SEMOB mais o tempo de percurso); feriados não são considerados porque a SEMOB não informa.
 - **Ajuda ao usuário:** o tutorial do primeiro acesso é o único material de uso dentro do app.
 
 ## 6. Escopo entregue
-Estão entregues todas as funcionalidades da tabela 5.1: acesso, mapa e rastreamento, ETA, rotas, parada, viagem, ocorrências, rota favorita, tutorial, alertas e instalação como PWA. Além do planejado no início, o produto ganhou "pegar o ônibus" (#171), alerta de proximidade (#172) por Web Push (#195), paradas de subir e descer na rota (#190), ETA pela parada física (#173), PWA (#136) e e-mail de recuperação de senha (#237).
+Estão entregues todas as funcionalidades da tabela 5.1: acesso, mapa e rastreamento, ETA, rotas, planejamento por horário, parada, viagem, ocorrências, rota favorita, tutorial, alertas (atraso, proximidade e cancelamento) e instalação como PWA. Além do planejado no início, o produto ganhou "pegar o ônibus" (#171), alerta de proximidade (#172) por Web Push (#195), paradas de subir e descer na rota (#190), ETA pela parada física (#173), PWA (#136), e-mail de recuperação de senha (#237), alerta de cancelamento de viagem (#28), planejamento por horário (#115) e posição colaborativa com consentimento (#199).
 
 Não foi feita validação em campo: o raio de embarque, a tolerância do ETA e a regra "ônibus chegando" não foram medidos com um ônibus real. O texto dos Termos de Uso e da Política de Privacidade (#32) ainda precisa ser publicado numa tela do aplicativo; hoje o cadastro exige apenas o aceite. Os resultados dos testes estão no Documento de Testes e Implementação.
 
@@ -116,3 +119,4 @@ Não foi feita validação em campo: o raio de embarque, a tolerância do ETA e 
 | Versão | Data | Alteração |
 | :--- | :--- | :--- |
 | 1.0 | 30/10/2026 | Versão entregue, refletindo o produto implementado |
+| 1.1 | 31/10/2026 | Inclusão do alerta de cancelamento (#28), do planejamento por horário (#115) e da posição colaborativa (#199) |

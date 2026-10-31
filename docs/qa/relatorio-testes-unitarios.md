@@ -54,6 +54,18 @@ Os números acima são de 16/10 (`07c9edc`). Em 28/10 a contagem foi refeita **a
 
 São **380 testes a mais** que em 16/10 (173 no backend, 207 no frontend). A cobertura **não foi remedida**: o CI não a mede, então os 93,7% (backend) e 89,1% (frontend) continuam sendo os de 16/10. O número de arquivos de teste por serviço do backend também não foi recontado.
 
+### Atualização de 31/10/2026 (`homolog` com o PR #265)
+
+Com a entrada do alerta de cancelamento (#28), da posição colaborativa (#199) e do planejamento por horário (#115) na `homolog`, a contagem foi refeita **rodando as suítes completas** sobre `homolog` com o PR #265 (backend contra PostgreSQL 16 local; o CI do PR #265 também passou nos 7 checks).
+
+| Suíte | Arquivos | Testes | Passando | Falhando |
+|---|---|---|---|---|
+| Backend (pytest) | não recontado | 952 | **952** | 0 |
+| Frontend (Jest) | 45 suítes | 840 | **840** | 0 |
+| **Total** | | **1.792** | **1.792** | **0** |
+
+São 152 testes a mais que em 28/10 (108 no backend, 44 no frontend). A cobertura **não foi remedida**: continuam valendo os números de 16/10. Os casos manuais (CT-xxx) e a avaliação de Nielsen **não foram refeitos** para as três funcionalidades novas.
+
 ### Ressalvas sobre a execução
 
 - **Ambiente diferente do CI.** O CI usa Python 3.12, Node 20 e a imagem `postgis/postgis:16-3.4`; a medição local usou Python 3.14.7, Node 24 e PostgreSQL 16.15 sem PostGIS. Os 7 checks do CI do PR #194 passaram (ver a tabela da seção 2); esta execução confirma o mesmo resultado fora do CI, e não o substitui.

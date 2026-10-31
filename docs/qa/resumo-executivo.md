@@ -13,7 +13,7 @@ O projeto tem uma base automatizada ampla e verde e, agora, **os 49 casos manuai
 
 | O que | Valor | Fonte |
 |---|---|---|
-| Testes automatizados | **1.640** passando (844 backend, 796 frontend), contados no log do CI em 28/10 | [`relatorio-testes-unitarios.md`](relatorio-testes-unitarios.md), execução `40689632241` (`48483be`). Em 16/10 eram 1.260 |
+| Testes automatizados | **1.792** passando (952 backend, 840 frontend), contados em 31/10 em `homolog` com o PR #265 | [`relatorio-testes-unitarios.md`](relatorio-testes-unitarios.md). Em 28/10 eram 1.640 (execução `40689632241`) e em 16/10, 1.260 |
 | Cobertura do código de produção | backend **93,7%**; frontend **89,1%** (só dos arquivos importados pelos testes), de 16/10 | [`relatorio-cobertura-e-defeitos.md`](relatorio-cobertura-e-defeitos.md) |
 | Disciplina de teste nos PRs | **27 de 27** PRs `feat`/`fix` desde 22/09 trazem arquivo de teste | `gh pr view --json files` |
 | CI de PR | 94% verde na Sprint 3 (33 de 35), contra 79% na Sprint 2 | `gh run list` |
