@@ -17,6 +17,13 @@
 #               sábado e domingo) e nunca a lista antiga e plana da linha.
 #
 # Sem nenhuma das duas, devolve `eta_minutos=None` — RN-09, "não inventar".
+# US #199 — entra uma terceira origem, intermediária (RN-C2/RN-C3):
+#
+#  • colaborativo — sem ônibus da SEMOB a caminho, mas com passageiros
+#               compartilhando a posição do ônibus (consentimento LGPD,
+#               leitura efêmera): o ETA usa o veículo "colaborativo"
+#               injetado no PosicaoService, com o selo declarando a
+#               origem. Nunca substitui um ao_vivo.
 # Observado de verdade (média histórica de passagem) fica de fora: exigiria
 # persistir passagens, e isso é uma decisão arquitetural à parte (D3-C).
 
@@ -51,7 +58,7 @@ EMPATE_ENTRE_SENTIDOS_M = 15.0
 
 _METROS_POR_GRAU = 111_000.0
 
-FonteChegada = Literal["ao_vivo", "previsto"]
+FonteChegada = Literal["ao_vivo", "colaborativo", "previsto"]
 
 
 @dataclass(frozen=True)
@@ -131,10 +138,15 @@ async def chegadas_da_parada(
     posicao_service: PosicaoService,
     rota_service: RotaService,
     agora: datetime | None = None,
+    colaborativos=None,
 ) -> ChegadasDaParada | None:
     """
     Chegadas de cada linha que passa na parada `codigo`, as mais próximas
     primeiro. `None` quando o código não existe.
+
+    US #199 — com `colaborativos`, veículos "colaborativos" entram no pool
+    de posições por cima do feed; cada chegada declara se saiu de um
+    ônibus da SEMOB (`ao_vivo`) ou de passageiro (`colaborativo`).
     """
     agora = agora or datetime.now(timezone.utc)
 
@@ -146,29 +158,34 @@ async def chegadas_da_parada(
     if not vinculos:
         return ChegadasDaParada(parada=parada, chegadas=[])
 
-    posicoes = await posicao_service.posicoes_das_linhas(vinculos.keys())
+    posicoes = await posicao_service.posicoes_das_linhas(
+        vinculos.keys(), db=db, colaborativos=colaborativos
+    )
 
     chegadas: list[ChegadaNaParada] = []
     for numero, (vinculo, rota) in vinculos.items():
         medido = rota_service.trajeto_medido(db, numero, rota.sentido)
         trajeto = medido[0] if medido else None
 
-        etas: list[tuple[float, str]] = []
+        etas: list[tuple[float, str, str]] = []
         if trajeto is not None:
             for veiculo in posicoes.get(numero, []):
                 eta = eta_ate_indice(veiculo, trajeto, vinculo.indice_trajeto, rota.sentido, agora)
                 if eta is not None:
-                    etas.append((eta, veiculo.prefixo))
+                    etas.append((eta, veiculo.prefixo, veiculo.fonte))
 
         if etas:
-            eta, prefixo = min(etas)
+            # O mais próximo vence; empate exato é da SEMOB (RN-C2). O selo
+            # acompanha o vencedor — `colaborativo` quando ele é o fallback.
+            melhor = min(etas, key=lambda e: (e[0], e[2] != "ao_vivo"))
+            eta, prefixo, fonte_ao_vivo = melhor
             chegadas.append(
                 ChegadaNaParada(
                     numero=numero,
                     nome=rota.nome,
                     rota_sentido=rota.sentido,
                     eta_minutos=round(eta, 1),
-                    fonte="ao_vivo",
+                    fonte=fonte_ao_vivo if fonte_ao_vivo == "colaborativo" else "ao_vivo",
                     prefixo=prefixo,
                     veiculos_a_caminho=len(etas),
                 )
@@ -205,8 +222,8 @@ async def chegadas_da_parada(
 
 
 def _ordem_de_exibicao(c: ChegadaNaParada) -> tuple[int, float, str]:
-    """Ao vivo antes de previsto antes de sem dado; dentro de cada grupo, o mais próximo."""
-    grupo = {"ao_vivo": 0, "previsto": 1}.get(c.fonte or "", 2)
+    """Ao vivo antes de colaborativo antes de previsto antes de sem dado; dentro de cada grupo, o mais próximo."""
+    grupo = {"ao_vivo": 0, "colaborativo": 1, "previsto": 2}.get(c.fonte or "", 3)
     return grupo, c.eta_minutos if c.eta_minutos is not None else float("inf"), c.numero
 
 

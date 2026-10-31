@@ -29,6 +29,7 @@ from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
 from mobilidade.providers.linha_mock import LinhaMockProvider
 from mobilidade.posicao_service import FUSO_SEMOB, PosicaoService
+from mobilidade.posicoes_colaborativas import ServicoPosicoesColaborativas
 from mobilidade.rota_service import RotaService
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
@@ -73,6 +74,12 @@ _geocode_service = GeocodeService()
 # US #16 — uma instância só por processo: o cache do feed de GPS é
 # compartilhado entre todos os usuários (ver posicao_service.py).
 _posicao_service = PosicaoService()
+
+# US #199 — fallback colaborativo igualmente de um por processo: as
+# leituras vivem SÓ EM MEMÓRIA (validade de ~120 s; nada em banco, disco
+# ou log — LGPD/RN-C1). Trocar a memória por armazenamento compartilhado
+# depois é trocar a implementação de ArmazenamentoPosicoesColaborativas.
+_colaborativos = ServicoPosicoesColaborativas()
 
 # US #18 — sem estado próprio, só lê a tabela `linha` sob demanda.
 _parada_service = ParadaService()
@@ -359,7 +366,9 @@ async def chegadas_na_parada(codigo: str, db: Session = Depends(get_db)):
     404 quando o código não é de uma parada física conhecida.
     """
     agora = datetime.now(timezone.utc)
-    resultado = await chegadas_da_parada(db, codigo, _posicao_service, _rota_service, agora)
+    resultado = await chegadas_da_parada(
+        db, codigo, _posicao_service, _rota_service, agora, colaborativos=_colaborativos
+    )
 
     if resultado is None:
         raise HTTPException(status_code=404, detail="Parada não encontrada.")
@@ -420,8 +429,14 @@ async def posicoes_da_linha(
                posição do usuário quando o veículo está em movimento, ou
                `None` quando parado/sem velocidade (a pílula então
                mostra só o número da linha).
+    US #199: linhas sem cobertura SEMOB podem devolver veículos com
+               `fonte="colaborativo"` — posição informada por passageiro
+               com consentimento, do fallback efêmero. SEMOB sempre vence
+               (RN-C2); o selo declara a origem (RN-C3).
     """
-    veiculos = await _posicao_service.posicoes_da_linha(numero_linha)
+    veiculos = await _posicao_service.posicoes_da_linha(
+        numero_linha, db=db, colaborativos=_colaborativos
+    )
     tem_localizacao_usuario = lat is not None and lng is not None
 
     agora = datetime.now(timezone.utc)
@@ -497,6 +512,7 @@ async def posicoes_da_linha(
                 direcao=v.direcao,
                 atualizado_em=v.atualizado_em.isoformat(),
                 operadora=v.operadora,
+                fonte=v.fonte,
                 eta_minutos=eta,
                 parada_codigo=parada_do_eta.codigo if parada_do_eta else None,
                 parada_nome=(parada_do_eta.nome or None) if parada_do_eta else None,

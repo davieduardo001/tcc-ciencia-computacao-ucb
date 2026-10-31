@@ -7,6 +7,9 @@
 #                                  proximidade pendente, US #172)
 #   POST /viagens/{id}/alerta-proximidade/visto
 #                                  o app confirma que mostrou o aviso (#172)
+#   POST /viagens/{id}/posicao     posição do ônibus informada por
+#                                  passageiro, com consentimento (US #199)
+#   DELETE /viagens/{id}/posicao   revoga o compartilhamento — "Parar" (#199)
 #
 # Fica em arquivo próprio para não crescer o routes.py. O PosicaoService é o
 # MESMO do routes.py (um por processo: o cache do feed é compartilhado), por
@@ -23,12 +26,15 @@ from mobilidade import routes as _base
 from mobilidade import viagem_service as servico
 from mobilidade.dependencies import get_usuario_atual_id
 from mobilidade.models.viagem import Viagem
+from mobilidade.posicoes_colaborativas import MOTIVO_ACEITA, EnvioAdiantado
 from mobilidade.schemas_viagem import (
     AlertaProximidadeResponse,
     DestinoRequest,
     DestinoViagemResponse,
     EmbarqueRequest,
     ParadaViagemResponse,
+    PosicaoColaborativaRequest,
+    PosicaoColaborativaResponse,
     VeiculoViagemResponse,
     ViagemAtivaResponse,
     ViagemResponse,
@@ -53,6 +59,7 @@ def _viagem_response(viagem: Viagem) -> ViagemResponse:
         embarcou_em=viagem.embarcou_em,
         encerrada_em=viagem.encerrada_em,
         motivo_encerramento=viagem.motivo_encerramento,
+        compartilha_posicao=viagem.compartilha_posicao_em is not None,
     )
 
 
@@ -68,6 +75,8 @@ async def pegar_onibus(
     Já em viagem: 409 (a atual não muda).
 
     A latitude/longitude do corpo só confirma o embarque; não é gravada.
+    US #199 — `compartilha_posicao` ativa o fallback colaborativo (LGPD,
+    desligado por padrão) e `consentimento_versao` vira a prova do aceite.
     """
     veiculos = await _base._posicao_service.posicoes_da_linha(corpo.numero_linha)
     try:
@@ -82,6 +91,8 @@ async def pegar_onibus(
             veiculos=veiculos,
             agora=servico.agora_utc(),
             rota_service=_base._rota_service,
+            compartilha_posicao=corpo.compartilha_posicao,
+            consentimento_versao=corpo.consentimento_versao,
         )
     except servico.JaEmViagem:
         raise HTTPException(status_code=409, detail="Você já está em uma viagem.")
@@ -140,12 +151,15 @@ def encerrar_viagem(
     """
     Cenário 3 — "Cheguei". Idempotente. 404 tanto para viagem inexistente
     quanto para a de outro usuário: não revela que o id existe.
+    US #199 — "Cheguei" também encerra o compartilhamento (a viagem ativa
+    é a pré-condição dele); a leitura efêmera é apagada na hora.
     """
     viagem = servico.encerrar(
         db, usuario_id=usuario_id, viagem_id=viagem_id, agora=servico.agora_utc()
     )
     if viagem is None:
         raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+    _base._colaborativos.apagar(viagem.id)
     return _viagem_response(viagem)
 
 
@@ -227,3 +241,76 @@ async def viagem_em_andamento(
         proxima_parada=_parada(progresso.proxima_parada) if progresso.proxima_parada else None,
         paradas_restantes=[_parada(p) for p in progresso.paradas_restantes],
     )
+
+
+@router.post(
+    "/viagens/{viagem_id}/posicao",
+    response_model=PosicaoColaborativaResponse,
+    status_code=202,
+)
+def compartilhar_posicao(
+    viagem_id: uuid.UUID,
+    corpo: PosicaoColaborativaRequest,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    US #199 — o passageiro a bordo, com consentimento vigente, informa
+    onde o ônibus está, e a leitura alimenta o ETA de quem ainda não
+    sabe. RN-C4 descarta o incoerente (fora do traçado, salto que ônibus
+    nenhum faz) sem guardar nada; o devolvido vem no `motivo`.
+
+    A coordenada JAMAIS é gravada em banco nem em log: só entra no
+    armazenamento efêmero (memória, ~120 s — ver posicoes_colaborativas.py).
+    404 para viagem inexistente ou de outro usuário (ou quando a viagem
+    ativa não é esta); 409 sem consentimento vigente; 429 acima do
+    intervalo mínimo de envio.
+    """
+    viagem = servico.viagem_ativa(db, usuario_id, servico.agora_utc())
+    if viagem is None or viagem.id != viagem_id:
+        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+    if viagem.compartilha_posicao_em is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Compartilhamento de posição não ativado nesta viagem.",
+        )
+
+    try:
+        motivo = _base._colaborativos.registrar(
+            db,
+            viagem,
+            corpo.lat,
+            corpo.lng,
+            rota_service=_base._rota_service,
+        )
+    except EnvioAdiantado:
+        raise HTTPException(
+            status_code=429,
+            detail="Envie posições com menos frequência (a cada 10 segundos).",
+        )
+
+    return PosicaoColaborativaResponse(aceita=motivo == MOTIVO_ACEITA, motivo=motivo)
+
+
+@router.delete("/viagens/{viagem_id}/posicao", status_code=204)
+def parar_compartilhamento(
+    viagem_id: uuid.UUID,
+    usuario_id: uuid.UUID = Depends(get_usuario_atual_id),
+    db: Session = Depends(get_db),
+):
+    """
+    US #199 — botão "Parar": revoga o compartilhamento a qualquer momento
+    (LGPD art. 8º, §5º), tão fácil quanto aceitar. A viagem continua; só o
+    compartilhamento acaba, e a leitura efêmera é apagada na hora.
+
+    Idempotente. 404 para viagem inexistente ou de outro usuário. "Cheguei"
+    e a expiração (RN-17) também encerram o compartilhamento, e o próprio
+    armazenamento valida a data de vencimento de cada leitura.
+    """
+    viagem = servico.parar_compartilhamento(
+        db, usuario_id=usuario_id, viagem_id=viagem_id
+    )
+    if viagem is None:
+        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+    _base._colaborativos.apagar(viagem.id)
+    return Response(status_code=204)

@@ -251,6 +251,8 @@ def embarcar(
     agora: datetime,
     rota_service: RotaService | None = None,
     veiculo_prefixo: str | None = None,
+    compartilha_posicao: bool = False,
+    consentimento_versao: str | None = None,
 ) -> Viagem:
     """
     Registra o embarque. `lat`/`lng` entram só na validação (RN-06).
@@ -267,6 +269,11 @@ def embarcar(
     Issue #216: com `veiculo_prefixo` (popup de um ônibus), só esse veículo
     pode confirmar — outro ônibus da mesma linha perto do usuário não vale
     como o ônibus que ele tocou, que pode estar a dezenas de km.
+
+    US #199 — o compartilhamento colaborativo nasce aqui: só com
+    `compartilha_posicao=True` E a versão do texto aceito (validada pelo
+    schema). Nenhuma coordenada é gravada — o que fica é o instante do
+    aceite e a versão dele.
     """
     if viagem_ativa(db, usuario_id, agora) is not None:
         raise JaEmViagem()
@@ -306,6 +313,10 @@ def embarcar(
         parada_destino_codigo=parada_destino_codigo,
         embarcou_em=agora,
         origem_embarque="manual",
+        # US #199 — consentimento explícito (RN-C1), desligado por padrão.
+        # Sem coordenada nenhuma: só o instante e a versão do texto aceito.
+        compartilha_posicao_em=agora if compartilha_posicao else None,
+        consentimento_versao=(consentimento_versao or None),
     )
     db.add(viagem)
     try:
@@ -366,6 +377,32 @@ def encerrar(db: Session, *, usuario_id, viagem_id, agora: datetime) -> Viagem |
     if viagem.encerrada_em is None:
         viagem.encerrada_em = agora
         viagem.motivo_encerramento = MOTIVO_USUARIO
+        db.commit()
+    return viagem
+
+
+def parar_compartilhamento(db: Session, *, usuario_id, viagem_id) -> Viagem | None:
+    """
+    US #199 — revoga o compartilhamento da posição, mantendo a viagem
+    (LGPD art. 8º, §5º: revogação tão fácil quanto aceitar, a qualquer
+    momento). Idempotente. `None` quando a viagem não existe ou é de outra
+    pessoa (a rota responde 404 nos dois casos).
+
+    Fica `consentimento_versao` como prova do aceite; o instante volta a
+    nulo, e é ele que significa "consentimento vigente". Quem chama limpa
+    também a leitura efêmera (posicoes_colaborativas). "Cheguei" e a
+    expiração (RN-17) dispensam esta chamada: viagem ativa é pré-condição
+    de todo o compartilhamento.
+    """
+    viagem = (
+        db.query(Viagem)
+        .filter(Viagem.id == viagem_id, Viagem.usuario_id == usuario_id)
+        .one_or_none()
+    )
+    if viagem is None:
+        return None
+    if viagem.compartilha_posicao_em is not None:
+        viagem.compartilha_posicao_em = None
         db.commit()
     return viagem
 

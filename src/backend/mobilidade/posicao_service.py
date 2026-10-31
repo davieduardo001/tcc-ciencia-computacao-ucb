@@ -23,6 +23,7 @@ import logging
 import time
 from collections import deque
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -30,6 +31,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from mobilidade.semob_source import URL_POSICAO, _distancia_metros
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from mobilidade.posicoes_colaborativas import FonteColaborativa
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +129,10 @@ class PosicaoVeiculo:
     # partir do histórico em memória. `None` quando ainda não há histórico
     # suficiente — quem usa cai para `velocidade`. Ver JANELA_MEDIA_S.
     velocidade_media_kmh: float | None = None
+    # US #199 (RN-10/RN-C3) — origem da posição. A SEMOB (que este módulo
+    # lê) é sempre "ao_vivo"; o fallback colaborativo injeta veículos com
+    # fonte "colaborativo" (posição informada por passageiro) por cima.
+    fonte: str = "ao_vivo"
 
 
 class PosicaoService:
@@ -147,23 +157,39 @@ class PosicaoService:
         # para a mais nova. Só veículos com linha atribuída.
         self._historico: dict[str, deque[tuple[datetime, float, float]]] = {}
 
-    async def posicoes_da_linha(self, numero_linha: str) -> list[PosicaoVeiculo]:
+    async def posicoes_da_linha(
+        self,
+        numero_linha: str,
+        *,
+        db: Session | None = None,
+        colaborativos: FonteColaborativa | None = None,
+    ) -> list[PosicaoVeiculo]:
         """
         Veículos rodando a linha informada, com posição recente.
 
         Lista vazia significa "nenhum veículo em operação" — Cenário 3 da
         US #16. Falha ao consultar o SEMOB também devolve lista vazia:
         o mapa continua mostrando o trajeto, só sem os ônibus.
+
+        US #199 — com `colaborativos` (e `db`), o fallback colaborativo é
+        consultado por cima do feed: linhas SEM cobertura SEMOB podem ter
+        veículos "colaborativos" (fonte própria, RN-C3) na resposta.
         """
         numero_alvo = numero_linha.strip()
         if not numero_alvo:
             return []
 
-        resultado = await self.posicoes_das_linhas([numero_alvo])
+        resultado = await self.posicoes_das_linhas(
+            [numero_alvo], db=db, colaborativos=colaborativos
+        )
         return resultado.get(numero_alvo, [])
 
     async def posicoes_das_linhas(
-        self, numeros_linha: Iterable[str]
+        self,
+        numeros_linha: Iterable[str],
+        *,
+        db: Session | None = None,
+        colaborativos: FonteColaborativa | None = None,
     ) -> dict[str, list[PosicaoVeiculo]]:
         """
         Igual a `posicoes_da_linha`, para várias linhas de uma vez —
@@ -218,6 +244,22 @@ class PosicaoService:
                         velocidade_media_kmh=self._velocidade_media_kmh(prefixo, registrado_em),
                     )
                 )
+
+        # US #199 — queda os veículos colaborativos por cima do feed. Nunca
+        # derrubam o mapa: qualquer falha da fonte é engolida e devolvida
+        # só com SEMOB (RN-C2: SEMOB vale mais — a colaborativa é a
+        # lacuna que ela cobre, não um risco ao que já funciona).
+        if colaborativos is not None:
+            if db is None:
+                logger.warning("Fonte colaborativa pedida sem sessão de banco; ignorada")
+            else:
+                try:
+                    extras = colaborativos.veiculos(db, alvos, posicoes, agora)
+                except Exception:  # noqa: BLE001 — o fallback nunca derruba o feed
+                    logger.warning("Fonte colaborativa falhou; seguindo só com SEMOB", exc_info=True)
+                    extras = {}
+                for numero, veiculos_do_fallback in extras.items():
+                    posicoes.setdefault(numero, []).extend(veiculos_do_fallback)
 
         return posicoes
 
