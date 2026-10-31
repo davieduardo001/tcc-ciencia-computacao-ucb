@@ -1,7 +1,7 @@
 """feat: consentimento e compartilhamento de posicao na viagem (US #199)
 
 Revision ID: f7a8b9c0d1e2
-Revises: a7b8c9d0e1f2
+Revises: c7d8e9f0a1b2
 Create Date: 2026-10-23 00:00:00.000000
 
 Migration só aditiva: nada existente é alterado ou apagado.
@@ -24,7 +24,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'f7a8b9c0d1e2'
-down_revision: Union[str, None] = 'b1c2d3e4f5a6'
+down_revision: Union[str, None] = 'c7d8e9f0a1b2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
