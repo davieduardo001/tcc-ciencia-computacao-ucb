@@ -122,6 +122,9 @@ class PreferenciasDeNotificacao:
                                 todas as notificações")
         alerta_chegada        → interruptor específico do alerta de chegada
                                 (Cenário 3: "desativar tipo específico")
+        alerta_cancelamento   → interruptor do alerta de cancelamento de
+                                viagem (US #28) — mesma tabela, tipo
+                                "cancelamento"
         antecedencia_minutos  → a partir de qual ETA (em minutos) o alerta
                                 dispara (Cenário 1: "distância/tempo
                                 configurado"). Permitidos: 5, 10, 30, 60;
@@ -130,6 +133,7 @@ class PreferenciasDeNotificacao:
 
     notificacoes_ativas: bool = True
     alerta_chegada: bool = True
+    alerta_cancelamento: bool = True
     antecedencia_minutos: int = 30
 
 

@@ -116,7 +116,7 @@ def _veiculo(indice, velocidade=30.0, sentido="IDA", prefixo="440001", media=Non
 
 
 def _com_posicoes(por_linha: dict[str, list[PosicaoVeiculo]]):
-    async def falso(numeros):
+    async def falso(numeros, *, db=None, colaborativos=None):
         return {n: por_linha.get(n, []) for n in numeros}
 
     return patch("mobilidade.routes._posicao_service.posicoes_das_linhas", AsyncMock(side_effect=falso))

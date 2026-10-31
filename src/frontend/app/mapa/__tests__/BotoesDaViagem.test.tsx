@@ -3,6 +3,7 @@ import {
   buscarViagemAtiva,
   definirDestinoDaViagem,
   embarcarNoOnibus,
+  VERSAO_CONSENTIMENTO,
   ViagemAtiva,
   ViagemError,
 } from "@/lib/api";
@@ -344,5 +345,92 @@ describe("BotaoPegueiNaRota", () => {
     await act(async () => {
       concluir();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US #199, Cenário 1 — consentimento do fallback colaborativo, desligado por
+// padrão: tocar no botão SEM marcar o toggle não manda nada de compartilha-
+// mento; marcar o toggle manda compartilhaPosicao + a versão do texto aceito.
+// ---------------------------------------------------------------------------
+
+describe("Consentimento de posição (US #199)", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("o toggle, ambos os botões: vêm DESligados por padrão", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+
+    comProvider(<BotaoPegueiOnibus numeroLinha="0.110" prefixo="440001" posicaoDoUsuario={POSICAO} />);
+
+    await screen.findByRole("button", { name: "Peguei este ônibus" });
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  });
+
+  it("sem marcar o toggle, embarcar NÃO recebe campos de compartilhamento", async () => {
+    buscarMock.mockResolvedValueOnce(AGUARDANDO).mockResolvedValue({ falhou: false, viagem: viagem() });
+    embarcarMock.mockResolvedValue(undefined);
+
+    comProvider(<BotaoPegueiOnibus numeroLinha="0.110" prefixo="440001" posicaoDoUsuario={POSICAO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
+
+    await waitFor(() => expect(embarcarMock).toHaveBeenCalledTimes(1));
+    expect(embarcarMock.mock.calls[0][0]).toEqual({
+      numeroLinha: "0.110",
+      lat: -15.8,
+      lng: -48.05,
+      veiculoPrefixo: "440001",
+    });
+  });
+
+  it("marcar o toggle e embarcar: manda compartilhaPosicao + versão do consentimento", async () => {
+    buscarMock.mockResolvedValueOnce(AGUARDANDO).mockResolvedValue({ falhou: false, viagem: viagem() });
+    embarcarMock.mockResolvedValue(undefined);
+
+    comProvider(<BotaoPegueiOnibus numeroLinha="0.110" prefixo="440001" posicaoDoUsuario={POSICAO} />);
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Peguei este ônibus" }));
+
+    await waitFor(() =>
+      expect(embarcarMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          compartilhaPosicao: true,
+          consentimentoVersao: VERSAO_CONSENTIMENTO,
+        })
+      )
+    );
+  });
+
+  it("'Saiba o que é compartilhado' abre o texto do consentimento (LGPD, RN-C5)", async () => {
+    buscarMock.mockResolvedValue(AGUARDANDO);
+
+    comProvider(<BotaoPegueiOnibus numeroLinha="0.110" prefixo="440001" posicaoDoUsuario={POSICAO} />);
+    await screen.findByRole("button", { name: "Peguei este ônibus" });
+
+    expect(screen.queryByLabelText("O que é compartilhado")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Saiba o que é compartilhado/ }));
+    expect(screen.getByLabelText("O que é compartilhado")).toHaveTextContent(/não guardamos histórico/i);
+  });
+
+  it("no botão da rota, o consentimento também entra no payload quando marcado", async () => {
+    buscarMock.mockResolvedValueOnce(AGUARDANDO).mockResolvedValue({ falhou: false, viagem: viagem() });
+    embarcarMock.mockResolvedValue(undefined);
+
+    comProvider(
+      <BotaoPegueiNaRota numeroLinha="0.110" paradaDestinoCodigo="PR-D" posicaoDoUsuario={POSICAO} />
+    );
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(await screen.findByRole("button", { name: "Peguei este ônibus" }));
+
+    await waitFor(() =>
+      expect(embarcarMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          numeroLinha: "0.110",
+          compartilhaPosicao: true,
+          consentimentoVersao: VERSAO_CONSENTIMENTO,
+        })
+      )
+    );
   });
 });

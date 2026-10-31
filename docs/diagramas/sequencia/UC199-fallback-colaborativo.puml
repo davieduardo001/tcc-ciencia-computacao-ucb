@@ -1,0 +1,184 @@
+@startuml UC199_FallbackColaborativo
+hide footbox
+title Diagrama de Sequencia - Fallback Colaborativo: Ajudar a Estimar Chegada com a Posicao do Proprio Onibus (US #199)
+
+actor "Passageiro (a bordo)" as Passageiro
+actor "Outro Passageiro (na parada)" as Outro
+
+participant ":TelaMapaViagem" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ModeloSessao" as Sessao <<modelo>>
+participant ":ServicoViagem" as Service <<servico mobilidade>>
+participant ":ModeloViagem" as Model <<modelo>>
+participant ":ServicoPosicoesColaborativas" as Colab <<servico mobilidade>>
+participant ":ArmazenamentoEmMemoria" as Memoria <<modelo efemero>>
+participant ":ServicoChegadas" as Chegadas <<servico mobilidade>>
+
+== Consentir e Embarcar (Cenario 1) ==
+
+Passageiro -> View : ativarCompartilhamento()
+activate View
+View -> View : exibirTextoDoConsentimento(versao "v1-199")
+note right of View : O controle vem DESligado por padrao.\nO texto diz o que e compartilhado (a posicao\nDO ONIBUS, nao o perfil da pessoa), por quanto\ntempo (2 minutos por leitura) e como parar.\nRN-C5 / LGPD: proibido consentimento silencioso.
+deactivate View
+
+Passageiro -> View : tocarPegueiEsteOnibus(linha, prefixo)
+activate View
+View -> Gateway : requisicao(token, POST /viagens, compartilha_posicao=true, consentimento_versao)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  alt passageiro ja esta em viagem
+    Service --> Gateway : respostaErro(conflito, 409)
+    deactivate Service
+    Gateway --> View : retornarResposta(conflito)
+    View -> View : exibirAviso("Voce ja esta em uma viagem.")
+
+  else embarque confirmado, com consentimento
+    Service -> Model : registrarViagem(identidadeUsuario, ..., compartilhaPosicaoEm=agora, versaoConsentimento)
+    activate Model
+    note right of Model : A prova do consentimento e o par\n(compartilha_posicao_em, consentimento_versao).\nNenhuma coordenada e gravada aqui.
+    Model --> Service : viagemRegistrada
+    deactivate Model
+    Service --> Gateway : resposta(viagemRegistrada, 201)
+    deactivate Service
+    Gateway --> View : retornarResposta(viagemRegistrada)
+    View -> View : exibirIndicador("Compartilhando a localizacao do onibus")
+  end
+
+else token expirado ou invalido
+  Gateway -> Sessao : renovarOuRecusarSessao(refreshToken)
+  activate Sessao
+  Sessao --> Gateway : resultado(401)
+  deactivate Sessao
+  Gateway --> View : notificarNaoAutorizado(401)
+  View -> View : redirecionarParaLogin()
+end
+
+deactivate Gateway
+deactivate View
+
+== Enviar a Posicao em Ciclos (Cenario 2) ==
+
+loop enquanto compartilhando (a cada 15 s, client-side)
+  View -> View : lerGpsDoPassageiro(precisaoM)
+  View -> Gateway : requisicao(token, POST /viagens/{id}/posicao, lat, lng, precisao_m?)
+  activate View
+  activate Gateway
+  Gateway -> Gateway : verificarAssinaturaToken(token)
+  Gateway -> Colab : registrar(viagemId, identidadeUsuario, lat, lng, precisaoM?)
+  activate Colab
+
+  alt sem consentimento em pe ou viagem de outro passageiro
+    Colab --> Gateway : recusado(conflito, 409)
+    deactivate Colab
+    Gateway --> View : retornarResposta(409)
+    View -> View : revogarLocalmente() e PARAR o ciclo
+    note right of View : Sem alerta na tela: o indicador\nsimplesmente some e o envio para.\nRN-C5: nenhum dado de posicao e logado.
+
+  else envio adiantado demais (limite de taxa)
+    Colab --> Gateway : recusado(429)
+    deactivate Colab
+    Gateway --> View : retornarResposta(429)
+    View -> View : ficar em silencio e tentar no proximo ciclo
+    note right of View : 429 NAO e erro para o usuario:\ne o propio servidor limitando a martelada.
+
+  else leitura valida
+    Colab -> Colab : validarTracadoEVelocidade(lat, lng, precisaoM)
+    Colab -> Memoria : guardar(viagemId, leituraColaborativa)
+    activate Memoria
+    note right of Memoria : Armazenamento EFEMERO em memoria:\ncada leitura vale no maximo 120 segundos.\nSem banco, sem historico, sem trilha.
+    Memoria --> Colab : leituraGuardada
+    deactivate Memoria
+    Colab --> Gateway : resposta(202, {aceita, motivo})
+    deactivate Colab
+    Gateway --> View : retornarResposta(202)
+    View -> View : nada a exibir (o indicador ja esta na faixa)
+  end
+
+  deactivate Gateway
+  deactivate View
+end
+
+Colab -> Memoria : expirar()
+activate Memoria
+Memoria --> Colab : leiturasExpiradasApagadas
+deactivate Memoria
+
+== O Numero Vira Estimativa para Outro Passageiro (Cenario 4) ==
+
+Outro -> View : tocarParadaNoMapa()
+activate View
+View -> Gateway : requisicao(token, GET /paradas/{codigo}/chegadas)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Chegadas : encaminharRequisicao(req, identidadeUsuario)
+activate Chegadas
+
+Chegadas -> Colab : veiculos(linha, agora)
+activate Colab
+
+alt GPS oficial da SEMOB cobre o onibus
+  Colab --> Chegadas : nenhumaLeituraColaborativaUsada()
+  deactivate Colab
+  note right of Colab : O dado oficial SEMPRE tem preferencia:\no colaborativo e fallback, nunca a fonte primaria.
+
+else onibus sem sinal oficial, com leitura colaborativa valida
+  Colab --> Chegadas : posicaoColaborativa(prefixo, idade <= 120s)
+  deactivate Colab
+  Chegadas -> Chegadas : calcularEtaComPosicaoColaborativa()
+  Chegadas --> Gateway : resposta(chegadas, fonte="colaborativo")
+  deactivate Chegadas
+  Gateway --> View : retornarResposta(chegadas)
+  View -> View : exibirSelo("colaborativo") com a legenda da fonte
+
+else sem leitura colaborativa valida
+  Colab --> Chegadas : semDado()
+  deactivate Colab
+  Chegadas -> Chegadas : cairParaHorarioPrevisto()
+  Chegadas --> Gateway : resposta(chegadas, fonte="previsto")
+  deactivate Chegadas
+  Gateway --> View : retornarResposta(chegadas)
+  View -> View : exibirSelo("previsto")
+end
+
+deactivate Gateway
+deactivate View
+
+== Parar o Compartilhamento (Cenario 3) ==
+
+Passageiro -> View : tocarParar()
+activate View
+View -> View : revogarLocalmente() e PARAR o ciclo na hora
+View -> Gateway : requisicao(token, DELETE /viagens/{id}/posicao)
+activate Gateway
+Gateway -> Gateway : verificarAssinaturaToken(token)
+Gateway -> Colab : apagar(viagemId, identidadeUsuario)
+activate Colab
+Colab -> Memoria : apagar(viagemId)
+activate Memoria
+Memoria --> Colab : leiturasApagadas
+deactivate Memoria
+
+alt viagem do passageiro (ou sem leitura guardada)
+  Colab --> Gateway : resposta(204, idempotente)
+  deactivate Colab
+  Gateway --> View : retornarResposta(204)
+  View -> View : confirmarRemocaoDoIndicador()
+
+else viagem ja encerrada ou de outro passageiro
+  Colab --> Gateway : respostaErro(naoEncontrado, 404)
+  deactivate Colab
+  Gateway --> View : retornarResposta(404, tratado como sucesso)
+  note right of View : 404 tambem cumpre a intencao:\nrepetir o "Parar" nao da erro e a faixa\ncontinua sem o indicador.
+end
+
+deactivate Gateway
+deactivate View
+
+@enduml

@@ -1587,6 +1587,96 @@
   color: var(--mc-sucesso-texto);
 }
 
+/* Selo colaborativo (US #199): mesmo matiz de confiança do "ao vivo",
+   sem prometer dado oficial. */
+.selo-fonte.colaborativo {
+  color: var(--mc-petroleo);
+}
+
+/* US #199 — consentimento de posição no embarque (Cenário 1):
+   desligado por padrão, com o texto do que é compartilhado à mão. */
+.mapa-consentimento {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mapa-consentimento-caixa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.mapa-consentimento-caixa input[type="checkbox"] {
+  accent-color: var(--mc-petroleo);
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.mapa-consentimento-mais {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mc-petroleo);
+  cursor: pointer;
+}
+
+.mapa-consentimento-texto {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* US #199 — indicador "Compartilhando" na faixa de viagem (Cenários 2
+   e 3), com o "Parar" do consentimento revogável na hora. */
+.mapa-viagem-compartilha {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-height: 44px;
+  border-radius: var(--mc-r-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.mapa-viagem-compartilha-rotulo {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-viagem-compartilha-parar {
+  background: #fff;
+  color: var(--mc-petroleo);
+  border: none;
+  border-radius: 999px;
+  padding: 2px 10px;
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mapa-viagem-compartilha-parar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .mapa-chegadas {
   list-style: none;
   margin: 0 0 4px;
@@ -3057,4 +3147,121 @@
     background: #fff;
     color: var(--text);
   }
+}
+
+/* ===== Planejar por horário (US #115) ===== */
+.plano-horario {
+  margin: 8px 0 4px;
+}
+
+.plano-horario-abrir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--primary-700);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-700);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plano-horario-corpo {
+  margin-top: 10px;
+}
+
+.plano-horario-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.plano-horario-tipo {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 13.5px;
+}
+
+.plano-horario-tipo label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.plano-horario-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plano-horario-campo input {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1.5px solid var(--border, #d0d5dd);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: transparent;
+}
+
+.plano-horario-lista {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plano-horario-opcao {
+  padding: 12px;
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 12px;
+}
+
+.plano-horario-resumo {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.plano-horario-pernas {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.plano-horario-pernas p {
+  margin: 0 0 6px;
+}
+
+.plano-horario-espera {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.plano-horario-vazio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.plano-horario-vazio p {
+  margin: 0;
 }

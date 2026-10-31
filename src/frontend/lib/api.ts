@@ -665,6 +665,79 @@ export async function calcularRotas(
   return response.json();
 }
 
+export type TipoPlano = "saida" | "chegada";
+
+export interface PernaPlanejada {
+  numero: string;
+  sentido: string;
+  nome: string;
+  embarque: PontoEmbarque;
+  desembarque: PontoEmbarque;
+  /** ISO 8601, fuso de Brasília. */
+  embarca_em: string;
+  desembarca_em: string;
+  /** Tempo parado no ponto antes do ônibus; na baldeação, a espera na troca. */
+  espera_min: number;
+}
+
+export interface OpcaoPlanejada {
+  pernas: PernaPlanejada[];
+  baldeacoes: number;
+  saida_casa: string;
+  chegada_destino: string;
+  duracao_total_min: number;
+  caminhada_metros: number;
+}
+
+export interface PlanoViagem {
+  tipo: TipoPlano;
+  referencia: string;
+  opcoes: OpcaoPlanejada[];
+  motivo: "sem_opcoes" | "sem_tabela_de_horarios" | "fora_do_horario" | null;
+  mensagem: string | null;
+  /** O horário de passagem em cada parada é estimado, não de tabela por parada. */
+  estimado: boolean;
+}
+
+export class PlanejarViagemError extends Error {}
+
+/**
+ * US #115 — Planeja a viagem por horário de partida ("sair às 7h10") ou de
+ * chegada ("chegar até 8h00"). `data` é AAAA-MM-DD; sem ela vale hoje.
+ *
+ * Sem opção, o backend responde 200 com `motivo` e `mensagem` — a tela
+ * mostra o motivo em vez de uma lista vazia sem explicação. Erro de rede
+ * ou do servidor lança, para o usuário saber que não deu certo.
+ */
+export async function planejarViagem(
+  origem: { lat: number; lng: number },
+  destino: { lat: number; lng: number },
+  tipo: TipoPlano,
+  horario: string,
+  data?: string
+): Promise<PlanoViagem> {
+  const params = new URLSearchParams({
+    origem_lat: String(origem.lat),
+    origem_lng: String(origem.lng),
+    destino_lat: String(destino.lat),
+    destino_lng: String(destino.lng),
+    tipo,
+    horario,
+  });
+  if (data) params.set("data", data);
+
+  const response = await fetchAutenticado(`${API_URL}/api/mobilidade/planejar?${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new PlanejarViagemError("Não foi possível planejar a viagem. Tente novamente.");
+  }
+
+  return response.json();
+}
+
 /**
  * US #17 — Busca os detalhes de uma linha (trajeto, paradas, sentido)
  * pra desenhar no mapa. Usa o mesmo endpoint da US #15
@@ -848,8 +921,9 @@ export async function buscarParadas(termo: string): Promise<ResultadoBuscaParada
 // Card #179 (⑤b) — Quando o ônibus chega NESTA parada
 // ---------------------------------------------------------------------------
 
-/** De onde veio o número: posição real do ônibus, ou saída + percurso. */
-export type FonteChegada = "ao_vivo" | "previsto";
+/** De onde veio o número: posição real do ônibus, ou saída + percurso.
+ *  "colaborativo" (US #199) vem da posição reportada por um passageiro. */
+export type FonteChegada = "ao_vivo" | "colaborativo" | "previsto";
 
 export interface ChegadaNaParada {
   numero: string;
@@ -1544,6 +1618,13 @@ export async function removerFavorito(id: string): Promise<void> {
 // US #171 — Pegar o ônibus: embarcar, acompanhar e encerrar a viagem
 // ---------------------------------------------------------------------------
 
+/**
+ * US #199 — versão do texto de consentimento que esta tela mostra. Muda o
+ * texto, muda a constante: o servidor guarda a versão que a pessoa aceitou,
+ * também como prova do que ela viu.
+ */
+export const VERSAO_CONSENTIMENTO = "v1-199";
+
 export interface ParadaDaViagem {
   codigo: string;
   nome: string;
@@ -1573,6 +1654,9 @@ export interface ViagemAtiva {
   veiculoPrefixo: string;
   paradaDestinoCodigo: string | null;
   embarcouEm: string;
+  /** US #199 — a pessoa consentiu em compartilhar a posição do ônibus.
+   *  Opcional: respostas de um backend antigo não trazem o campo. */
+  compartilhaPosicao?: boolean;
   /** "sem_sinal": o ônibus não está no feed ou a posição é velha — a tela
    * diz isso em vez de estimar (RN-09). */
   sinal: "ao_vivo" | "sem_sinal";
@@ -1641,6 +1725,9 @@ export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
         sentido: data.viagem.sentido ?? null,
         veiculoPrefixo: data.viagem.veiculo_prefixo,
         paradaDestinoCodigo: data.viagem.parada_destino_codigo ?? null,
+        // US #199 — o compartilhamento ativo governa o indicador e o loop de
+        // envio. Opcional: respostas de um backend antigo não trazem o campo.
+        compartilhaPosicao: data.viagem.compartilha_posicao === true,
         embarcouEm: data.viagem.embarcou_em,
         sinal: data.sinal === "ao_vivo" ? "ao_vivo" : "sem_sinal",
         veiculo: data.veiculo
@@ -1700,6 +1787,13 @@ export interface EmbarquePayload {
   paradaDestinoCodigo?: string;
   /** Popup de um ônibus: só esse veículo confirma o embarque (issue #216). */
   veiculoPrefixo?: string;
+  /**
+   * US #199 — consentimento LGPD do fallback colaborativo, desligado por
+   * padrão. Quando ligado, `consentimentoVersao` vem junto como prova do
+   * texto aceito; nenhuma coordenada é persistida.
+   */
+  compartilhaPosicao?: boolean;
+  consentimentoVersao?: string;
 }
 
 /**
@@ -1719,6 +1813,13 @@ export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
         lng: dados.lng,
         parada_destino_codigo: dados.paradaDestinoCodigo,
         ...(dados.veiculoPrefixo ? { veiculo_prefixo: dados.veiculoPrefixo } : {}),
+        ...(dados.compartilhaPosicao
+          ? {
+              compartilha_posicao: true,
+              // A prova do consentimento: versão do texto que a tela mostrou.
+              consentimento_versao: dados.consentimentoVersao ?? VERSAO_CONSENTIMENTO,
+            }
+          : {}),
       }),
     });
   } catch {
@@ -1769,6 +1870,73 @@ export async function encerrarViagem(viagemId: string): Promise<void> {
   // está cumprido, então não é erro.
   if (!response.ok && response.status !== 404) {
     throw await erroDaViagem(response, "Não foi possível encerrar a viagem. Tente novamente.");
+  }
+}
+
+/**
+ * US #199 — endpoint de posição colaborativa (limite de taxa no servidor).
+ *
+ * Envia a posição do ônibus que o passageiro embarcou (o consentimento
+ * `/viagens` já confere; 409 = revogado ou sem consentimento). A resposta
+ * diz se a leitura vale (`aceita`) e por quê (`motivo`); 429 significa
+ * "enviou cedo demais" — quem chama só tenta de novo no próximo ciclo.
+ */
+export async function enviarPosicaoColaborativa(
+  viagemId: string,
+  posicao: { lat: number; lng: number; precisaoM?: number }
+): Promise<{ aceita: boolean; motivo: string }> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/posicao`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        // RN-06/RN-C5: lat/lng só valem a validação e morrem no servidor —
+        // nada de coordenada no banco, no log ou no histórico desta tela.
+        body: JSON.stringify({
+          lat: posicao.lat,
+          lng: posicao.lng,
+          ...(posicao.precisaoM != null ? { precisao_m: posicao.precisaoM } : {}),
+        }),
+      }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível enviar a posição. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(
+      response,
+      "Não foi possível enviar a posição. Tente novamente."
+    );
+  }
+  const data = await response.json();
+  return {
+    aceita: data.aceita === true,
+    motivo: typeof data.motivo === "string" ? data.motivo : "",
+  };
+}
+
+/**
+ * Cenário 3 — "Parar" do compartilhamento. Idempotente: repetir não dá
+ * erro, e 404 (a viagem já não é dele) também cumpre a intenção.
+ */
+export async function pararDeCompartilhar(viagemId: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/posicao`,
+      { method: "DELETE", credentials: "include" }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível parar o compartilhamento. Verifique sua conexão.");
+  }
+  if (!response.ok && response.status !== 404) {
+    throw await erroDaViagem(
+      response,
+      "Não foi possível parar o compartilhamento. Tente novamente."
+    );
   }
 }
 

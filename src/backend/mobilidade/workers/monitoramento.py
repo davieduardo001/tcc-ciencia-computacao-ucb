@@ -8,6 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.services.servico_proximidade import ServicoProximidade
+from mobilidade.services.servico_cancelamento import ServicoCancelamento
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from shared.database import SessionLocal
@@ -53,6 +54,7 @@ def criar_worker(
     intervalo_minutos: int = 5,
     servico_proximidade: Optional[ServicoProximidade] = None,
     intervalo_proximidade_segundos: Optional[int] = None,
+    servico_cancelamento: Optional[ServicoCancelamento] = None,
 ) -> BackgroundScheduler:
     """
     Cria o scheduler com os jobs de monitoramento.
@@ -63,9 +65,13 @@ def criar_worker(
       destino (US #172) — só é criado quando `servico_proximidade` é
       informado; por padrão no mesmo intervalo, mas `intervalo_proximidade_segundos`
       permite um ciclo mais curto só para ele.
+    - "monitoramento-cancelamento": alerta de cancelamento de viagem
+      (US #28) — criado só quando `servico_cancelamento` é informado;
+      mesmo intervalo do de atrasos, porque a janela de detecção é de
+      minutos e um ciclo curto não muda nada.
 
-    Os dois jobs abrem a própria sessão e isolam falha por iteração:
-    um ciclo quebrado não derruba o scheduler nem o outro job.
+    Os jobs abrem a própria sessão e isolam falha por iteração:
+    um ciclo quebrado não derruba o scheduler nem os demais jobs.
     """
     scheduler = BackgroundScheduler(max_instances=1)
 
@@ -120,6 +126,26 @@ def criar_worker(
             id="monitoramento-proximidade",
             replace_existing=True,
             **intervalo,
+        )
+
+    if servico_cancelamento is not None:
+        def job_cancelamento():
+            db = SessionLocal()
+            try:
+                servico_cancelamento.verificar_ciclo(db)
+            except Exception:
+                db.rollback()
+            finally:
+                db.close()
+
+        # Mesmo intervalo do de atrasos: a janela de detecção (15–45 min)
+        # absorve um ciclo a mais ou a menos sem perder a partida.
+        scheduler.add_job(
+            func=job_cancelamento,
+            trigger="interval",
+            id="monitoramento-cancelamento",
+            replace_existing=True,
+            minutes=intervalo_minutos,
         )
 
     return scheduler

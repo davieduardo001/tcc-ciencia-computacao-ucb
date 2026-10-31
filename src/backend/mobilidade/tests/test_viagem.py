@@ -246,9 +246,14 @@ class TestEmbarque:
         assert salva.origem_embarque == "manual"
 
     def test_a_posicao_do_usuario_nao_e_persistida(self, db):
-        """RN-06: nem coluna existe — não há onde guardar a trilha."""
+        """RN-06: nem coluna existe — não há onde guardar a trilha.
+
+        US #199 acrescentou `compartilha_posicao_em` (prova de consentimento,
+        data e hora) — o filtro fica só em coordenadas; a checagem de valores
+        abaixo continua cobrindo todas as colunas da tabela.
+        """
         colunas = {c["name"] for c in inspect(db.get_bind()).get_columns("viagem")}
-        assert not {c for c in colunas if "lat" in c or "lng" in c or "posicao" in c}
+        assert not {c for c in colunas if "lat" in c or "lng" in c or "coordenada" in c}
 
         _embarcar([_veiculo()])
         salva = db.query(Viagem).one()

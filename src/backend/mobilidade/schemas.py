@@ -91,6 +91,51 @@ class OpcaoViagemResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# US #115 — Planejar viagem por horário de partida/chegada
+# ---------------------------------------------------------------------------
+
+
+class PernaPlanejadaResponse(BaseModel):
+    """Uma perna da viagem com os horários estimados de subir e descer."""
+
+    numero: str
+    sentido: str
+    nome: str
+    embarque: PontoEmbarqueResponse
+    desembarque: PontoEmbarqueResponse
+    embarca_em: str  # ISO 8601, fuso de Brasília
+    desembarca_em: str
+    # Tempo parado no ponto antes do ônibus; na baldeação é a espera no
+    # ponto de troca (Cenário 3).
+    espera_min: int
+
+
+class OpcaoPlanejadaResponse(BaseModel):
+    pernas: list[PernaPlanejadaResponse]
+    baldeacoes: int
+    saida_casa: str
+    chegada_destino: str
+    duracao_total_min: int
+    caminhada_metros: int
+
+
+class PlanoViagemResponse(BaseModel):
+    """
+    Cenário 5 — sem opção, `motivo` e `mensagem` dizem por quê, em vez de
+    uma lista vazia sem explicação.
+    """
+
+    tipo: Literal["saida", "chegada"]
+    referencia: str
+    opcoes: list[OpcaoPlanejadaResponse]
+    motivo: Literal["sem_opcoes", "sem_tabela_de_horarios", "fora_do_horario"] | None = None
+    mensagem: str | None = None
+    # O horário de passagem em cada parada é estimado (saída da tabela +
+    # tempo de percurso proporcional); o front declara isso na tela.
+    estimado: bool = True
+
+
+# ---------------------------------------------------------------------------
 # US #16 — Posição do ônibus em tempo real
 # ---------------------------------------------------------------------------
 
@@ -115,6 +160,10 @@ class PosicaoVeiculoResponse(BaseModel):
     # parada ingerida por perto e o ETA veio da projeção do GPS no traçado.
     parada_codigo: str | None = None
     parada_nome: str | None = None
+    # US #199 (RN-10/RN-C3) — origem da posição: `ao_vivo` vem do feed da
+    # SEMOB; `colaborativo`, de passageiro com consentimento (fallback da
+    # US #199). O default cobre os veículos de sempre.
+    fonte: Literal["ao_vivo", "colaborativo"] = "ao_vivo"
 
 
 class ChegadaResponse(BaseModel):
@@ -122,15 +171,17 @@ class ChegadaResponse(BaseModel):
     Quando o ônibus de uma linha chega numa parada (card #179, ⑤b).
 
     `fonte` diz de onde veio o número — RN-10: `ao_vivo` é a posição real
-    do ônibus; `previsto` é horário de saída + tempo de percurso, para
-    quando não há ônibus a caminho; `None` é "sem dado" (RN-09: não inventa).
+    do ônibus; `colaborativo` é a posição informada por passageiro
+    (fallback da US #199, quando não há ônibus da SEMOB); `previsto` é
+    horário de saída + tempo de percurso, para quando não há ônibus a
+    caminho; `None` é "sem dado" (RN-09: não inventa).
     """
 
     numero: str
     nome: str
     rota_sentido: str
     eta_minutos: float | None = None
-    fonte: Literal["ao_vivo", "previsto"] | None = None
+    fonte: Literal["ao_vivo", "colaborativo", "previsto"] | None = None
     # só `ao_vivo`
     prefixo: str | None = None
     veiculos_a_caminho: int = 0

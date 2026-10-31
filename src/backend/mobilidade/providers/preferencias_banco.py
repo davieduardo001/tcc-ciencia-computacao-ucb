@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 _PADRAO = PreferenciasDeNotificacao()
 
 _CONSULTA = text(
-    "SELECT notificacoes_ativas, alerta_chegada, antecedencia_minutos "
+    "SELECT notificacoes_ativas, alerta_chegada, alerta_cancelamento, antecedencia_minutos "
     "FROM preferencias_notificacao "
     "WHERE usuario_id = :usuario_id"
 )
@@ -72,5 +72,8 @@ class PreferenciasDoBanco:
         return PreferenciasDeNotificacao(
             notificacoes_ativas=bool(linha.notificacoes_ativas),
             alerta_chegada=bool(linha.alerta_chegada),
+            # US #28 — o interruptor "Cancelamento de viagem" da tela de
+            # preferências (#29). Ausente (linha velha), o padrão é True.
+            alerta_cancelamento=bool(getattr(linha, "alerta_cancelamento", True)),
             antecedencia_minutos=antecedencia,
         )

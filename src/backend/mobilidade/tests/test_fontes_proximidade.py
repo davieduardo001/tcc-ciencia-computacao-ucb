@@ -65,6 +65,34 @@ def test_preferencias_antecedencia_invalida_cai_no_padrao():
     assert pref.antecedencia_minutos == 30
 
 
+def test_preferencias_liga_o_alerta_de_cancelamento_por_padrao():
+    # Linha gravada antes da US #28 (sem a coluna): padrão é ligado.
+    db = MagicMock()
+    db.execute.return_value.first.return_value = SimpleNamespace(
+        notificacoes_ativas=True,
+        alerta_chegada=True,
+        antecedencia_minutos=30,
+    )
+
+    pref = PreferenciasDoBanco().obter(MagicMock(), db)
+
+    assert pref.alerta_cancelamento is True
+
+
+def test_preferencias_respeita_o_cancelamento_desligado_pelo_usuario():
+    db = MagicMock()
+    db.execute.return_value.first.return_value = SimpleNamespace(
+        notificacoes_ativas=True,
+        alerta_chegada=True,
+        alerta_cancelamento=False,
+        antecedencia_minutos=30,
+    )
+
+    pref = PreferenciasDoBanco().obter(MagicMock(), db)
+
+    assert pref.alerta_cancelamento is False
+
+
 # ---------------------------------------------------------------------------
 # VeiculosAoVivo — feed do SEMOB (US #16) para o worker
 # ---------------------------------------------------------------------------

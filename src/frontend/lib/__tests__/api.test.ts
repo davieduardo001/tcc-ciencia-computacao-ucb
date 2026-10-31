@@ -7,6 +7,8 @@ import {
   buscarLugares,
   calcularRotas,
   CalcularRotaError,
+  planejarViagem,
+  PlanejarViagemError,
   nomearLugar,
   buscarPosicoesDaLinha,
   buscarChegadasParada,
@@ -16,6 +18,8 @@ import {
   definirDestinoDaViagem,
   embarcarNoOnibus,
   encerrarViagem,
+  enviarPosicaoColaborativa,
+  pararDeCompartilhar,
   ViagemError,
   solicitarResetSenha,
   redefinirSenha,
@@ -169,6 +173,52 @@ describe("api.ts — sugerirLinhas (autocomplete, US #17)", () => {
 describe("api.ts — rota origem → destino (US #20)", () => {
   afterEach(() => {
     jest.resetAllMocks();
+  });
+
+  it("planejarViagem manda coordenadas, tipo, horário e dia como query params", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ opcoes: [], motivo: "fora_do_horario", mensagem: "x" }),
+    }) as jest.Mock;
+
+    const plano = await planejarViagem(
+      { lat: -15.8195, lng: -48.1096 },
+      { lat: -15.7939, lng: -47.8828 },
+      "chegada",
+      "08:00",
+      "2026-11-02"
+    );
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain("/api/mobilidade/planejar?");
+    expect(url).toContain("origem_lat=-15.8195");
+    expect(url).toContain("destino_lng=-47.8828");
+    expect(url).toContain("tipo=chegada");
+    expect(url).toContain("horario=08%3A00");
+    expect(url).toContain("data=2026-11-02");
+    expect(options.credentials).toBe("include");
+    expect(plano.motivo).toBe("fora_do_horario");
+  });
+
+  it("planejarViagem não manda 'data' quando ela não é informada", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ opcoes: [] }),
+    }) as jest.Mock;
+
+    await planejarViagem({ lat: 1, lng: 2 }, { lat: 3, lng: 4 }, "saida", "07:10");
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).not.toContain("data=");
+  });
+
+  it("planejarViagem lança PlanejarViagemError quando o servidor falha", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 }) as jest.Mock;
+
+    await expect(
+      planejarViagem({ lat: 1, lng: 2 }, { lat: 3, lng: 4 }, "saida", "07:10")
+    ).rejects.toBeInstanceOf(PlanejarViagemError);
   });
 
   it("calcularRotas manda as quatro coordenadas como query params", async () => {
@@ -1054,6 +1104,34 @@ describe("api.ts — pegar o ônibus (US #171)", () => {
       expect(JSON.parse(opcoes.body).veiculo_prefixo).toBe("440001");
     });
 
+    it("consentimento ligado manda compartilha_posicao e a versão do texto (US #199)", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
+
+      await embarcarNoOnibus({
+        numeroLinha: "0.110",
+        lat: 1,
+        lng: 2,
+        compartilhaPosicao: true,
+        consentimentoVersao: "v1-199",
+      });
+
+      const corpo = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(corpo).toMatchObject({
+        compartilha_posicao: true,
+        consentimento_versao: "v1-199",
+      });
+    });
+
+    it("sem consentimento (padrão), não manda campos do fallback", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
+
+      await embarcarNoOnibus({ numeroLinha: "0.110", lat: 1, lng: 2 });
+
+      const corpo = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(corpo).not.toHaveProperty("compartilha_posicao");
+      expect(corpo).not.toHaveProperty("consentimento_versao");
+    });
+
     it("sem destino, não manda o campo", async () => {
       global.fetch = jest.fn().mockResolvedValue(resposta(201, {})) as jest.Mock;
 
@@ -1474,6 +1552,101 @@ describe("api.ts — confirmarOcorrencia (US #26)", () => {
     await expect(confirmarOcorrencia(OCORRENCIA_ID)).rejects.toMatchObject({
       status: 422,
       message: expect.stringContaining("ativo"),
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US #199 — posição colaborativa
+// ---------------------------------------------------------------------------
+
+describe("US #199 — posição colaborativa", () => {
+  function resposta(status: number, corpo: unknown = {}) {
+    return { ok: status >= 200 && status < 300, status, json: async () => corpo };
+  }
+
+  describe("enviarPosicaoColaborativa", () => {
+    it("faz POST /viagens/{id}/posicao com lat/lng e precisao_m do GPS", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(202, { aceita: true, motivo: "aceita" })) as jest.Mock;
+
+      const resultado = await enviarPosicaoColaborativa("v-1", {
+        lat: -15.8,
+        lng: -48.05,
+        precisaoM: 12,
+      });
+
+      const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/api\/mobilidade\/viagens\/v-1\/posicao$/);
+      expect(opcoes).toMatchObject({ method: "POST", credentials: "include" });
+      expect(JSON.parse(opcoes.body)).toEqual({ lat: -15.8, lng: -48.05, precisao_m: 12 });
+      expect(resultado).toEqual({ aceita: true, motivo: "aceita" });
+    });
+
+    it("sem precisão, não manda o campo", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(202, {})) as jest.Mock;
+
+      await enviarPosicaoColaborativa("v-1", { lat: 1, lng: 2 });
+
+      const corpo = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(corpo).not.toHaveProperty("precisao_m");
+    });
+
+    it("corpo estranho não é 'aceita' e motivo inválido vira string vazia", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(202, { aceita: "sim", motivo: null })) as jest.Mock;
+
+      const resultado = await enviarPosicaoColaborativa("v-1", { lat: 1, lng: 2 });
+
+      expect(resultado).toEqual({ aceita: false, motivo: "" });
+    });
+
+    it("429 (anti-martelada) lança erro com o status — quem chama decide o silêncio", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(429, {})) as jest.Mock;
+
+      const erro = await enviarPosicaoColaborativa("v-1", { lat: 1, lng: 2 }).catch((e) => e);
+
+      expect(erro).toBeInstanceOf(ViagemError);
+      expect(erro.status).toBe(429);
+    });
+
+    it("409 (consentimento revogado) lança erro com o status e a frase do servidor", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(resposta(409, { detail: "Sem consentimento." })) as jest.Mock;
+
+      const erro = await enviarPosicaoColaborativa("v-1", { lat: 1, lng: 2 }).catch((e) => e);
+
+      expect(erro.status).toBe(409);
+      expect(erro.message).toBe("Sem consentimento.");
+    });
+  });
+
+  describe("pararDeCompartilhar", () => {
+    it("faz DELETE /viagens/{id}/posicao", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(204)) as jest.Mock;
+
+      await pararDeCompartilhar("v-1");
+
+      const [url, opcoes] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/api\/mobilidade\/viagens\/v-1\/posicao$/);
+      expect(opcoes).toMatchObject({ method: "DELETE", credentials: "include" });
+    });
+
+    it("404 (viagem já não é dele) não é erro: a intenção foi cumprida", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(404, {})) as jest.Mock;
+
+      await expect(pararDeCompartilhar("v-1")).resolves.toBeUndefined();
+    });
+
+    it("500 lança ViagemError", async () => {
+      global.fetch = jest.fn().mockResolvedValue(resposta(500, {})) as jest.Mock;
+
+      const erro = await pararDeCompartilhar("v-1").catch((e) => e);
+
+      expect(erro).toBeInstanceOf(ViagemError);
     });
   });
 });
