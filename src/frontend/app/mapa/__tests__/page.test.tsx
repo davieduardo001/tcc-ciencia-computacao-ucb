@@ -386,6 +386,22 @@ describe("MapaPage — planejar viagem origem → destino (US #20)", () => {
     );
   });
 
+  it("falha ao consultar a rota NÃO vira 'Nenhuma linha liga esses dois pontos' (#233)", async () => {
+    calcularRotasMock.mockRejectedValueOnce(new Error("503"));
+    await abrirPlanejador();
+
+    await escolherLugar("De onde", LUGAR_ORIGEM);
+    await escolherLugar("Para onde", LUGAR_DESTINO);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /ver opções de ônibus/i }));
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível calcular a rota");
+    expect(screen.queryByText(/Nenhuma linha liga esses dois pontos/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /tentar de novo/i })).toBeInTheDocument();
+  });
+
   it("mostra a mensagem do Cenário 3 quando não há rota possível", async () => {
     calcularRotasMock.mockResolvedValue([]);
     await abrirPlanejador();
