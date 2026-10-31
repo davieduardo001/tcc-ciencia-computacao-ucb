@@ -147,9 +147,11 @@ export interface LoginPayload {
   senha: string;
 }
 
+/**
+ * O Gateway grava a sessão em cookies httpOnly e não devolve os tokens no
+ * corpo (issue #253). O frontend não guarda token nenhum.
+ */
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
   token_type: string;
 }
 
@@ -175,17 +177,12 @@ export async function loginUsuario(
 
   const data = await response.json();
 
-  if (data.access_token) {
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
-  }
+  limparTokensLegados();
 
   return data;
 }
 
 export interface GoogleLoginResponse {
-  access_token: string;
-  refresh_token: string;
   token_type: string;
   account_linking_pending: boolean;
   account_linking_required: boolean;
@@ -193,15 +190,6 @@ export interface GoogleLoginResponse {
 
 export class GoogleLoginError extends Error {}
 
-function armazenarTokensSeExistirem(data: {
-  access_token?: string;
-  refresh_token?: string;
-}): void {
-  if (data.access_token) {
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token ?? "");
-  }
-}
 
 /**
  * Login via Google: envia o id_token (JWT) obtido do Google Identity
@@ -228,7 +216,7 @@ export async function loginComGoogle(
     );
   }
 
-  armazenarTokensSeExistirem(data);
+  limparTokensLegados();
 
   return data;
 }
@@ -262,7 +250,7 @@ export async function confirmarVinculoGoogle(
     );
   }
 
-  armazenarTokensSeExistirem(data);
+  limparTokensLegados();
 
   return data;
 }
@@ -291,17 +279,19 @@ export function decodificarIdTokenGoogle(idToken: string): {
   }
 }
 
-export function getAccessToken(): string | null {
-  return localStorage.getItem("access_token");
-}
-
-export function getRefreshToken(): string | null {
-  return localStorage.getItem("refresh_token");
-}
-
-export function clearTokens(): void {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+/**
+ * A sessão vive só nos cookies httpOnly do Gateway; o frontend nunca guarda
+ * token (issue #253). Versões antigas gravavam access_token/refresh_token no
+ * localStorage; esta limpeza remove o que sobrou nos navegadores que já
+ * tinham feito login, para o refresh token não ficar legível por XSS.
+ */
+export function limparTokensLegados(): void {
+  try {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+  } catch {
+    // best-effort: storage indisponível (modo privado etc.)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +344,7 @@ function renovarSessaoUmaVez(): Promise<boolean> {
 }
 
 function encerrarSessaoNoCliente(): void {
-  clearTokens();
+  limparTokensLegados();
   try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
   const caminho = caminhoAtual();
   if (PAGINAS_PUBLICAS.some((p) => caminho.startsWith(p))) return;
@@ -409,6 +399,7 @@ export interface UsuarioAtual {
  * só precisam exibir "logado" vs "visitante".
  */
 export async function buscarUsuarioAtual(): Promise<UsuarioAtual | null> {
+  limparTokensLegados();
   try {
     const response = await fetchAutenticado(
       `${API_URL}/api/auth/me`,
@@ -459,7 +450,7 @@ export async function logoutUsuario(): Promise<void> {
       credentials: "include",
     });
   } finally {
-    clearTokens();
+    limparTokensLegados();
     // US #25 — limpa o cache local de favoritos ao sair.
     try { localStorage.removeItem("movecity:favoritos"); } catch { /* best-effort */ }
   }
@@ -2048,6 +2039,10 @@ export async function removerInscricaoPush(endpoint: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // US #29 — Preferências de Notificação
 // ---------------------------------------------------------------------------
+
+/** Confirmações de outros passageiros para a ocorrência virar "confirmada".
+ * Espelha Ocorrencia.LIMITE_CONFIRMACOES do servidor (RN-015). */
+export const LIMITE_CONFIRMACOES = 3;
 
 export const ANTECEDENCIAS_ALERTA = [5, 10, 30, 60] as const;
 export type AntecedenciaAlerta = (typeof ANTECEDENCIAS_ALERTA)[number];

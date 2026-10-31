@@ -40,6 +40,13 @@ describe("ReportarOcorrenciaPage", () => {
     paramsLinha = "";
   });
 
+  it("o texto de validação cita as 3 confirmações exigidas pelo servidor (RN-015)", () => {
+    render(<ReportarOcorrenciaPage />);
+
+    expect(screen.getByText(/3 confirmações de outros passageiros/)).toBeInTheDocument();
+    expect(screen.queryByText(/mínimo 2/)).not.toBeInTheDocument();
+  });
+
   it("vindo do atalho 'Reportar nesta linha', já chega com a linha preenchida", () => {
     paramsLinha = "0.312";
     render(<ReportarOcorrenciaPage />);

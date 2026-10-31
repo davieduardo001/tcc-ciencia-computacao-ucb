@@ -170,7 +170,7 @@ def test_redefinir_senha_senha_curta():
 
     assert response.status_code == 400
     data = response.json()
-    assert "minimo" in data["detail"]
+    assert "mínimo" in data["detail"]
 
 
 def test_redefinir_senha_token_invalido():
@@ -190,7 +190,7 @@ def test_redefinir_senha_token_invalido():
 
         assert response.status_code == 400
         data = response.json()
-        assert "valido" in data["detail"]
+        assert "válido" in data["detail"]
     finally:
         app.dependency_overrides.clear()
 
@@ -222,7 +222,7 @@ def test_redefinir_senha_token_expirado():
 
         assert response.status_code == 400
         data = response.json()
-        assert "valido" in data["detail"]
+        assert "válido" in data["detail"]
     finally:
         app.dependency_overrides.clear()
 
@@ -254,6 +254,6 @@ def test_redefinir_senha_token_ja_usado():
 
         assert response.status_code == 400
         data = response.json()
-        assert "valido" in data["detail"]
+        assert "válido" in data["detail"]
     finally:
         app.dependency_overrides.clear()

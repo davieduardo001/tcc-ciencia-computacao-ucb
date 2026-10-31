@@ -53,7 +53,7 @@ describe("Página de recuperação de senha — US #133", () => {
   it("solicita a recuperação e exibe a confirmação", async () => {
     (solicitarResetSenha as jest.Mock).mockResolvedValue({
       mensagem:
-        "Se o e-mail estiver cadastrado, voce recebera um link de redefinicao.",
+        "Se o e-mail estiver cadastrado, você receberá um link de redefinição.",
     });
 
     render(<RecuperarSenhaPage />);
@@ -108,7 +108,7 @@ describe("Página de recuperação de senha — US #133", () => {
   it("possui caminho para voltar ao login após a solicitação", async () => {
     (solicitarResetSenha as jest.Mock).mockResolvedValue({
       mensagem:
-        "Se o e-mail estiver cadastrado, voce recebera um link de redefinicao.",
+        "Se o e-mail estiver cadastrado, você receberá um link de redefinição.",
     });
 
     render(<RecuperarSenhaPage />);

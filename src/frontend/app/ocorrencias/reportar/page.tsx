@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, LocateFixed, Send } from "lucide-react";
 import AppShell from "../../mapa/AppShell";
 import {
+  LIMITE_CONFIRMACOES,
   LinhaResumo,
   nomearLugar,
   reportarOcorrencia,
@@ -141,7 +142,7 @@ function ReportarConteudo() {
         <h1>Reportar ocorrência</h1>
         <p className="ocor-sub">
           Ajude outros passageiros. Ocorrências como atraso, lotação e obra na via são
-          validadas por cruzamento (mínimo 2 confirmações) antes de aparecer como
+          validadas por cruzamento ({LIMITE_CONFIRMACOES} confirmações de outros passageiros) antes de aparecer como
           confirmadas; acidente e segurança aparecem na hora.
         </p>
 

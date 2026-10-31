@@ -110,7 +110,8 @@ Não existe confirmação de conta por e-mail: a conta entra direto.
 5. Gateway grava os cookies httpOnly:
    - access_token  (1 h,    path=/api,      Secure, SameSite=None)
    - refresh_token (7 dias, path=/api/auth, Secure, SameSite=None)
-6. Gateway devolve ao Browser a resposta do Auth Service, que continua contendo os tokens no corpo
+6. Gateway devolve ao Browser a resposta do Auth Service SEM os tokens no corpo (só `token_type` e flags);
+   o frontend não guarda token em `localStorage` nem em `sessionStorage` (issue #253)
 ```
 
 O login com Google (`/api/auth/login/google`) segue o mesmo caminho. Se o e-mail já pertence a uma conta com senha, o Auth Service responde sem tokens e com `account_linking_required`, e o vínculo só se conclui em `/api/auth/link-google/confirmar`, que revalida o token do Google.
@@ -161,7 +162,7 @@ Detalhes:
 2. Gateway roteia para o Auth Service
 3. Auth Service apaga da tabela `sessoes` a sessão do cookie access_token (se o cookie chegou)
 4. Gateway limpa os dois cookies, sempre
-5. Frontend limpa os tokens do localStorage e o cache local de favoritos
+5. Frontend apaga tokens legados que versões antigas deixaram no navegador e limpa o cache local de favoritos
    (o redirecionamento depende da tela que chamou o logout; não verificado aqui)
 ```
 

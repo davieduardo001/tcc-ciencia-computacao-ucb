@@ -69,6 +69,26 @@ describe("api.ts — paths do Gateway", () => {
     expect(url).toMatch(/\/api\/auth\/login$/);
     expect(options.credentials).toBe("include");
   });
+
+  it("loginUsuario não grava token em localStorage nem sessionStorage (issue #253)", async () => {
+    // O mock devolve tokens no corpo (Gateway antigo): mesmo assim nada é guardado.
+    await loginUsuario({ email: "teste@example.com", senha: "senha123" });
+
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+    expect(sessionStorage.getItem("access_token")).toBeNull();
+    expect(sessionStorage.getItem("refresh_token")).toBeNull();
+  });
+
+  it("loginUsuario apaga tokens legados deixados por versões antigas (issue #253)", async () => {
+    localStorage.setItem("access_token", "velho");
+    localStorage.setItem("refresh_token", "velho");
+
+    await loginUsuario({ email: "teste@example.com", senha: "senha123" });
+
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+  });
 });
 
 describe("api.ts — buscarLinha (US #17)", () => {
@@ -636,7 +656,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
       status: 200,
       json: async () => ({
         mensagem:
-          "Se o e-mail estiver cadastrado, voce recebera um link de redefinicao.",
+          "Se o e-mail estiver cadastrado, você receberá um link de redefinição.",
       }),
     }) as jest.Mock;
 
@@ -700,7 +720,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
       ok: false,
       status: 400,
       json: async () => ({
-        detail: "Este link nao e mais valido ou expirou.",
+        detail: "Este link não é mais válido ou expirou.",
       }),
     }) as jest.Mock;
 
@@ -710,7 +730,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
         novaSenha: "NovaSenha123!",
         confirmacaoSenha: "NovaSenha123!",
       })
-    ).rejects.toThrow("Este link nao e mais valido ou expirou.");
+    ).rejects.toThrow("Este link não é mais válido ou expirou.");
   });
 });
 
