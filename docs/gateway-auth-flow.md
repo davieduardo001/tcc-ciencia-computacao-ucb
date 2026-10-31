@@ -196,7 +196,7 @@ Se `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` ou `FRONTEND_URL` faltarem, o e-mai
 
 `SameSite=None` porque o frontend (Vercel) e o Gateway (Fly.io) estão em domínios diferentes: com `Lax` ou `Strict` o navegador não envia o cookie em `fetch()` cross-site. `Secure` é obrigatório junto com `SameSite=None` (ADR-07).
 
-**O que os cookies httpOnly protegem, e o que não protegem hoje.** Cookie httpOnly não pode ser lido por JavaScript, o que seria a proteção contra roubo de token por XSS. **Essa proteção está reduzida** porque o corpo da resposta de login (e-mail e Google) e de refresh continua trazendo `access_token` e `refresh_token` (o Gateway devolve a resposta do Auth Service e só acrescenta os cookies), e o frontend grava os dois em `localStorage` (`loginUsuario` e `armazenarTokensSeExistirem`, em `src/frontend/lib/api.ts`). `getAccessToken()` e `getRefreshToken()` existem, mas nenhuma outra parte do frontend as chama: a autenticação real usa os cookies. Mesmo sem uso, qualquer script executado na página consegue ler os tokens do `localStorage`. **Limitação conhecida, issue #253 (aberta).**
+**O que os cookies httpOnly protegem.** Cookie httpOnly não pode ser lido por JavaScript, o que protege o token contra roubo por XSS. Desde a issue #253 (PR #269), o Gateway também tira `access_token` e `refresh_token` do corpo das respostas de login (e-mail e Google), de vínculo Google e de refresh, e o frontend não grava token em `localStorage` nem em `sessionStorage`; só apaga os que versões antigas deixaram no navegador. Validado em produção em 31/10/2026.
 
 ---
 
@@ -269,7 +269,7 @@ Com o CORS mais externo, o preflight `OPTIONS` (que nunca leva cookie) é respon
 
 | Ameaça | Mitigação | Limite |
 |--------|-----------|--------|
-| **XSS** | Cookies httpOnly | **Reduzida:** o frontend também grava os tokens em `localStorage` (#253, aberta) |
+| **XSS** | Cookies httpOnly; token fora do corpo e do `localStorage` (#253) | Atendida; sem auditoria formal |
 | **CSRF** | Escopo de `path` por cookie e HTTPS obrigatório | `SameSite=None` amplia a exposição a CSRF; não há token anti-CSRF |
 | **Replay** | Access token de 1 h; refresh de 7 dias, rotacionado a cada renovação | — |
 | **Token roubado** | O refresh token deixa de valer no logout (sessão apagada) | O access token já emitido vale até expirar; o Gateway não consulta `sessoes` |
@@ -281,5 +281,5 @@ Com o CORS mais externo, o preflight `OPTIONS` (que nunca leva cookie) é respon
 ## Referências
 
 - US #31: [Gerenciar Ciclo de Vida da Sessão](https://github.com/davieduardo001/tcc-ciencia-computacao-ucb/issues/31)
-- Issues: #188 (X-User-Id), #212 e #221 (refresh), #237 (e-mail de recuperação), #253 (tokens no `localStorage`)
+- Issues: #188 (X-User-Id), #212 e #221 (refresh), #237 (e-mail de recuperação), #253 (tokens fora do `localStorage`)
 - Diagrama de sequência: `docs/diagramas/sequencia/UC10-realizar-login-email-senha.puml`

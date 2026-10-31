@@ -94,7 +94,7 @@ Todos coletados de `gh issue/pr list` e `git log` em 29/10/2026, salvo indicaç�
 | "Mediana de 18 min até o merge não é revisão superficial?" | Por tipo: `feat` **20 min**, `fix` **9 min**, `docs` 25 min, `chore` 13 min. PRs pequenos e o CI cobre o mecânico, mas é um risco real: um único revisor. | Reconhecer o risco do revisor único como limite. |
 | "Os casos de teste manuais foram executados?" | Em 27/10 executamos os 18 casos P1 (API e navegador, desktop e celular; `docs/qa/execucao-casos-p1.md`): **4 reprovados**, que viraram defeitos (cadastro sem aceite dos termos, `/auth/refresh` inexistente, seção "Chegando nesta parada" ausente). Os P2/P3 foram executados até 28/10 (32 aprovados, 11 em parte ou com ressalva, 1 reprovado por configuração); 3 não são verificáveis hoje (NOT-02, VIA-07, VIA-08) e 2 ficam para execução à mão (MAP-03, ETA-03). Quadro em `docs/qa/execucao-casos-p1.md`. | Fazer à mão MAP-03 e ETA-03 (DevTools Sensors); levar VIA-07 e VIA-08 para o ensaio. |
 | "Existe ambiente de homologação?" | **Não separado, por decisão de custo**: `homolog` publica na produção da Vercel; backend e banco compartilham apps e Neon (free tier). Risco aceito e documentado. | Mostrar como trabalho futuro. |
-| "Os cookies httpOnly protegem contra XSS?" | Era o desenho: o Gateway grava os tokens em cookies httpOnly, `SameSite=None` e `Secure`. Mas o frontend também grava os tokens no `localStorage` (sem usá-los), o que expõe a XSS e reduz essa proteção. Achado em 28/10 por leitura de código, issue #253. | Corrigir antes da defesa, se houver tempo; senão, declarar como limite conhecido. |
+| "Os cookies httpOnly protegem contra XSS?" | Era o desenho: o Gateway grava os tokens em cookies httpOnly, `SameSite=None` e `Secure`. Mas o frontend também grava os tokens no `localStorage` (sem usá-los), o que expõe a XSS e reduz essa proteção. Achado em 28/10 por leitura de código, issue #253. | Corrigido em 31/10 (PR #269): o frontend não grava mais token e o Gateway não o devolve no corpo das respostas. |
 | "O ETA está correto?" | Tolerância proposta (2 min até 10 min) **não foi medida em campo**. | Validar em campo se houver tempo, ou declarar como limite. |
 | "A IA já errou?" | Sim, e está documentado: incidente da #35 (aprovação por comentário confundida com review formal), plano de 4 apps vs. código monolítico exposto em vez de escolhido em silêncio. | Escolher 2 exemplos (um de processo, um de código) para o slide. |
 
@@ -149,7 +149,7 @@ Com uma pessoa só no teclado, combinar a deixa de cada passo ("próximo: abrir 
 - **Embarque com raio de 100 km** (`RAIO_EMBARQUE_M=100000`), de propósito, para demonstrar de qualquer lugar. A regra documentada é 100 m.
 - **Alertas sem entrega:** a tela de preferências salva, mas não há push (#207) nem alerta de cancelamento (#28).
 - **Sem ambiente de homologação separado** (decisão de custo).
-- **Tokens de sessão também no `localStorage`** (#253): o frontend os grava ali sem usá-los, o que expõe a XSS e reduz a proteção que os cookies httpOnly dariam. Correção pendente.
+- **Tokens de sessão também no `localStorage`** (#253): o frontend os grava ali sem usá-los, o que expõe a XSS e reduz a proteção que os cookies httpOnly dariam. **Corrigido em 31/10** (PR #269).
 
 ## 7. Documentação final (próximo passo)
 
