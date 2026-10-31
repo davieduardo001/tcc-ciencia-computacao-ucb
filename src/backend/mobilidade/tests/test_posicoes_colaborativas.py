@@ -275,6 +275,17 @@ def test_respeita_o_intervalo_minimo_de_envio(db):
         _registrar(servico, viagem, LEVEMENTE_EM, db=db)
 
 
+def test_leitura_descartada_tambem_consome_o_intervalo(db):
+    viagem = _viagem_na_sessao(db)
+    servico = _servico(INTERVALO_MINIMO_ENVIO_S)
+
+    # fora do traçado: descartada, mas a reserva do intervalo já foi feita
+    assert _registrar(servico, viagem, FORA_DA_LINHA, db=db) == MOTIVO_FORA_DO_TRACADO
+
+    with pytest.raises(EnvioAdiantado):
+        _registrar(servico, viagem, NO_MEIO, db=db)
+
+
 def test_passado_o_intervalo_aceita_de_novo(db):
     viagem = _viagem_na_sessao(db)
     servico = _servico(INTERVALO_MINIMO_ENVIO_S)

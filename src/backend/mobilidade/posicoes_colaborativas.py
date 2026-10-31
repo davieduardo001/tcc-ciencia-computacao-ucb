@@ -126,9 +126,9 @@ class ArmazenamentoEmMemoria(ArmazenamentoPosicoesColaborativas):
     """
     Dicionário do processo: viagem → leituras recentes.
 
-    `obter` e `expirar` podam o que venceu — o mesmo que `validar-até-lá`
-    vigiado à toa. `obter` é lido por TODA consulta de mapa com fallback
-    ativo, então a poda vencida acontece mesmo sem o sweep periódico.
+    `obter` e `expirar` podam as leituras vencidas. `obter` é lido por TODA
+    consulta de mapa com fallback ativo, então a poda acontece mesmo sem
+    o sweep periódico.
     """
 
     def __init__(
@@ -243,14 +243,18 @@ class ServicoPosicoesColaborativas:
         if agora.tzinfo is None:
             agora = agora.replace(tzinfo=timezone.utc)
 
+        # Reserva o intervalo já na checagem: duas requisições simultâneas
+        # não passam juntas. Leitura descartada abaixo também consome o
+        # intervalo (anti-martelada vale para quem erra também).
         agora_mono = time.monotonic()
         with self._lock:
             ultimo = self._ultimo_envio.get(viagem.id)
-        if (
-            ultimo is not None
-            and (agora_mono - ultimo) < self._intervalo_minimo_s
-        ):
-            raise EnvioAdiantado()
+            if (
+                ultimo is not None
+                and (agora_mono - ultimo) < self._intervalo_minimo_s
+            ):
+                raise EnvioAdiantado()
+            self._ultimo_envio[viagem.id] = agora_mono
 
         leituras = self._armazenamento.obter(viagem.id)
         if leituras:
@@ -271,8 +275,6 @@ class ServicoPosicoesColaborativas:
             return MOTIVO_FORA_DO_TRACADO
 
         self._armazenamento.guardar(viagem.id, LeituraColaborativa(instante=agora, lat=lat, lng=lng))
-        with self._lock:
-            self._ultimo_envio[viagem.id] = agora_mono
         return MOTIVO_ACEITA
 
     def _encaixa_no_tracado(

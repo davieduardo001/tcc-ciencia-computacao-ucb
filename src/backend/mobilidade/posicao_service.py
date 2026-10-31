@@ -245,7 +245,7 @@ class PosicaoService:
                     )
                 )
 
-        # US #199 — queda os veículos colaborativos por cima do feed. Nunca
+        # US #199 — soma os veículos colaborativos ao feed. Nunca
         # derrubam o mapa: qualquer falha da fonte é engolida e devolvida
         # só com SEMOB (RN-C2: SEMOB vale mais — a colaborativa é a
         # lacuna que ela cobre, não um risco ao que já funciona).
