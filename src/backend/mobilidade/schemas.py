@@ -91,6 +91,51 @@ class OpcaoViagemResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# US #115 — Planejar viagem por horário de partida/chegada
+# ---------------------------------------------------------------------------
+
+
+class PernaPlanejadaResponse(BaseModel):
+    """Uma perna da viagem com os horários estimados de subir e descer."""
+
+    numero: str
+    sentido: str
+    nome: str
+    embarque: PontoEmbarqueResponse
+    desembarque: PontoEmbarqueResponse
+    embarca_em: str  # ISO 8601, fuso de Brasília
+    desembarca_em: str
+    # Tempo parado no ponto antes do ônibus; na baldeação é a espera no
+    # ponto de troca (Cenário 3).
+    espera_min: int
+
+
+class OpcaoPlanejadaResponse(BaseModel):
+    pernas: list[PernaPlanejadaResponse]
+    baldeacoes: int
+    saida_casa: str
+    chegada_destino: str
+    duracao_total_min: int
+    caminhada_metros: int
+
+
+class PlanoViagemResponse(BaseModel):
+    """
+    Cenário 5 — sem opção, `motivo` e `mensagem` dizem por quê, em vez de
+    uma lista vazia sem explicação.
+    """
+
+    tipo: Literal["saida", "chegada"]
+    referencia: str
+    opcoes: list[OpcaoPlanejadaResponse]
+    motivo: Literal["sem_opcoes", "sem_tabela_de_horarios", "fora_do_horario"] | None = None
+    mensagem: str | None = None
+    # O horário de passagem em cada parada é estimado (saída da tabela +
+    # tempo de percurso proporcional); o front declara isso na tela.
+    estimado: bool = True
+
+
+# ---------------------------------------------------------------------------
 # US #16 — Posição do ônibus em tempo real
 # ---------------------------------------------------------------------------
 
