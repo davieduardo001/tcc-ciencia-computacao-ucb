@@ -442,7 +442,7 @@ Esta seção separa o que é **premissa de dimensionamento** (nunca medida) do q
 
 ## 10. Evolução Arquitetural (junho a outubro de 2026)
 
-Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 28/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são da v3.0 e as ADR-25 a ADR-27, da v3.2.
+Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 31/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são da v3.0 e as ADR-25 a ADR-27, da v3.2.
 
 ### 10.1 Registro de decisões (ADR-01 a ADR-15)
 

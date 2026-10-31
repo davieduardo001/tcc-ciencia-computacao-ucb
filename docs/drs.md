@@ -1,6 +1,6 @@
 # Documento de Requisitos de Software (DRS) - Movecity
 
-> **Versão 1.0 · 30/10/2026.** Descreve o produto **como está entregue**, não como foi planejado. "Entregue" significa mergeado em `homolog` ou `main`; o código em produção é o de `homolog`. Estrutura conforme o `Template_DRS` da disciplina.
+> **Versão 1.1 · 31/10/2026.** Descreve o produto **como está entregue**, não como foi planejado. "Entregue" significa mergeado em `homolog` ou `main`; o código em produção é o de `homolog`. Estrutura conforme o `Template_DRS` da disciplina.
 
 ## 1. Introdução
 
