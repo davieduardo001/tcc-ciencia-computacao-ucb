@@ -1,6 +1,6 @@
 # Relatório de Construção e Testes — Movecity
 
-> **Versão 1.0 · 30/10/2026.** Descreve a construção e os testes do Movecity **como estão hoje**. O código descrito é o de `origin/homolog` (ambiente publicado); os testes manuais foram executados em produção em 27 e 28/10/2026; os testes automatizados foram contados no log do CI de 28/10/2026. O que não foi medido ou não foi feito está dito como tal.
+> **Versão 1.1 · 31/10/2026.** Descreve a construção e os testes do Movecity **como estão hoje**. O código descrito é o de `origin/homolog` (ambiente publicado); os testes manuais foram executados em produção em 27 e 28/10/2026; os testes automatizados foram contados no log do CI de 28/10/2026. O que não foi medido ou não foi feito está dito como tal.
 
 ## Resumo
 
@@ -8,11 +8,13 @@ O Movecity é um aplicativo web em Next.js, com um Gateway e três serviços Fas
 
 | Medida | Resultado |
 |---|---|
-| Testes automatizados | 1.640, todos passando no CI (844 de backend e 796 de frontend) |
+| Testes automatizados | 1.792, todos passando (952 de backend e 840 de frontend) |
 | Cobertura | 93,7% no backend e 89,1% no frontend (medida em 16/10) |
 | Casos manuais em produção | 49 executados: 32 aprovados, 11 aprovados em parte ou com ressalva, 1 reprovado por configuração, 3 não verificáveis fora de campo e 2 pendentes |
 | Defeitos catalogados | 26, dos quais 10 de conexão entre as peças e 16 de regra, dado ou interface |
 | Usabilidade | Avaliação heurística de Nielsen por um avaliador, de forma agêntica |
+
+**Funcionalidades posteriores aos testes manuais.** O alerta de cancelamento (#28), o planejamento por horário (#115) e a posição colaborativa (#199) entraram na `homolog` em 31/10/2026, depois da execução dos 49 casos. Elas têm testes automatizados (152 testes a mais que em 28/10), mas **não têm caso manual executado**, não passaram pela avaliação de Nielsen e a cobertura de código não foi remedida. A posição colaborativa depende de memória do processo e, com as duas máquinas do serviço de mobilidade, pode não aparecer para todos (ADR-25).
 
 **Onde está cada coisa.** Este documento traz a construção, o projeto de interface, os testes e o processo de desenvolvimento. Os detalhes de teste (plano, casos, execução com as evidências, matriz de rastreabilidade, testes unitários, cobertura e defeitos, integração e usabilidade) estão no documento de **Anexos de testes**, com um índice no início.
 
@@ -119,9 +121,9 @@ O backend declara **68 rotas** (decoradores `@router` e `@app`), em 4 aplicaçõ
 
 | Suíte | Testes | Passando | Falhando | Fonte |
 |---|---|---|---|---|
-| Backend (pytest) | 844 | 844 | 0 | CI de 28/10 |
-| Frontend (Jest, 43 suítes) | 796 | 796 | 0 | CI de 28/10 |
-| **Total** | **1.640** | **1.640** | **0** | execução `40689632241` |
+| Backend (pytest) | 952 | 952 | 0 | execução local de 31/10, CI verde no PR #265 |
+| Frontend (Jest, 45 suítes) | 840 | 840 | 0 | execução local de 31/10, CI verde no PR #265 |
+| **Total** | **1.792** | **1.792** | **0** | PR #265 (`homolog`, 31/10) |
 
 Em 16/10 eram 1.260 testes (671 de backend em 56 arquivos e 589 de frontend em 33 suítes); o registro original da #151 tinha 297. O aumento de 380 testes (173 no backend e 207 no frontend) é o que entrou na `homolog` entre 16/10 e 28/10.
 
@@ -282,7 +284,7 @@ Quatro heurísticas ficaram com severidade 3 (2, 6, 9 e 10); as demais, com 2. *
 | Tabelas e migrations | 21 e 20 | 28/10 |
 | Telas | 13 | 28/10 |
 | Issues, PRs e commits | 103, 155 e 283 | 29/10 |
-| Testes automatizados | 1.640 (844 e 796) | 28/10 |
+| Testes automatizados | 1.792 (952 e 840) | 31/10 |
 | Cobertura (backend, frontend) | 93,7% e 89,07% | 16/10 |
 | PRs `feat` e `fix` com teste | 41 de 42 desde 22/09 | 29/10 |
 | CI de PR verde, Sprint 3 | 94% | 16/10 |

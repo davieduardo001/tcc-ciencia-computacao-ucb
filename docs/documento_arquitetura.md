@@ -14,6 +14,7 @@
 | 18/set/26 | 2.0 | Atualização pós-implementação: correção das seções divergentes do código (persistência, processos, implementação, implantação e dados) e inclusão da seção 10 — Evolução Arquitetural | Grupo Segurança no Transporte |
 | 28/out/26 | 3.0 | Revisão contra o código de `homolog` (ambiente publicado): correção de afirmações que o código contradiz (regiões do Fly, validação cruzada, retenção de ocorrências, worker de colaboração, papel do Gateway na renovação da sessão, acesso ao banco), atualização das tabelas, endpoints, workflows e requisitos não funcionais com o que foi verificado e o que não foi medido, e registro das ADR-16 a ADR-24 | Grupo Segurança no Transporte |
 | 30/out/26 | 3.1 | Versão entregue: revisão do texto, remoção de repetições e atualização dos números de testes | Grupo Segurança no Transporte |
+| 31/out/26 | 3.2 | Inclusão do alerta de cancelamento (#28), do planejamento por horário (#115) e da posição colaborativa (#199): ADR-25 a ADR-27, processo 8, tabelas de dados e números de testes | Grupo Segurança no Transporte |
 
 ---
 
@@ -117,7 +118,7 @@ Resultados detalhados no Documento de Testes e Implementação. Aqui fica o que 
 | Confiabilidade (validação cruzada) | Regra de 3 confirmações implementada e testada. | Comportamento com muitos usuários reais. |
 | Segurança e LGPD | Sessão renovada em produção sem novo login; coordenadas do usuário fora da URL; viagem sem coluna de posição. | Revisão jurídica da LGPD. |
 | Usabilidade | Avaliação heurística de Nielsen por um avaliador; teste automatizado de contraste. | Teste com usuários reais; leitor de tela, tamanho de toque e conexão lenta. |
-| Manutenção (testes) | 1.640 testes automatizados passando no CI (844 de backend, 796 de frontend); cobertura de 93,7% (backend) e 89,1% (frontend), medida em 16/10. | Cobertura no CI. |
+| Manutenção (testes) | 1.792 testes automatizados passando no CI (952 de backend, 840 de frontend); cobertura de 93,7% (backend) e 89,1% (frontend), medida em 16/10. | Cobertura no CI. |
 | Integração entre as peças | 49 casos manuais executados em produção: 32 aprovados, 11 aprovados em parte, 1 reprovado por configuração, 3 não verificáveis fora de campo e 2 pendentes. | Teste automatizado de ponta a ponta entre frontend, Gateway e serviços. |
 | Escalabilidade | — | Teste de carga. |
 
@@ -219,7 +220,7 @@ O diagrama de pacotes da UML representa a organização lógica do sistema em ca
 
 - **Serviço de Autenticação (`<<servico autenticacao>>`):** Gerencia o ciclo de vida de usuários e sessões. Emite e valida credenciais; suporta login por e-mail/senha e OAuth 2.0 (Google, com vínculo de conta existente), cadastro com aceite dos termos, renovação e encerramento de sessão, primeiro acesso (tutorial) e recuperação de senha por e-mail.
 
-- **Serviço de Mobilidade (`<<servico mobilidade>>`):** Núcleo funcional da plataforma. Lê as posições de GPS do feed da SEMOB, mantém o catálogo de linhas, paradas e trajetos, calcula rotas de origem a destino (com baldeação) apoiado no OSRM, calcula o tempo de chegada, gerencia a viagem do passageiro (embarcar, trocar o destino, encerrar), o alerta de proximidade da parada e as inscrições de Web Push.
+- **Serviço de Mobilidade (`<<servico mobilidade>>`):** Núcleo funcional da plataforma. Lê as posições de GPS do feed da SEMOB, mantém o catálogo de linhas, paradas e trajetos, calcula rotas de origem a destino (com baldeação) apoiado no OSRM, calcula o tempo de chegada, gerencia a viagem do passageiro (embarcar, trocar o destino, encerrar), o alerta de proximidade da parada, o alerta de cancelamento, o planejamento por horário, a posição colaborativa e as inscrições de Web Push.
 
 - **Serviço de Colaboração (`<<servico colaboracao>>`):** Gerencia o fluxo de reportes colaborativos (ocorrências), a confirmação por outros passageiros (validação cruzada), as rotas favoritas e as preferências de notificação. O `monitoring_worker` (aviso de rotas preferidas) existe como componente, mas não está agendado em produção (seção 5).
 
@@ -258,6 +259,10 @@ Posições com mais de 15 minutos são descartadas como desatualizadas (`IDADE_M
 **4. Alerta de proximidade da parada de destino (serviço de mobilidade).** No `startup`, `mobilidade/main.py` inicia um `BackgroundScheduler` (APScheduler) **dentro do processo** do serviço. O job `monitoramento-proximidade` percorre as viagens ativas no banco, localiza o ônibus da viagem na posição ao vivo, calcula o ETA pelo trajeto até a parada de destino, confere as preferências do usuário (`notificacoes_ativas`, `alerta_chegada`, antecedência) e, ao cruzar o limiar, grava o alerta em `alertas_proximidade` — com índice único por (viagem, parada), de modo que o mesmo aviso não se repete — e chama o notificador. O notificador é o `NotificadorWebPush` quando as três variáveis VAPID existem e são coerentes, e o `NotificadorNulo` caso contrário (ADR-16); o aviso dentro do app independe do push. O intervalo padrão é o de `WORKER_INTERVAL_MINUTES` (5 min), ajustável por `WORKER_PROXIMIDADE_INTERVAL_SECONDS` (mínimo de 20 s). Com 5 minutos, o aviso pode chegar com atraso; a issue #200 prevê medir isso em aparelho e decidir o intervalo — **essa medição não foi feita**.
 
 **5. Rastreamento de atraso (#27) — implementado sobre dados simulados.** O mesmo agendador executa o job `monitoramento-atrasos`, que usa o `ServicoRastreamento` com o `FornecedorGTFSMock` e o `NotificadorNulo`. Não há fonte real de atraso nem canal de entrega: o alerta de atraso fica no servidor e não chega ao usuário.
+
+**5b. Alerta de cancelamento (#28).** O mesmo agendador executa o job `monitoramento-cancelamento` (ADR-27), com o `ServicoCancelamento`: acha a partida prevista sem ônibus no feed, grava o alerta, busca a linha alternativa e chama o notificador de Web Push, sempre depois do commit.
+
+**5c. Posição colaborativa (#199).** `POST /viagens/{id}/posicao` valida a leitura e a guarda na memória do processo por até 2 minutos; a leitura do mapa e do ETA (`PosicaoService`) soma esses veículos ao feed da SEMOB, que prevalece (ADR-25).
 
 **6. Monitoramento de rotas preferidas (serviço de colaboração) — componente não agendado.** O `monitoring_worker` expõe apenas `executar_ciclo()` e recebe suas dependências (`FavoritosProvider`, `ETAService`, `PushSender`, `Deduplicador`) por injeção, o que o mantém testável sem relógio, sem rede e sem banco. Porém `colaboracao/main.py` **não tem agendador**: o ciclo só roda quando alguém chama `POST /colaboracao/notificacoes/processar`, rota de demonstração que usa `FavoritosMockProvider`, `ETAMockProvider` e um `PushService` em memória. As rotas favoritas reais (tabela `rotas_favoritas`) não alimentam esse ciclo, e nenhum push chega ao usuário por ele.
 
@@ -370,7 +375,8 @@ O Movecity persiste dados estruturados no PostgreSQL. A seguir, a descrição da
 | `linha` | Catálogo de linhas: número, nome, sentido, `paradas`, `trajeto` e `horarios_previstos` | US #15, #17 |
 | `rota` / `rota_celula` | Trajeto por linha × sentido, horários por dia da semana, tempo de percurso e o índice de grade que acelera a busca por proximidade | US #20, #173 |
 | `parada` / `rota_parada` | Parada física única (código estável) e a posição dela em cada rota: ordem, índice no trajeto, distância acumulada e distância ao traçado | US #173 |
-| `viagem` | Viagem do passageiro, sem coluna de posição; uma ativa por usuário (índice único parcial) | US #171 |
+| `viagem` | Viagem do passageiro, sem coluna de posição; uma ativa por usuário (índice único parcial); `compartilha_posicao_em` e `consentimento_versao` guardam só o aceite do compartilhamento | US #171, #199 |
+| `alertas_cancelamento` | Partida prevista sem ônibus: linha, horário, status e linha alternativa; índice único por linha e horário | US #28 |
 | `alertas_proximidade` | Aviso de proximidade disparado por viagem e parada (índice único) | US #172 |
 | `inscricao_push` | Inscrição de Web Push do aparelho: endpoint, chaves públicas do navegador, data da última falha; sem coordenadas, nome ou *user agent* | US #195 |
 | `ocorrencia` | Reporte de ocorrência: número da linha, tipo, descrição, local, `lat`/`lng` opcionais, status, contador de confirmações e `expira_em` | US #23, #24 |
@@ -388,7 +394,7 @@ O Movecity persiste dados estruturados no PostgreSQL. A seguir, a descrição da
 
 **Representação de geometria.** Trajetos e paradas são armazenados em colunas `JSON` — `list[[lat, lng]]` para o traçado e `list[{nome, lat, lng}]` para as paradas —, e não em tipos geoespaciais. O consumidor desses dados é o Leaflet no navegador, que recebe coordenadas em JSON de qualquer forma; guardá-las no formato final evita conversão a cada leitura. A única operação genuinamente espacial do sistema — associar abrigos de parada ao traçado de uma linha — ocorre uma vez por mês, na ingestão, e é resolvida em Python com índice de grade (seção 10, ADR-02). Coordenadas de ocorrências e de favoritos são pares `Float` (`lat`/`lng`), sem tipo geoespacial.
 
-**Dados de localização que o banco guarda.** A posição de GPS do usuário **não** é gravada (a viagem não tem coluna de posição, ADR-15). O banco guarda, porém, coordenadas que o usuário escolhe informar: o `lat`/`lng` opcional de uma ocorrência e a origem e o destino de uma rota favorita.
+**Dados de localização que o banco guarda.** A posição de GPS do usuário **não** é gravada (a viagem não tem coluna de posição, ADR-15); a posição colaborativa (ADR-25) vive só em memória, por até 2 minutos. O banco guarda, porém, coordenadas que o usuário escolhe informar: o `lat`/`lng` opcional de uma ocorrência e a origem e o destino de uma rota favorita.
 
 **Modelo Entidade-Relacionamento (MER):**
 
@@ -436,7 +442,7 @@ Esta seção separa o que é **premissa de dimensionamento** (nunca medida) do q
 
 ## 10. Evolução Arquitetural (junho a outubro de 2026)
 
-Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 28/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são da v3.0.
+Esta seção registra as decisões arquiteturais tomadas **durante a implementação**, entre a versão 1.0 deste documento (12/jun/26) e 28/out/26. Cada registro segue o formato ADR (*Architecture Decision Record*): a decisão, o que a motivou e a consequência assumida. Onde a decisão contraria a v1.0, isso está dito explicitamente. As ADR-01 a ADR-15 foram registradas na v2.0 e conferidas contra o código na v3.0; as ADR-16 a ADR-24 são da v3.0 e as ADR-25 a ADR-27, da v3.2.
 
 ### 10.1 Registro de decisões (ADR-01 a ADR-15)
 
@@ -460,7 +466,7 @@ Esta seção registra as decisões arquiteturais tomadas **durante a implementa�
 
 *Tabela 5 – Registro de decisões arquiteturais*
 
-### 10.2 Decisões da Sprint 3 e da Sprint 4 (ADR-16 a ADR-24)
+### 10.2 Decisões da Sprint 3 e da Sprint 4 (ADR-16 a ADR-27)
 
 | ID | Decisão | Motivo | Consequência |
 |---|---|---|---|
@@ -472,6 +478,9 @@ Esta seção registra as decisões arquiteturais tomadas **durante a implementa�
 | **ADR-22** | **A chave estrangeira para `usuarios` sai do ORM de Colaboração** e fica no banco, pela migration. Um teste de regressão carrega só os modelos de Colaboração. | O modelo `Usuario` pertence ao Auth e não existe no contêiner de Colaboração; sem ele, `GET /colaboracao/preferencias/{id}` respondia 500 (#213). | O banco garante a integridade; o `autogenerate` do Alembic pode propor remover essas chaves e não deve ser usado para "corrigir" a diferença. |
 | **ADR-23** | **Regra de embarque configurável:** `RAIO_EMBARQUE_M` (padrão 100 m) e a regra do "ônibus chegando" (usuário a até 400 m de uma parada da linha e ônibus a até 2 min dela). A posição do usuário só valida o embarque e é descartada (ADR-15); a do veículo tem no máximo 5 min. | Quem estava na parada com o ônibus chegando era recusado (#190). | **Em produção o raio está em 100 km, por decisão do grupo, só para demonstrar o "Peguei este ônibus" na defesa; a regra de uso real é 100 m.** Os limiares não foram validados em campo. |
 | **ADR-24** | **A posição do usuário não vai para a URL:** a rota pendente passa por `sessionStorage` (chave `movecity:rota-pendente`), apagada na primeira leitura. | As coordenadas do botão "Ir" iam para o histórico, links copiados e logs (#231), contrariando a LGPD. | A rota não sobrevive à aba nem se compartilha por link. O filtro `shared/logs.py` já omitia a query string do log. |
+| **ADR-25** | **Fallback colaborativo da posição do ônibus (#199), só em memória.** Com consentimento explícito (desligado por padrão, separado do aceite dos Termos, revogável), o passageiro a bordo envia a posição do ônibus (`POST /viagens/{id}/posicao`, 202). Quando a linha não tem ônibus equivalente no feed da SEMOB, essa leitura entra como veículo `colaborativo` no ETA, no mapa e na parada, com o selo "colaborativo". A SEMOB sempre vence, inclusive no empate. As leituras vivem no processo, por no máximo 2 minutos, atrás de uma interface de armazenamento (`ArmazenamentoPosicoesColaborativas`); o banco só ganha `viagem.compartilha_posicao_em` e `consentimento_versao`. Leitura fora do traçado (150 m), com salto de velocidade impossível ou com menos de 10 s de intervalo é recusada. | O "ônibus fantasma" também acontece quando o ônibus roda e não aparece no GPS oficial. Gravar a posição do passageiro contrariaria a LGPD e a ADR-04. | Nenhuma coordenada vai para o banco ou para o log. **Limite:** a memória é por processo; o serviço de mobilidade tem duas máquinas no Fly com escala a zero, então a leitura enviada a uma máquina pode não ser vista por quem consulta na outra. Trocar por armazenamento compartilhado é trocar a implementação da interface. O consentimento só pode ser dado no embarque. |
+| **ADR-26** | **Planejamento por horário (#115) como camada sobre a rota da #20, sem GTFS nem RAPTOR.** `GET /mobilidade/planejar` recebe `tipo` (`saida` ou `chegada`), `horario` e `data`, pega as opções de `RotaService.calcular` (uma ou duas pernas) e aplica a tabela de saídas do dia da semana (`rota.horarios_por_dia`) e o tempo de percurso. O horário de passagem em cada ponto é a saída do terminal mais o tempo de percurso proporcional à posição do ponto no traçado (o mesmo princípio de `passagem_prevista`). "Sair às X" pega o primeiro ônibus possível em cada perna; "chegar até X" calcula de trás para frente. A espera na baldeação e a caminhada entram na conta, e espera acima de 3 h não é viagem. Sem opção, a resposta traz `motivo` e `mensagem`. | A issue previa feed GTFS e um motor de roteamento temporal, o que traria um serviço novo para hospedar. As opções da #20 são poucas, então uma camada de horário por cima resolve o caso do projeto-piloto. | O horário é **estimado**, não de uma tabela de passagem por parada (a resposta traz `estimado=true` e a tela avisa). Feriados não são considerados: a SEMOB não informa. Não há busca em grafo espaço-temporal; combinações com mais de uma baldeação ficam fora. |
+| **ADR-27** | **Alerta de cancelamento (#28) por ausência do ônibus.** O agendador da Mobilidade ganha o job `monitoramento-cancelamento`, que varre as linhas acompanhadas, localiza as partidas previstas que passaram entre 15 e 45 minutos atrás (`linha.horarios_previstos`, fuso de Brasília) e confere se a linha tem veículo no feed. Sem veículo, e com outras linhas reportando posição no mesmo ciclo, grava o alerta em `alertas_cancelamento` (índice único por linha e horário), busca uma linha alternativa que cubra ao menos 70% das paradas e notifica por Web Push quem ativou esse tipo de alerta. | A SEMOB não informa cancelamento operacional. Só a ausência do ônibus permite detectar o "ônibus fantasma". | Não distingue cancelamento de atraso longo ou de falha do feed; por isso o feed inteiro vazio não gera alerta. O job vive no processo da Mobilidade e herda a limitação de escala a zero (seção 7). |
 
 *Tabela 5.1 – Decisões da Sprint 3 e da Sprint 4*
 

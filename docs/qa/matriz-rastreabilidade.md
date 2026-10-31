@@ -47,6 +47,9 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 | #190 | Paradas de subir e descer na rota | fechada · Done | 11 | CT-ROT-06 (A\*), CT-VIA-06 (A) | #191, #193; correção #240 (parada sem nome, #232) | `mobilidade/tests/test_chegadas_da_rota.py`, `TempoNaParada.test.tsx`, `useChegadasDaRota.test.tsx`, `BotoesDaViagem.test.tsx`, `PlanejadorViagem.test.tsx` |
 | #149 | Bug: Swagger 401 em produção (rotas públicas) | fechada · Done | ver a issue | CT-SEG-02 (A) | #150 | `gateway/tests/test_rotas_publicas.py` |
 | #217 | Folha única com 3 alturas (celular) | **aberta** · Homolog | ver a issue | sem caso; conferir em celular real (pendente) | #220 | `app/mapa/__tests__/FolhaInferior.test.tsx`, `PlanejadorViagem.test.tsx`, `MapaInterativo.test.tsx` |
+| #28 | Alerta de cancelamento de viagem | **aberta** · Homolog | ver a issue | sem caso manual (não executado) | #258 | `mobilidade/tests/test_servico_cancelamento.py`, `test_linhas_alternativas.py` |
+| #115 | Planejar viagem por horário de partida ou chegada | **aberta** · Homolog | 5 | sem caso manual (não executado) | #265 | `mobilidade/tests/test_planejamento_horario.py`, `test_planejar_route.py`, `app/mapa/__tests__/PlanoPorHorario.test.tsx` |
+| #199 | Fallback colaborativo da posição do ônibus | **aberta** · Homolog | ver a issue | sem caso manual (não executado) | #263 | `mobilidade/tests/test_posicoes_colaborativas.py`, `test_viagem_colaborativo.py`, `app/mapa/__tests__/usePosicaoColaborativa.test.tsx`, `SeloFonte.test.tsx` |
 
 ## 2. Notas
 

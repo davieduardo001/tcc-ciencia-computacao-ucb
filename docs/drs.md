@@ -38,16 +38,16 @@ Definir e consolidar os requisitos do Movecity (aplicativo web de mobilidade urb
 
 | Necessidade (Visão) | Requisitos |
 | :--- | :--- |
-| Saber onde está o ônibus | RF-06 a RF-09 |
+| Saber onde está o ônibus | RF-06 a RF-09, RF-30 |
 | Saber quanto falta | RF-10, RF-11 |
-| Chegar de um ponto a outro | RF-12, RF-13, RF-14 |
+| Chegar de um ponto a outro | RF-12, RF-13, RF-14, RF-29 |
 | Acompanhar a viagem | RF-15, RF-16, RF-17 |
 | Contribuir com informação de campo | RF-18 a RF-20 |
-| Ser avisado de atraso e rotas | RF-22, RF-23, RF-24 |
+| Ser avisado de atraso e rotas | RF-22, RF-23, RF-24, RF-28 |
 | Acesso seguro | RF-01 a RF-05 |
 | Voltar a trajetos frequentes; aprender a usar | RF-21, RF-25, RF-26, RF-27 |
 
-São **27 requisitos funcionais**, todos entregues.
+São **30 requisitos funcionais**, todos entregues.
 
 ## 3. Especificação dos requisitos funcionais
 
@@ -107,6 +107,14 @@ Responsáveis conforme [`distribuicao_us.md`](distribuicao_us.md). Para as USs c
 **RF-14 — Paradas de subir e descer na rota, com o tempo do ônibus** · US #190 · Média · @davieduardo001
 - Aceite: (1) só as paradas de embarque e desembarque de cada trecho em destaque; (2) tempo do ônibus na parada de embarque, com a origem; (3) tempo até a parada de desembarque; (4) sem ônibus, horário previsto ou "Sem previsão no momento"; (5) baldeação mostra as paradas de cada trecho; (6) "Peguei este ônibus" no trecho já define o destino; (7) ponto sem parada cadastrada aparece como "Parada sem nome"; (8) "chega na sua parada em N min" no popup do ônibus.
 
+**RF-29 — Planejar a viagem por horário de partida ou chegada** · US #115 · Média · @davieduardo001
+- Aceite: (1) "sair às X" mostra as opções com o horário de cada trecho; (2) "chegar até X" calcula o horário de saída necessário; (3) a baldeação mostra o tempo de espera no ponto de troca; (4) usa a tabela do dia da semana escolhido; (5) sem viagem possível, explica o motivo (sem linha para o trajeto, sem tabela de horários ou fora do horário de operação), em vez de uma lista vazia.
+- Notas: parte das opções do RF-12; o horário de passagem em cada parada é **estimado** (saída do terminal pela tabela da SEMOB mais o tempo de percurso, proporcional ao ponto do trajeto) e a tela avisa isso; feriados não são considerados; espera acima de 3 h não conta como viagem.
+
+**RF-30 — Posição colaborativa do ônibus (fallback do GPS oficial)** · US #199 · Alta · @ngualbertolopes
+- Aceite: (1) ao pegar o ônibus, a pessoa pode aceitar compartilhar a posição do ônibus; o compartilhamento vem **desligado**, separado do aceite dos Termos; (2) com o ônibus fora do GPS da SEMOB, a posição informada entra no mapa e no ETA com o selo "colaborativo"; (3) "Parar" revoga a qualquer momento e apaga a leitura na hora; "Cheguei" também encerra o compartilhamento; (4) leituras fora do traçado da linha, com salto de velocidade impossível ou enviadas com menos de 10 s de intervalo são recusadas; (5) quando o ônibus volta ao feed da SEMOB, a posição oficial vale.
+- Notas: nenhuma coordenada vai para o banco; cada leitura vive só na memória do servidor, por no máximo 2 minutos (RN-024). O banco guarda apenas o instante e a versão do texto aceito.
+
 ### 3.3 Viagem e alertas de proximidade
 
 **RF-15 — Pegar o ônibus (embarcar, acompanhar e encerrar a viagem)** · US #171 · Alta · @Kelvin963 (atribuída), entregue por @Vitoria-Albuquerque
@@ -146,6 +154,10 @@ Responsáveis conforme [`distribuicao_us.md`](distribuicao_us.md). Para as USs c
 **RF-24 — Preferências de notificação** · US #29 · Média · @gualbertonathalia
 - Aceite: (1) antecedência de 5, 10, 30 ou 60 min; (2) desativar um tipo; (3) desativar todas.
 
+**RF-28 — Alerta de cancelamento de viagem** · US #28 · Alta · @Kelvin963
+- Aceite: (1) a linha acompanhada (favoritos e linhas seguidas) sem ônibus no feed 15 minutos depois do horário previsto de saída gera um alerta de cancelamento; (2) o alerta sugere uma linha alternativa quando outra cobre ao menos 70% das paradas do trecho; (3) respeita a preferência de notificação de cancelamento (RF-24); (4) com o feed inteiro da SEMOB vazio, não alerta.
+- Notas: detecta o cancelamento pela **ausência** do ônibus; a SEMOB não informa cancelamento operacional, então esse caso não existe. A notificação sai por Web Push (RF-17).
+
 ### 3.6 Onboarding e instalação
 
 **RF-25 — Tutorial no primeiro acesso** · US #30 · Média · @Vitoria-Albuquerque
@@ -163,7 +175,7 @@ Responsáveis conforme [`distribuicao_us.md`](distribuicao_us.md). Para as USs c
 | :--- | :--- | :--- |
 | RN-001 | O passageiro está **Aguardando** ou **Em viagem**; só assume "Em viagem" por indicação explícita confirmada no servidor, nunca por suposição | RF-15 |
 | RN-002 | Em viagem, o ETA de espera some; mostram-se a próxima parada e as paradas restantes | RF-15 |
-| RN-003 | LGPD na viagem: guarda-se o mínimo (usuário, linha, sentido, veículo, parada de destino, horários), **sem trilha de posição**; a posição do usuário valida o embarque e é descartada; nenhuma coordenada do usuário vai para o endereço da página | RF-12, RF-15 |
+| RN-003 | LGPD na viagem: guarda-se o mínimo (usuário, linha, sentido, veículo, parada de destino, horários, e o aceite do compartilhamento quando houver), **sem trilha de posição**; a posição do usuário valida o embarque e é descartada; nenhuma coordenada do usuário vai para o endereço da página | RF-12, RF-15, RF-30 |
 | RN-004 | Confirmar o embarque exige veículo **da linha**, com posição recente (até 5 min), a até o raio de embarque do usuário (padrão 100 m); com vários, vale o mais próximo | RF-14, RF-15 |
 | RN-005 | Uma viagem ativa por usuário, garantida por índice único no banco | RF-15 |
 | RN-006 | Viagem esquecida expira sozinha em 4 h e não gera alerta | RF-15, RF-16 |
@@ -183,6 +195,12 @@ Responsáveis conforme [`distribuicao_us.md`](distribuicao_us.md). Para as USs c
 | RN-020 | Conta bloqueada por 15 min após 5 tentativas de login falhas | RF-02 |
 | RN-021 | Cadastro exige aceite dos termos; a recuperação de senha responde igual para e-mail existente e inexistente | RF-01, RF-04 |
 | RN-022 | O servidor ignora o `X-User-Id` enviado pelo cliente; a identidade vem do JWT validado no Gateway | todas as rotas protegidas |
+| RN-023 | O compartilhamento da posição do ônibus é **opt-in**, desligado por padrão e separado do aceite dos Termos; exige a versão do texto aceito, que fica guardada como prova; é revogável a qualquer momento ("Parar") e termina com "Cheguei" | RF-30 |
+| RN-024 | A posição colaborativa nunca é gravada: cada leitura vale até 2 minutos, só em memória, sem identificador do usuário; o banco guarda apenas o instante do aceite e a versão do texto | RF-30 |
+| RN-025 | A posição da SEMOB sempre vence a colaborativa (no empate de ETA também); a colaborativa só entra quando não há ônibus da SEMOB equivalente, e o selo declara a origem | RF-30, RF-11 |
+| RN-026 | Leitura colaborativa só é aceita se encaixar no traçado da linha (150 m), sem salto acima da velocidade máxima de ônibus e a cada 10 s no mínimo por viagem | RF-30 |
+| RN-027 | No planejamento por horário, cada trecho usa a tabela do dia da semana (nunca mistura dia útil, sábado e domingo); sem opção viável, a resposta diz o motivo | RF-29, RN-008 |
+| RN-028 | O cancelamento só é declarado quando a linha está sem ônibus e outras linhas reportam posição no mesmo ciclo; com o feed inteiro vazio, a causa pode ser a fonte, e não se alerta | RF-28, RN-009 |
 
 ## 5. Lista de requisitos não funcionais
 
@@ -192,19 +210,19 @@ Classificação ISO/IEC 25010.
 | :--- | :--- | :--- | :--- |
 | RNF-01 | Carregamento em até 3 s em conexão 4G | Eficiência de desempenho | Meta; não medida |
 | RNF-02 | Disponibilidade de 99% nos horários de pico (5h–9h, 17h–20h) | Confiabilidade | Meta; sem monitoramento de uptime |
-| RNF-03 | Proteção de dados de geolocalização (LGPD) | Segurança | Atendida no desenho (RN-003); sem auditoria formal |
+| RNF-03 | Proteção de dados de geolocalização (LGPD) | Segurança | Atendida no desenho (RN-003, RN-023, RN-024); sem auditoria formal |
 | RNF-04 | Sessão por cookies httpOnly, Secure, SameSite=None; JWT validado no Gateway; rotas públicas restritas | Segurança | Atendido |
 | RNF-05 | Validação cruzada do reporte colaborativo (3 confirmações) | Confiabilidade | Atendido (RN-015) |
 | RNF-06 | Não inventar dado: sem posição ou horário confiável, mostrar "sem previsão" | Confiabilidade | Atendido (RN-009) |
 | RNF-07 | Acessibilidade WCAG 2.2 AA e avaliação por heurísticas de Nielsen | Usabilidade | Contraste das cores calculado e coberto por teste; avaliação de Nielsen feita por um avaliador |
 | RNF-08 | Aplicativo web responsivo e instalável (PWA) | Portabilidade | Atendido |
 | RNF-09 | Tolerância a falha de integração externa (SEMOB, OSRM, geocodificação, CARTO) | Confiabilidade | Definida no Documento de Arquitetura, seção 10.3 |
-| RNF-10 | Manutenibilidade: testes automatizados e CI | Manutenibilidade | 1.640 testes automatizados passando no CI; resultados no Documento de Testes e Implementação |
+| RNF-10 | Manutenibilidade: testes automatizados e CI | Manutenibilidade | 1.792 testes automatizados passando no CI; resultados no Documento de Testes e Implementação |
 | RNF-11 | Frescor da posição: feed lido ao vivo com cache de 20 s, ETA atualizado sozinho | Eficiência de desempenho | Atendido |
 
 ## 6. Casos de uso
 
-Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](diagramas/sequencia/). Os UC10 a UC30, UC171, UC172, UC173, UC190 e UC195 usam o número da US como identificador.
+Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](diagramas/sequencia/). Os UC10 a UC30, UC115, UC171, UC172, UC173, UC190, UC195 e UC199 usam o número da US como identificador.
 
 | Caso de uso | US / RF | Diagrama |
 | :--- | :--- | :--- |
@@ -226,13 +244,16 @@ Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](dia
 | UC25 Salvar rota favorita | #25 / RF-21 | [`UC25`](diagramas/sequencia/UC25-salvar-rota-favorita.puml) |
 | UC26 Confirmar ocorrência reportada | #26 / RF-20 | [`UC26`](diagramas/sequencia/UC26-confirmar-ocorrencia-reportada.puml) |
 | UC27 Receber alerta de atraso na linha | #27 / RF-23 | [`UC27`](diagramas/sequencia/UC27-receber-alerta-atraso-linha.puml) |
+| UC28 Receber alerta de cancelamento de viagem | #28 / RF-28 | [`UC28`](diagramas/sequencia/UC28-receber-alerta-cancelamento-viagem.puml) |
 | UC29 Gerenciar preferências de notificação | #29 / RF-24 | [`UC29`](diagramas/sequencia/UC29-gerenciar-preferencias-notificacao.puml) |
 | UC30 Visualizar tutorial no primeiro acesso | #30 / RF-25 | [`UC30`](diagramas/sequencia/UC30-visualizar-tutorial-primeiro-acesso.puml) |
+| UC115 Planejar viagem por horário | #115 / RF-29 | [`UC115`](diagramas/sequencia/UC115-planejar-viagem-por-horario.puml) |
 | UC171 Pegar o ônibus | #171 / RF-15 | [`UC171`](diagramas/sequencia/UC171-pegar-onibus.puml) |
 | UC172 Alerta de proximidade da parada | #172 / RF-16 | [`UC172`](diagramas/sequencia/UC172-alerta-proximidade-parada.puml) |
 | UC173 ETA: mapeamento entre paradas | #173 / RF-11 | [`UC173`](diagramas/sequencia/UC173-corrigir-eta-mapeamento-paradas.puml) |
 | UC190 Paradas de subir e descer na rota | #190 / RF-14 | [`UC190`](diagramas/sequencia/UC190-paradas-subir-descer-rota-pegar-onibus.puml) |
 | UC195 Alerta de proximidade com a tela bloqueada | #195 / RF-17 | [`UC195`](diagramas/sequencia/UC195-alerta-proximidade-tela-bloqueada.puml) |
+| UC199 Fallback colaborativo de posição | #199 / RF-30 | [`UC199`](diagramas/sequencia/UC199-fallback-colaborativo.puml) |
 
 Sem diagrama de sequência: #31 (RF-05, descrito em [`gateway-auth-flow.md`](gateway-auth-flow.md)), #133 (RF-04), #136 (RF-26), #159 (RF-12), #174 (RF-10) e #201 (RF-27). A especificação textual de cada caso é o conjunto de cenários BDD de cada US, na seção 3.
 
@@ -269,6 +290,9 @@ RF → US → caso de uso. A rastreabilidade completa, com PRs, casos de teste e
 | RF-25 | #30 | UC30 |
 | RF-26 | #136 | — |
 | RF-27 | #201 | — |
+| RF-28 | #28 | UC28 |
+| RF-29 | #115 | UC115 |
+| RF-30 | #199 | UC199 |
 
 ## 8. Restrições e premissas
 
@@ -281,6 +305,8 @@ RF → US → caso de uso. A rastreabilidade completa, com PRs, casos de teste e
 | **Escala a zero no Fly**: partida a frio na primeira requisição após ociosidade | ADR-12 |
 | **Gateway como ponto único de entrada**; cookies `SameSite=None` + `Secure`, porque frontend (Vercel) e Gateway (Fly) são cross-site | ADR-07 |
 | **Integrações externas atrás de contrato `typing.Protocol`** (mock e real) | ADR-06 |
+| **Posição colaborativa só em memória do processo**: com mais de uma máquina no Fly.io, o fallback pode não aparecer para quem consulta em outra máquina; trocar por armazenamento compartilhado é uma mudança só de implementação | ADR-25 |
+| **Horário planejado é estimado** (saída do terminal mais tempo de percurso proporcional); feriados não são considerados | ADR-26 |
 | **Web Push** exige chaves VAPID no servidor; no iPhone, só com o app instalado | ADR-16 |
 | **Escopo geográfico**: projeto-piloto em Taguatinga e Ceilândia (os dados da SEMOB cobrem o DF inteiro) | Documento de Visão |
 | **Sem validação em campo**: raio de embarque, tolerância do ETA e regra "ônibus chegando" não foram medidos com ônibus real | Documento de Testes e Implementação |
@@ -299,3 +325,4 @@ O projeto adota um fluxo de trabalho com agentes de IA generativa no desenvolvim
 | Versão | Data | Alteração |
 | :--- | :--- | :--- |
 | 1.0 | 30/10/2026 | Versão entregue, criada a partir das issues `[US]`, dos PRs mergeados, do código de `homolog` e da documentação de testes |
+| 1.1 | 31/10/2026 | Inclusão de RF-28 (alerta de cancelamento, #28), RF-29 (planejamento por horário, #115) e RF-30 (posição colaborativa, #199), com RN-023 a RN-028 |
