@@ -636,7 +636,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
       status: 200,
       json: async () => ({
         mensagem:
-          "Se o e-mail estiver cadastrado, voce recebera um link de redefinicao.",
+          "Se o e-mail estiver cadastrado, você receberá um link de redefinição.",
       }),
     }) as jest.Mock;
 
@@ -700,7 +700,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
       ok: false,
       status: 400,
       json: async () => ({
-        detail: "Este link nao e mais valido ou expirou.",
+        detail: "Este link não é mais válido ou expirou.",
       }),
     }) as jest.Mock;
 
@@ -710,7 +710,7 @@ describe("api.ts — recuperação de senha (US #133)", () => {
         novaSenha: "NovaSenha123!",
         confirmacaoSenha: "NovaSenha123!",
       })
-    ).rejects.toThrow("Este link nao e mais valido ou expirou.");
+    ).rejects.toThrow("Este link não é mais válido ou expirou.");
   });
 });
 

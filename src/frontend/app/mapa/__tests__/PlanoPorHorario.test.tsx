@@ -74,6 +74,30 @@ describe("PlanoPorHorario", () => {
     );
   });
 
+  it("parada sem nome no plano aparece como 'Parada sem nome'", async () => {
+    const semNome = {
+      ...PLANO,
+      opcoes: [
+        {
+          ...PLANO.opcoes[0],
+          pernas: [
+            {
+              ...PLANO.opcoes[0].pernas[0],
+              embarque: { ...PONTO(""), caminhada_metros: 0 },
+              desembarque: { ...PONTO(""), caminhada_metros: 0 },
+            },
+          ],
+        },
+      ],
+    };
+    (planejarViagem as jest.Mock).mockResolvedValue(semNome);
+    abrir();
+    fireEvent.change(screen.getByLabelText("Horário"), { target: { value: "07:10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Planejar" }));
+
+    expect(await screen.findAllByText(/Parada sem nome/)).not.toHaveLength(0);
+  });
+
   it("Cenário 1: 'sair às' envia o tipo saída e o horário digitado", async () => {
     (planejarViagem as jest.Mock).mockResolvedValue(PLANO);
     abrir();
