@@ -1,3 +1,5 @@
+import json
+
 from fastapi import Response
 
 
@@ -44,3 +46,26 @@ def clear_auth_cookies(response: Response) -> None:
     """Limpar cookies de autenticação."""
     response.delete_cookie(key="access_token", path="/api")
     response.delete_cookie(key="refresh_token", path="/api/auth")
+
+
+CAMPOS_DE_TOKEN = ("access_token", "refresh_token")
+
+
+def aplicar_sessao_em_cookies(response: Response) -> None:
+    """Move os tokens do corpo da resposta do Auth Service para cookies httpOnly.
+
+    Os tokens saem do corpo (issue #253): o frontend não precisa deles e, no
+    corpo, ficariam legíveis por qualquer JavaScript da página. O restante do
+    corpo (token_type, account_linking_* etc.) é preservado.
+    """
+    dados = json.loads(response.body)
+    set_auth_cookies(
+        response,
+        dados.get("access_token", ""),
+        dados.get("refresh_token", ""),
+    )
+    for campo in CAMPOS_DE_TOKEN:
+        dados.pop(campo, None)
+    corpo = json.dumps(dados).encode()
+    response.body = corpo
+    response.headers["content-length"] = str(len(corpo))

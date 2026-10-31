@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Request, Response
 
 from gateway.config import get_gateway_settings
-from gateway.cookies import clear_auth_cookies, set_auth_cookies
+from gateway.cookies import aplicar_sessao_em_cookies, clear_auth_cookies
 from gateway.proxy import proxy_request
 
 router = APIRouter()
@@ -69,12 +69,7 @@ async def login(request: Request):
     )
 
     if response.status_code == 200:
-        data = json.loads(response.body)
-        set_auth_cookies(
-            response,
-            data.get("access_token", ""),
-            data.get("refresh_token", ""),
-        )
+        aplicar_sessao_em_cookies(response)
 
     return response
 
@@ -120,12 +115,7 @@ async def login_google(request: Request):
     )
 
     if response.status_code == 200:
-        data = json.loads(response.body)
-        set_auth_cookies(
-            response,
-            data.get("access_token", ""),
-            data.get("refresh_token", ""),
-        )
+        aplicar_sessao_em_cookies(response)
 
     return response
 
@@ -140,12 +130,7 @@ async def confirmar_link_google(request: Request):
     )
 
     if response.status_code == 200:
-        data = json.loads(response.body)
-        set_auth_cookies(
-            response,
-            data.get("access_token", ""),
-            data.get("refresh_token", ""),
-        )
+        aplicar_sessao_em_cookies(response)
 
     return response
 
@@ -187,12 +172,7 @@ async def refresh(request: Request):
     )
 
     if response.status_code == 200:
-        data = json.loads(response.body)
-        set_auth_cookies(
-            response,
-            data.get("access_token", ""),
-            data.get("refresh_token", ""),
-        )
+        aplicar_sessao_em_cookies(response)
 
     return response
 
