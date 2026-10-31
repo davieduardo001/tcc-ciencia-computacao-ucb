@@ -79,9 +79,11 @@ SERVICES = {
 3. Auth Service valida credenciais no banco
 4. Auth Service retorna tokens (access + refresh)
 5. Gateway seta cookies httpOnly:
-   - access_token (60 min, path=/api, SameSite=Lax)
-   - refresh_token (7 dias, path=/api/auth, SameSite=Strict)
-6. Gateway retorna response para Browser
+   - access_token (60 min, path=/api, SameSite=None; Secure)
+   - refresh_token (7 dias, path=/api/auth, SameSite=None; Secure)
+6. Gateway retorna response para Browser SEM os tokens no corpo
+   (só token_type e flags); o frontend não guarda token em
+   localStorage/sessionStorage (issue #253)
 ```
 
 ### 2. Requisição Autenticada
@@ -130,8 +132,8 @@ SERVICES = {
 
 | Cookie | HttpOnly | Secure | SameSite | Path | Max Age |
 |--------|----------|--------|----------|------|---------|
-| `access_token` | ✅ | ✅ | Lax | `/api` | 60 min |
-| `refresh_token` | ✅ | ✅ | Strict | `/api/auth` | 7 dias |
+| `access_token` | ✅ | ✅ | None | `/api` | 60 min |
+| `refresh_token` | ✅ | ✅ | None | `/api/auth` | 7 dias |
 
 **Por que httpOnly?**
 - Protegido contra XSS (JavaScript não acessa)

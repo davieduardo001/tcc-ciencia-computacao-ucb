@@ -96,6 +96,49 @@ def test_login_google_e_publico_sem_cookie_de_sessao():
     assert "access_token" in response.cookies
 
 
+def _proxy_response_com_flags_google():
+    corpo = json.dumps(
+        {
+            "access_token": "token-fake-access",
+            "refresh_token": "token-fake-refresh",
+            "token_type": "bearer",
+            "account_linking_pending": False,
+            "account_linking_required": False,
+        }
+    ).encode()
+    return Response(content=corpo, status_code=200, media_type="application/json")
+
+
+def test_tokens_vao_so_nos_cookies_e_nao_no_corpo_da_resposta():
+    """Issue #253: a sessão vive nos cookies httpOnly. Os tokens não podem
+    voltar no corpo, onde qualquer JavaScript da página os leria."""
+    rotas = [
+        ("/api/auth/login", {"email": "teste@example.com", "senha": "senha123"}),
+        ("/api/auth/refresh", None),
+        ("/api/auth/login/google", {"id_token": "id-token-fake"}),
+        (
+            "/api/auth/link-google/confirmar",
+            {"id_token": "x", "email": "teste@example.com", "google_id": "g"},
+        ),
+    ]
+    for rota, corpo_req in rotas:
+        with patch(
+            "gateway.routes.proxy_request",
+            AsyncMock(return_value=_proxy_response_com_flags_google()),
+        ):
+            response = client.post(rota, json=corpo_req)
+
+        assert response.status_code == 200, rota
+        assert "access_token" in response.cookies, rota
+        assert "refresh_token" in response.cookies, rota
+        corpo = response.json()
+        assert "access_token" not in corpo, rota
+        assert "refresh_token" not in corpo, rota
+        assert corpo["token_type"] == "bearer", rota
+        assert corpo["account_linking_required"] is False, rota
+        assert int(response.headers["content-length"]) == len(response.content), rota
+
+
 def test_link_google_confirmar_e_publico_sem_cookie_de_sessao():
     with patch(
         "gateway.routes.proxy_request",

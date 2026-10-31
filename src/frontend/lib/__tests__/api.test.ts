@@ -69,6 +69,26 @@ describe("api.ts — paths do Gateway", () => {
     expect(url).toMatch(/\/api\/auth\/login$/);
     expect(options.credentials).toBe("include");
   });
+
+  it("loginUsuario não grava token em localStorage nem sessionStorage (issue #253)", async () => {
+    // O mock devolve tokens no corpo (Gateway antigo): mesmo assim nada é guardado.
+    await loginUsuario({ email: "teste@example.com", senha: "senha123" });
+
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+    expect(sessionStorage.getItem("access_token")).toBeNull();
+    expect(sessionStorage.getItem("refresh_token")).toBeNull();
+  });
+
+  it("loginUsuario apaga tokens legados deixados por versões antigas (issue #253)", async () => {
+    localStorage.setItem("access_token", "velho");
+    localStorage.setItem("refresh_token", "velho");
+
+    await loginUsuario({ email: "teste@example.com", senha: "senha123" });
+
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+  });
 });
 
 describe("api.ts — buscarLinha (US #17)", () => {

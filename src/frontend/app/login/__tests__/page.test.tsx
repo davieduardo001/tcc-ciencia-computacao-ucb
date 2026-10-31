@@ -179,7 +179,8 @@ it("leva para a página de recuperação de senha", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
-    expect(localStorage.getItem("access_token")).toBe("token-google");
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
   });
 
   it("pede confirmação de vínculo quando o e-mail do Google já tem conta com senha", async () => {
@@ -260,7 +261,8 @@ it("leva para a página de recuperação de senha", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
-    expect(localStorage.getItem("access_token")).toBe("token-vinculado");
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
   });
 
   it("exibe erro quando o login via Google falha", async () => {
