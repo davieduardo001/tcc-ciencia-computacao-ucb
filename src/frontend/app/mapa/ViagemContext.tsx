@@ -18,6 +18,8 @@ import {
   EmbarquePayload,
   embarcarNoOnibus,
   encerrarViagem,
+  pararDeCompartilhar,
+  VERSAO_CONSENTIMENTO,
   ViagemAtiva,
   ViagemError,
 } from "@/lib/api";
@@ -44,6 +46,17 @@ interface EstadoViagem {
   embarcar: (dados: EmbarquePayload) => Promise<ResultadoAcao>;
   definirDestino: (codigo: string | null) => Promise<ResultadoAcao>;
   encerrar: () => Promise<ResultadoAcao>;
+  /**
+   * US #199 — a pessoa ASSEGUROU compartilhar a posição do ônibus E não
+   * revogou (nem localmente, nem no servidor): o mapa envia e a faixa
+   * mostra o indicador com o "Parar".
+   */
+  compartilhando: boolean;
+  /** Cenário 3 — "Parar": revoga o consentimento e para de enviar na hora. */
+  pararCompartilhamento: () => Promise<ResultadoAcao>;
+  /** Para o loop de envio sem tocar o servidor (quando o servidor já
+   *  devolveu 409 revogando o compartilhamento). */
+  revogarLocalmente: () => void;
   /** `true` quando o servidor respondeu (com ou sem viagem). */
   atualizar: () => Promise<boolean>;
   /** US #172 — o aviso "seu ônibus está chegando", se houver um por ver. */
@@ -57,10 +70,13 @@ const SEM_PROVEDOR: EstadoViagem = {
   carregando: false,
   ocupado: false,
   avisoProximidade: null,
+  compartilhando: false,
   dispensarAviso: () => {},
   embarcar: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
   definirDestino: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
   encerrar: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
+  pararCompartilhamento: async () => ({ ok: false, mensagem: "Viagem indisponível nesta tela." }),
+  revogarLocalmente: () => {},
   atualizar: async () => false,
 };
 
@@ -99,6 +115,10 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
   const [avisosDispensados, setAvisosDispensados] = useState<string[]>([]);
   const ordemRef = useRef(0);
   const montadoRef = useRef(true);
+  // US #199 — revogação local de compartilhamento: ao tocar em "Parar" (ou
+  // quando o servidor recusa envio com 409), o loop de envio para mesmo que
+  // a releitura da viagem ainda não tenha voltado. Reinicia com a viagem.
+  const [revogadoLocal, setRevogadoLocal] = useState(false);
 
   useEffect(() => {
     montadoRef.current = true;
@@ -128,6 +148,12 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
     const intervalo = setInterval(atualizar, INTERVALO_VIAGEM_MS);
     return () => clearInterval(intervalo);
   }, [idDaViagem, atualizar]);
+
+  // Reinicia a revogação local quando vira de viagem (nova embarque →
+  // compartilhar de novo é uma decisão, se ela consentir).
+  useEffect(() => {
+    setRevogadoLocal(false);
+  }, [idDaViagem]);
 
   const executar = useCallback(
     async (
@@ -188,6 +214,27 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
     );
   }, [executar, idDaViagem]);
 
+  // US #199 — compartilhando = consentimento do servidor ainda de pé E
+  // revogação local ainda não pedida ("Parar" já usado nesta viagem, ou o
+  // servidor recusou envio com 409).
+  const compartilhando = viagem?.compartilhaPosicao === true && !revogadoLocal;
+
+  const pararCompartilhamento = useCallback(() => {
+    if (!idDaViagem) return Promise.resolve<ResultadoAcao>({ ok: true });
+    // Otimista: o Cenário 3 pede "para na hora" — corta o envio AGORA, e só
+    // volta o estado anterior se a revogação não for confirmada no servidor.
+    setRevogadoLocal(true);
+    return executar(
+      () => pararDeCompartilhar(idDaViagem),
+      "Não foi possível parar o compartilhamento. Tente novamente."
+    ).then((resultado) => {
+      if (!resultado.ok) setRevogadoLocal(false);
+      return resultado;
+    });
+  }, [executar, idDaViagem]);
+
+  const revogarLocalmente = useCallback(() => setRevogadoLocal(true), []);
+
   const aviso = viagem?.avisoProximidade ?? null;
   const avisoProximidade = aviso && !avisosDispensados.includes(aviso.id) ? aviso : null;
 
@@ -206,6 +253,9 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
       embarcar,
       definirDestino,
       encerrar,
+      compartilhando,
+      pararCompartilhamento,
+      revogarLocalmente,
       atualizar,
       avisoProximidade,
       dispensarAviso,
@@ -217,6 +267,9 @@ export function ViagemProvider({ children }: { children: ReactNode }) {
       embarcar,
       definirDestino,
       encerrar,
+      compartilhando,
+      pararCompartilhamento,
+      revogarLocalmente,
       atualizar,
       avisoProximidade,
       dispensarAviso,

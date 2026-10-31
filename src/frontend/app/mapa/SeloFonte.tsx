@@ -4,12 +4,23 @@
  * lido como "quando o ônibus passa aqui" — são coisas diferentes, e a
  * diferença pode ser de dezenas de minutos.
  */
-export type FonteDoTempo = "ao_vivo" | "media" | "estimado" | "saida_terminal" | "previsto";
+export type FonteDoTempo =
+  | "ao_vivo"
+  | "colaborativo"
+  | "media"
+  | "estimado"
+  | "saida_terminal"
+  | "previsto";
 
 const FONTES: Record<FonteDoTempo, { texto: string; legenda: string }> = {
   ao_vivo: {
     texto: "ao vivo",
     legenda: "Medido a partir da posição real do ônibus agora",
+  },
+  colaborativo: {
+    texto: "colaborativo",
+    legenda:
+      "Posição reportada por passageiro embarcado que consentiu em compartilhar — usada só quando o GPS oficial não cobre o ônibus",
   },
   media: {
     texto: "média",

@@ -4,6 +4,7 @@ import SeloFonte, { FonteDoTempo, legendaDaFonte } from "../SeloFonte";
 describe("SeloFonte", () => {
   const CASOS: [FonteDoTempo, string, string][] = [
     ["ao_vivo", "ao vivo", "ao-vivo"],
+    ["colaborativo", "colaborativo", "colaborativo"],
     ["media", "média", "media"],
     ["estimado", "estimado", "estimado"],
     ["saida_terminal", "saída do terminal", "saida-terminal"],
@@ -38,5 +39,7 @@ describe("SeloFonte", () => {
     // "previsto" não é "ao vivo": a legenda diz que é saída + percurso e que não há ônibus a caminho
     expect(legendaDaFonte("previsto")).toMatch(/Sem ônibus a caminho/);
     expect(legendaDaFonte("previsto")).toMatch(/tempo de percurso/);
+    // US #199: a legenda do colaborativo diz que vem de passageiro e é fallback
+    expect(legendaDaFonte("colaborativo")).toMatch(/passageiro/);
   });
 });
