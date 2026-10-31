@@ -115,6 +115,10 @@ class PosicaoVeiculoResponse(BaseModel):
     # parada ingerida por perto e o ETA veio da projeção do GPS no traçado.
     parada_codigo: str | None = None
     parada_nome: str | None = None
+    # US #199 (RN-10/RN-C3) — origem da posição: `ao_vivo` vem do feed da
+    # SEMOB; `colaborativo`, de passageiro com consentimento (fallback da
+    # US #199). O default cobre os veículos de sempre.
+    fonte: Literal["ao_vivo", "colaborativo"] = "ao_vivo"
 
 
 class ChegadaResponse(BaseModel):
@@ -122,15 +126,17 @@ class ChegadaResponse(BaseModel):
     Quando o ônibus de uma linha chega numa parada (card #179, ⑤b).
 
     `fonte` diz de onde veio o número — RN-10: `ao_vivo` é a posição real
-    do ônibus; `previsto` é horário de saída + tempo de percurso, para
-    quando não há ônibus a caminho; `None` é "sem dado" (RN-09: não inventa).
+    do ônibus; `colaborativo` é a posição informada por passageiro
+    (fallback da US #199, quando não há ônibus da SEMOB); `previsto` é
+    horário de saída + tempo de percurso, para quando não há ônibus a
+    caminho; `None` é "sem dado" (RN-09: não inventa).
     """
 
     numero: str
     nome: str
     rota_sentido: str
     eta_minutos: float | None = None
-    fonte: Literal["ao_vivo", "previsto"] | None = None
+    fonte: Literal["ao_vivo", "colaborativo", "previsto"] | None = None
     # só `ao_vivo`
     prefixo: str | None = None
     veiculos_a_caminho: int = 0

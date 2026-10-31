@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useViagem } from "./ViagemContext";
+import { VERSAO_CONSENTIMENTO } from "@/lib/api";
+import ConsentimentoDePosicao from "./ConsentimentoDePosicao";
 
 interface BotaoPegueiProps {
   numeroLinha: string;
@@ -20,6 +22,8 @@ interface BotaoPegueiProps {
 export function BotaoPegueiOnibus({ numeroLinha, prefixo, posicaoDoUsuario }: BotaoPegueiProps) {
   const { viagem, ocupado, embarcar } = useViagem();
   const [mensagem, setMensagem] = useState<string | null>(null);
+  // US #199, Cenário 1 — desligado por padrão.
+  const [compartilha, setCompartilha] = useState(false);
 
   if (viagem) {
     const esteOnibus = viagem.numeroLinha === numeroLinha && viagem.veiculoPrefixo === prefixo;
@@ -45,6 +49,9 @@ export function BotaoPegueiOnibus({ numeroLinha, prefixo, posicaoDoUsuario }: Bo
       lat: posicaoDoUsuario!.lat,
       lng: posicaoDoUsuario!.lng,
       veiculoPrefixo: prefixo,
+      ...(compartilha
+        ? { compartilhaPosicao: true, consentimentoVersao: VERSAO_CONSENTIMENTO }
+        : {}),
     });
     if (!resultado.ok) {
       setMensagem(resultado.mensagem ?? "Não foi possível registrar o embarque.");
@@ -61,6 +68,7 @@ export function BotaoPegueiOnibus({ numeroLinha, prefixo, posicaoDoUsuario }: Bo
       >
         Peguei este ônibus
       </button>
+      <ConsentimentoDePosicao marcado={compartilha} aoAlternar={setCompartilha} />
       {mensagem && (
         <p className="mapa-pegar-onibus-erro" role="alert">
           {mensagem}
@@ -94,6 +102,8 @@ export function BotaoPegueiNaRota({
 }: BotaoPegueiNaRotaProps) {
   const { viagem, ocupado, embarcar } = useViagem();
   const [mensagem, setMensagem] = useState<string | null>(null);
+  // US #199, Cenário 1 — desligado por padrão.
+  const [compartilha, setCompartilha] = useState(false);
 
   if (viagem) {
     return viagem.numeroLinha === numeroLinha ? (
@@ -118,6 +128,9 @@ export function BotaoPegueiNaRota({
       lat: posicaoDoUsuario!.lat,
       lng: posicaoDoUsuario!.lng,
       ...(paradaDestinoCodigo ? { paradaDestinoCodigo } : {}),
+      ...(compartilha
+        ? { compartilhaPosicao: true, consentimentoVersao: VERSAO_CONSENTIMENTO }
+        : {}),
     });
     if (!resultado.ok) {
       setMensagem(resultado.mensagem ?? "Não foi possível registrar o embarque.");
@@ -134,6 +147,7 @@ export function BotaoPegueiNaRota({
       >
         Peguei este ônibus
       </button>
+      <ConsentimentoDePosicao marcado={compartilha} aoAlternar={setCompartilha} />
       {mensagem && (
         <p className="mapa-pegar-onibus-erro" role="alert">
           {mensagem}

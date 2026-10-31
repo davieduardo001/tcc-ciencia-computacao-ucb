@@ -848,8 +848,9 @@ export async function buscarParadas(termo: string): Promise<ResultadoBuscaParada
 // Card #179 (⑤b) — Quando o ônibus chega NESTA parada
 // ---------------------------------------------------------------------------
 
-/** De onde veio o número: posição real do ônibus, ou saída + percurso. */
-export type FonteChegada = "ao_vivo" | "previsto";
+/** De onde veio o número: posição real do ônibus, ou saída + percurso.
+ *  "colaborativo" (US #199) vem da posição reportada por um passageiro. */
+export type FonteChegada = "ao_vivo" | "colaborativo" | "previsto";
 
 export interface ChegadaNaParada {
   numero: string;
@@ -1544,6 +1545,13 @@ export async function removerFavorito(id: string): Promise<void> {
 // US #171 — Pegar o ônibus: embarcar, acompanhar e encerrar a viagem
 // ---------------------------------------------------------------------------
 
+/**
+ * US #199 — versão do texto de consentimento que esta tela mostra. Muda o
+ * texto, muda a constante: o servidor guarda a versão que a pessoa aceitou,
+ * também como prova do que ela viu.
+ */
+export const VERSAO_CONSENTIMENTO = "v1-199";
+
 export interface ParadaDaViagem {
   codigo: string;
   nome: string;
@@ -1573,6 +1581,9 @@ export interface ViagemAtiva {
   veiculoPrefixo: string;
   paradaDestinoCodigo: string | null;
   embarcouEm: string;
+  /** US #199 — a pessoa consentiu em compartilhar a posição do ônibus.
+   *  Opcional: respostas de um backend antigo não trazem o campo. */
+  compartilhaPosicao?: boolean;
   /** "sem_sinal": o ônibus não está no feed ou a posição é velha — a tela
    * diz isso em vez de estimar (RN-09). */
   sinal: "ao_vivo" | "sem_sinal";
@@ -1641,6 +1652,9 @@ export async function buscarViagemAtiva(): Promise<ResultadoViagemAtiva> {
         sentido: data.viagem.sentido ?? null,
         veiculoPrefixo: data.viagem.veiculo_prefixo,
         paradaDestinoCodigo: data.viagem.parada_destino_codigo ?? null,
+        // US #199 — o compartilhamento ativo governa o indicador e o loop de
+        // envio. Opcional: respostas de um backend antigo não trazem o campo.
+        compartilhaPosicao: data.viagem.compartilha_posicao === true,
         embarcouEm: data.viagem.embarcou_em,
         sinal: data.sinal === "ao_vivo" ? "ao_vivo" : "sem_sinal",
         veiculo: data.veiculo
@@ -1700,6 +1714,13 @@ export interface EmbarquePayload {
   paradaDestinoCodigo?: string;
   /** Popup de um ônibus: só esse veículo confirma o embarque (issue #216). */
   veiculoPrefixo?: string;
+  /**
+   * US #199 — consentimento LGPD do fallback colaborativo, desligado por
+   * padrão. Quando ligado, `consentimentoVersao` vem junto como prova do
+   * texto aceito; nenhuma coordenada é persistida.
+   */
+  compartilhaPosicao?: boolean;
+  consentimentoVersao?: string;
 }
 
 /**
@@ -1719,6 +1740,13 @@ export async function embarcarNoOnibus(dados: EmbarquePayload): Promise<void> {
         lng: dados.lng,
         parada_destino_codigo: dados.paradaDestinoCodigo,
         ...(dados.veiculoPrefixo ? { veiculo_prefixo: dados.veiculoPrefixo } : {}),
+        ...(dados.compartilhaPosicao
+          ? {
+              compartilha_posicao: true,
+              // A prova do consentimento: versão do texto que a tela mostrou.
+              consentimento_versao: dados.consentimentoVersao ?? VERSAO_CONSENTIMENTO,
+            }
+          : {}),
       }),
     });
   } catch {
@@ -1769,6 +1797,73 @@ export async function encerrarViagem(viagemId: string): Promise<void> {
   // está cumprido, então não é erro.
   if (!response.ok && response.status !== 404) {
     throw await erroDaViagem(response, "Não foi possível encerrar a viagem. Tente novamente.");
+  }
+}
+
+/**
+ * US #199 — endpoint de posição colaborativa (limite de taxa no servidor).
+ *
+ * Envia a posição do ônibus que o passageiro embarcou (o consentimento
+ * `/viagens` já confere; 409 = revogado ou sem consentimento). A resposta
+ * diz se a leitura vale (`aceita`) e por quê (`motivo`); 429 significa
+ * "enviou cedo demais" — quem chama só tenta de novo no próximo ciclo.
+ */
+export async function enviarPosicaoColaborativa(
+  viagemId: string,
+  posicao: { lat: number; lng: number; precisaoM?: number }
+): Promise<{ aceita: boolean; motivo: string }> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/posicao`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        // RN-06/RN-C5: lat/lng só valem a validação e morrem no servidor —
+        // nada de coordenada no banco, no log ou no histórico desta tela.
+        body: JSON.stringify({
+          lat: posicao.lat,
+          lng: posicao.lng,
+          ...(posicao.precisaoM != null ? { precisao_m: posicao.precisaoM } : {}),
+        }),
+      }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível enviar a posição. Verifique sua conexão.");
+  }
+  if (!response.ok) {
+    throw await erroDaViagem(
+      response,
+      "Não foi possível enviar a posição. Tente novamente."
+    );
+  }
+  const data = await response.json();
+  return {
+    aceita: data.aceita === true,
+    motivo: typeof data.motivo === "string" ? data.motivo : "",
+  };
+}
+
+/**
+ * Cenário 3 — "Parar" do compartilhamento. Idempotente: repetir não dá
+ * erro, e 404 (a viagem já não é dele) também cumpre a intenção.
+ */
+export async function pararDeCompartilhar(viagemId: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetchAutenticado(
+      `${API_URL}/api/mobilidade/viagens/${encodeURIComponent(viagemId)}/posicao`,
+      { method: "DELETE", credentials: "include" }
+    );
+  } catch {
+    throw new ViagemError("Não foi possível parar o compartilhamento. Verifique sua conexão.");
+  }
+  if (!response.ok && response.status !== 404) {
+    throw await erroDaViagem(
+      response,
+      "Não foi possível parar o compartilhamento. Tente novamente."
+    );
   }
 }
 

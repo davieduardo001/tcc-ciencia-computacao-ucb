@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Bus, ChevronDown, Flag } from "lucide-react";
+import { Bus, ChevronDown, Flag, LocateFixed } from "lucide-react";
 import { textoDaViagem } from "./textoDaViagem";
 import { useViagem } from "./ViagemContext";
 
@@ -14,7 +14,7 @@ import { useViagem } from "./ViagemContext";
  * num painel por cima, a pedido de quem toca, e não empurram nada.
  */
 export default function FaixaDaViagem() {
-  const { viagem, ocupado, encerrar } = useViagem();
+  const { viagem, ocupado, encerrar, compartilhando, pararCompartilhamento } = useViagem();
   const [aberta, setAberta] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const idDetalhes = useId();
@@ -27,6 +27,14 @@ export default function FaixaDaViagem() {
     setErro(null);
     const resultado = await encerrar();
     if (!resultado.ok) setErro(resultado.mensagem ?? "Não foi possível encerrar a viagem.");
+  }
+
+  async function aoTocarParar() {
+    setErro(null);
+    const resultado = await pararCompartilhamento();
+    if (!resultado.ok) {
+      setErro(resultado.mensagem ?? "Não foi possível parar o compartilhamento.");
+    }
   }
 
   return (
@@ -45,6 +53,25 @@ export default function FaixaDaViagem() {
         >
           {principal}
         </span>
+
+        {compartilhando && (
+          // US #199, Cenários 2 e 3 — indicador permanente do compartilhamento
+          // com o "Parar" do consentimento revogável na hora.
+          <span className="mapa-viagem-compartilha" role="status">
+            <LocateFixed size={13} aria-hidden="true" />
+            <span className="mapa-viagem-compartilha-rotulo">
+              Compartilhando a localização do ônibus
+            </span>
+            <button
+              type="button"
+              className="mapa-viagem-compartilha-parar"
+              onClick={aoTocarParar}
+              disabled={ocupado}
+            >
+              Parar
+            </button>
+          </span>
+        )}
 
         <button
           type="button"

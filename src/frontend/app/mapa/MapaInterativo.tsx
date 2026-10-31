@@ -22,6 +22,7 @@ import TempoNaParada, { SEM_DADO } from "./TempoNaParada";
 import FaixaDaViagem from "./FaixaDaViagem";
 import FolhaInferior from "./FolhaInferior";
 import { useViagem } from "./ViagemContext";
+import { usePosicaoColaborativa } from "./usePosicaoColaborativa";
 import { Bus, Crosshair, Layers, List, TriangleAlert } from "lucide-react";
 import {
   buscarDetalhesParada,
@@ -327,6 +328,9 @@ type StatusLocalizacao = "carregando" | "ok" | "indisponivel";
 interface Coordenadas {
   lat: number;
   lng: number;
+  /** Margem reportada pelo GPS (metros); entra como evidência de
+   *  imprecisão, nunca como coordenada guardada (US #199, RN-C5). */
+  precisaoM?: number;
 }
 
 /**
@@ -456,8 +460,18 @@ export default function MapaInterativo({
 
   // US #171 (RN-05) — quem já está a bordo não espera mais: some o ETA de
   // espera (pílula, popup e painel da parada) e entra a faixa de viagem.
-  const { viagem: viagemEmCurso } = useViagem();
+  const { viagem: viagemEmCurso, compartilhando, revogarLocalmente } = useViagem();
   const emViagem = viagemEmCurso !== null;
+
+  // US #199, Cenário 2 — envia a posição do ônibus com o GPS que já roda
+  // aqui (o watchPosition é deste componente; ninguém duplica). O hook
+  // para sozinho quando o consentimento sai (`compartilhando` → false).
+  usePosicaoColaborativa({
+    viagemId: viagemEmCurso?.id ?? null,
+    compartilhando,
+    lerPosicao: () => coordenadasRef.current,
+    revogarLocalmente,
+  });
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -469,6 +483,7 @@ export default function MapaInterativo({
       setCoordenadas({
         lat: posicao.coords.latitude,
         lng: posicao.coords.longitude,
+        precisaoM: posicao.coords.accuracy,
       });
       setStatus("ok");
     }
@@ -1072,6 +1087,14 @@ export default function MapaInterativo({
                               <>
                                 Chega em <strong>{formatarMinutos(c.etaMinutos)}</strong>
                                 <SeloFonte fonte="ao_vivo" />
+                              </>
+                            )}
+                            {c.fonte === "colaborativo" && c.etaMinutos !== null && (
+                              // US #199, Cenário 4 — fallback quando a SEMOB
+                              // não cobre: o selo diz de onde veio o número.
+                              <>
+                                Chega em <strong>{formatarMinutos(c.etaMinutos)}</strong>
+                                <SeloFonte fonte="colaborativo" />
                               </>
                             )}
                             {c.fonte === "previsto" && c.etaMinutos !== null && (

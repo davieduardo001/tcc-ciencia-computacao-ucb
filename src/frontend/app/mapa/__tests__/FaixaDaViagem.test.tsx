@@ -1,5 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { buscarViagemAtiva, encerrarViagem, ViagemAtiva, ViagemError } from "@/lib/api";
+import {
+  buscarViagemAtiva,
+  encerrarViagem,
+  pararDeCompartilhar,
+  ViagemAtiva,
+  ViagemError,
+} from "@/lib/api";
 import FaixaDaViagem from "../FaixaDaViagem";
 import { ViagemProvider } from "../ViagemContext";
 
@@ -7,10 +13,12 @@ jest.mock("@/lib/api", () => ({
   ...jest.requireActual("@/lib/api"),
   buscarViagemAtiva: jest.fn(),
   encerrarViagem: jest.fn(),
+  pararDeCompartilhar: jest.fn(),
 }));
 
 const buscarMock = buscarViagemAtiva as jest.Mock;
 const encerrarMock = encerrarViagem as jest.Mock;
+const pararMock = pararDeCompartilhar as jest.Mock;
 
 const parada = (codigo: string, nome: string) => ({ codigo, nome, lat: 0, lng: 0 });
 
@@ -241,6 +249,103 @@ describe("FaixaDaViagem", () => {
       await waitFor(() => expect(botao).toBeDisabled());
       liberar();
       await waitFor(() => expect(botao).not.toBeDisabled());
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // US #199 — indicador de compartilhamento com revogação na hora
+  // -------------------------------------------------------------------------
+
+  describe("Compartilhamento (US #199)", () => {
+    it("embarcou com consentimento: mostra o indicador 'Compartilhando' e o 'Parar'", async () => {
+      buscarMock.mockResolvedValue({
+        falhou: false,
+        viagem: viagem({ compartilhaPosicao: true }),
+      });
+
+      renderizar();
+
+      expect(
+        await screen.findByText("Compartilhando a localização do ônibus")
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Parar" })).toBeEnabled();
+    });
+
+    it("embarcou SEM consentimento: a faixa não mostra o indicador", async () => {
+      buscarMock.mockResolvedValue({ falhou: false, viagem: viagem() });
+
+      renderizar();
+
+      await screen.findByRole("region", { name: "Viagem em andamento" });
+      expect(screen.queryByText("Compartilhando a localização do ônibus")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Parar" })).not.toBeInTheDocument();
+    });
+
+    it("'Parar' (Cenário 3): some o indicador na HORA e manda DELETE ao servidor", async () => {
+      buscarMock.mockResolvedValue({
+        falhou: false,
+        viagem: viagem({ compartilhaPosicao: true }),
+      });
+      pararMock.mockResolvedValue(undefined);
+
+      renderizar();
+      fireEvent.click(await screen.findByRole("button", { name: "Parar" }));
+
+      await waitFor(() =>
+        expect(screen.queryByText("Compartilhando a localização do ônibus")).not.toBeInTheDocument()
+      );
+      expect(pararMock).toHaveBeenCalledWith("v-1");
+    });
+
+    it("revogada localmente, o indicador não volta nem se a releitura ainda tragar consentimento (409 à parte)", async () => {
+      // O servidor já recusou o envio (409) e a releitura de 20 s ainda está
+      // desatualizada: revogarLocalmente() da US #199 segura o indicador fora.
+      buscarMock.mockResolvedValue({
+        falhou: false,
+        viagem: viagem({ compartilhaPosicao: true }),
+      });
+      pararMock.mockResolvedValue(undefined);
+
+      renderizar();
+      fireEvent.click(await screen.findByRole("button", { name: "Parar" }));
+
+      await waitFor(() => expect(pararMock).toHaveBeenCalledTimes(1));
+      // A releitura (o "atualizar" do Parar) já passou por aqui e trouxe
+      // compartilhaPosicao: true — mesmo assim, revogado localmente manda:
+      expect(screen.queryByRole("button", { name: "Parar" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Compartilhando a localização do ônibus")).not.toBeInTheDocument();
+    });
+
+    it("falha ao revogar: mostra o erro num alerta e o indicador VOLTA (otimismo revertido)", async () => {
+      buscarMock.mockResolvedValue({
+        falhou: false,
+        viagem: viagem({ compartilhaPosicao: true }),
+      });
+      pararMock.mockRejectedValue(
+        new ViagemError("Não foi possível parar o compartilhamento. Tente novamente.")
+      );
+
+      renderizar();
+      fireEvent.click(await screen.findByRole("button", { name: "Parar" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Não foi possível parar o compartilhamento"
+      );
+      expect(screen.getByText("Compartilhando a localização do ônibus")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Parar" })).not.toBeDisabled();
+    });
+
+    it("encerrar a viagem encerra tudo: a faixa inteira some (nada de indicador órfão)", async () => {
+      buscarMock
+        .mockResolvedValueOnce({ falhou: false, viagem: viagem({ compartilhaPosicao: true }) })
+        .mockResolvedValue({ falhou: false, viagem: null });
+      encerrarMock.mockResolvedValue(undefined);
+
+      renderizar();
+      fireEvent.click(await screen.findByRole("button", { name: /Cheguei/ }));
+
+      await waitFor(() => expect(screen.queryByRole("region")).not.toBeInTheDocument());
+      expect(pararMock).not.toHaveBeenCalled(); // o DELETE da viagem revoga no servidor
     });
   });
 });

@@ -32,6 +32,14 @@ class Viagem(Base):
         motivo_encerramento    → "usuario" | "expirada"
         origem_embarque        → "manual" hoje; "proximidade" reservado
                                  para uma inferência automática futura
+        compartilha_posicao_em → US #199: instante em que o passageiro
+                                 ativou o compartilhamento da posição do
+                                 ônibus; nulo = não compartilha (padrão)
+        consentimento_versao   → US #199: versão do texto de consentimento
+                                 aceito (prova LGPD, art. 7º, I). Nenhuma
+                                 coordenada é persistida — a posição
+                                 colaborativa vive só em memória
+                                 (posicoes_colaborativas.py)
     """
 
     __tablename__ = "viagem"
@@ -57,3 +65,9 @@ class Viagem(Base):
     encerrada_em = Column(DateTime, nullable=True)
     motivo_encerramento = Column(String(20), nullable=True)
     origem_embarque = Column(String(20), nullable=False, default="manual")
+
+    # US #199 — consentimento explícito e revogável (RN-C1); desligado por
+    # padrão. `compartilha_posicao_em IS NOT NULL` é "o consentimento está
+    # vigente" para todo o código; revogar é voltá-lo para nulo.
+    compartilha_posicao_em = Column(DateTime, nullable=True)
+    consentimento_versao = Column(String(40), nullable=True)
