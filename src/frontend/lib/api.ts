@@ -665,6 +665,79 @@ export async function calcularRotas(
   return response.json();
 }
 
+export type TipoPlano = "saida" | "chegada";
+
+export interface PernaPlanejada {
+  numero: string;
+  sentido: string;
+  nome: string;
+  embarque: PontoEmbarque;
+  desembarque: PontoEmbarque;
+  /** ISO 8601, fuso de Brasília. */
+  embarca_em: string;
+  desembarca_em: string;
+  /** Tempo parado no ponto antes do ônibus; na baldeação, a espera na troca. */
+  espera_min: number;
+}
+
+export interface OpcaoPlanejada {
+  pernas: PernaPlanejada[];
+  baldeacoes: number;
+  saida_casa: string;
+  chegada_destino: string;
+  duracao_total_min: number;
+  caminhada_metros: number;
+}
+
+export interface PlanoViagem {
+  tipo: TipoPlano;
+  referencia: string;
+  opcoes: OpcaoPlanejada[];
+  motivo: "sem_opcoes" | "sem_tabela_de_horarios" | "fora_do_horario" | null;
+  mensagem: string | null;
+  /** O horário de passagem em cada parada é estimado, não de tabela por parada. */
+  estimado: boolean;
+}
+
+export class PlanejarViagemError extends Error {}
+
+/**
+ * US #115 — Planeja a viagem por horário de partida ("sair às 7h10") ou de
+ * chegada ("chegar até 8h00"). `data` é AAAA-MM-DD; sem ela vale hoje.
+ *
+ * Sem opção, o backend responde 200 com `motivo` e `mensagem` — a tela
+ * mostra o motivo em vez de uma lista vazia sem explicação. Erro de rede
+ * ou do servidor lança, para o usuário saber que não deu certo.
+ */
+export async function planejarViagem(
+  origem: { lat: number; lng: number },
+  destino: { lat: number; lng: number },
+  tipo: TipoPlano,
+  horario: string,
+  data?: string
+): Promise<PlanoViagem> {
+  const params = new URLSearchParams({
+    origem_lat: String(origem.lat),
+    origem_lng: String(origem.lng),
+    destino_lat: String(destino.lat),
+    destino_lng: String(destino.lng),
+    tipo,
+    horario,
+  });
+  if (data) params.set("data", data);
+
+  const response = await fetchAutenticado(`${API_URL}/api/mobilidade/planejar?${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new PlanejarViagemError("Não foi possível planejar a viagem. Tente novamente.");
+  }
+
+  return response.json();
+}
+
 /**
  * US #17 — Busca os detalhes de uma linha (trajeto, paradas, sentido)
  * pra desenhar no mapa. Usa o mesmo endpoint da US #15
