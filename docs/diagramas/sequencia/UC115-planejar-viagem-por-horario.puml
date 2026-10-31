@@ -1,0 +1,66 @@
+@startuml UC115_PlanejarViagemPorHorario
+hide footbox
+title Diagrama de Sequencia - Planejar Viagem por Horario de Partida/Chegada (US #115)
+
+actor "Passageiro" as Passageiro
+
+participant ":PlanoPorHorario" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ServicoMobilidade" as Service <<servico mobilidade>>
+participant ":ServicoRotas" as Rotas <<servico mobilidade>>
+participant ":ModeloRota" as Model <<modelo>>
+
+Passageiro -> View : escolherTipoEHorario(tipo "saida"|"chegada", horario, dia)
+activate View
+
+View -> Gateway : GET /api/mobilidade/planejar(origem, destino, tipo, horario, dia)
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Rotas : calcular(origem, destino)
+  activate Rotas
+  Rotas --> Service : opcoes(diretas e com uma baldeacao)
+  deactivate Rotas
+
+  loop para cada opcao
+    Service -> Model : consultarTabelaDeHorarios(linha, sentido)
+    activate Model
+    Model --> Service : saidasPorDiaDaSemana, tempoDePercurso
+    deactivate Model
+
+    alt tipo = saida (Cenario 1)
+      Service -> Service : proximoOnibusDepoisDe(horario) em cada perna
+    else tipo = chegada (Cenario 2)
+      Service -> Service : ultimoOnibusQueChegaAte(horario) de tras para frente
+    end
+
+    Service -> Service : somarEsperaNaBaldeacao() (Cenario 3)
+    Service -> Service : usarTabelaDoDiaDaSemana(dia) (Cenario 4)
+  end
+
+  alt ha opcao viavel
+    Service --> Gateway : plano(opcoes com horario de cada perna, estimado=true)
+    Gateway --> View : retornarResposta(plano)
+    View -> View : exibirHorariosEEsperaPorPerna()
+    View -> View : avisarQueHorariosSaoEstimados()
+
+  else nenhuma opcao viavel (Cenario 5)
+    Service --> Gateway : plano(motivo: sem_opcoes | sem_tabela_de_horarios | fora_do_horario)
+    deactivate Service
+    Gateway --> View : retornarResposta(motivo, mensagem)
+    View -> View : exibirMensagemDoMotivo()
+  end
+
+else token invalido
+  Gateway --> View : 401
+  View -> View : redirecionarParaLogin()
+end
+
+deactivate Gateway
+deactivate View
+@enduml
