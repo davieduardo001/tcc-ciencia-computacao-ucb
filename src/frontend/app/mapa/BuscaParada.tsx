@@ -46,6 +46,9 @@ export default function BuscaParada({ onFechar, onResultado, onSelecionar }: Bus
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<ResultadoBuscaParada | null>(null);
+  // Último termo buscado: enquanto o campo difere dele, a tela lembra que a
+  // busca só sai ao confirmar (issue #236).
+  const [termoBuscado, setTermoBuscado] = useState<string | null>(null);
   // Só vale a resposta da busca mais recente (mesma ideia da issue #174).
   const sequenciaRef = useRef(0);
 
@@ -54,6 +57,7 @@ export default function BuscaParada({ onFechar, onResultado, onSelecionar }: Bus
   async function buscar() {
     if (!termoValido) return;
     const sequencia = ++sequenciaRef.current;
+    setTermoBuscado(termo.trim());
     setCarregando(true);
     setErro(null);
 
@@ -139,6 +143,9 @@ export default function BuscaParada({ onFechar, onResultado, onSelecionar }: Bus
         </div>
         {termo.trim().length > 0 && !termoValido && (
           <p className="bp-dica">Digite pelo menos {MIN_CARACTERES} letras.</p>
+        )}
+        {termoValido && !carregando && termo.trim() !== termoBuscado && (
+          <p className="bp-dica">Pressione Enter para buscar.</p>
         )}
       </form>
 

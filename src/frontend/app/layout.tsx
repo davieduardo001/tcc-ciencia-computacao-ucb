@@ -1,22 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Sora } from "next/font/google";
+import localFont from "next/font/local";
 import RegistrarServiceWorker from "./RegistrarServiceWorker";
 import SplashScreen from "./SplashScreen";
 import "./globals.css";
 
 // Identidade v3: Manrope para texto corrido, Sora para títulos e números.
+// As fontes ficam no repositório (app/fonts) e não vêm do Google Fonts: o
+// build da Vercel já falhou por o Google estar fora do ar (issue #234).
 // `display: "swap"` evita tela em branco enquanto a fonte carrega — o app é
 // usado na rua, em 4G, e texto com fonte de sistema é melhor que texto
 // invisível.
-const manrope = Manrope({
-  subsets: ["latin"],
+const manrope = localFont({
+  src: "./fonts/manrope-latin-wght-normal.woff2",
+  weight: "200 800",
   variable: "--font-manrope",
   display: "swap",
 });
 
-const sora = Sora({
-  subsets: ["latin"],
-  weight: ["600", "700"],
+const sora = localFont({
+  src: "./fonts/sora-latin-wght-normal.woff2",
+  weight: "100 800",
   variable: "--font-sora",
   display: "swap",
 });

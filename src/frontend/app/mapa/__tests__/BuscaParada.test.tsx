@@ -112,6 +112,24 @@ describe("BuscaParada (US #21)", () => {
     expect(screen.queryByText(/Nenhuma parada encontrada/)).not.toBeInTheDocument();
   });
 
+  it("avisa que a busca sai pelo Enter enquanto o termo não foi buscado (#236)", async () => {
+    buscarParadasMock.mockResolvedValue({ paradas: [], origem: "banco" });
+    montar();
+    const campo = screen.getByLabelText("Nome, referência ou endereço");
+
+    fireEvent.change(campo, { target: { value: "terminal" } });
+    expect(screen.getByText("Pressione Enter para buscar.")).toBeInTheDocument();
+    expect(buscarParadasMock).not.toHaveBeenCalled();
+
+    fireEvent.submit(screen.getByRole("search"));
+    await waitFor(() =>
+      expect(screen.queryByText("Pressione Enter para buscar.")).not.toBeInTheDocument()
+    );
+
+    fireEvent.change(campo, { target: { value: "terminal sul" } });
+    expect(screen.getByText("Pressione Enter para buscar.")).toBeInTheDocument();
+  });
+
   it("não busca com menos de 3 letras", () => {
     montar();
 
