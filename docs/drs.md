@@ -115,6 +115,10 @@ Responsáveis conforme [`distribuicao_us.md`](distribuicao_us.md). Para as USs c
 - Aceite: (1) ao pegar o ônibus, a pessoa pode aceitar compartilhar a posição do ônibus; o compartilhamento vem **desligado**, separado do aceite dos Termos; (2) com o ônibus fora do GPS da SEMOB, a posição informada entra no mapa e no ETA com o selo "colaborativo"; (3) "Parar" revoga a qualquer momento e apaga a leitura na hora; "Cheguei" também encerra o compartilhamento; (4) leituras fora do traçado da linha, com salto de velocidade impossível ou enviadas com menos de 10 s de intervalo são recusadas; (5) quando o ônibus volta ao feed da SEMOB, a posição oficial vale.
 - Notas: nenhuma coordenada vai para o banco; cada leitura vive só na memória do servidor, por no máximo 2 minutos (RN-024). O banco guarda apenas o instante e a versão do texto aceito.
 
+**RF-31 — Quadro de horários da linha** · US #118 · Média · @davieduardo001
+- Aceite: (1) ao abrir uma linha, o quadro mostra as partidas por segunda a sexta, sábado e domingo; (2) a próxima partida a partir de agora fica em destaque, pelo dia da semana atual; (3) fora do horário ou em dia sem operação, a tela diz isso explicitamente; (4) a duração das rotas (RF-12) usa o tempo de percurso publicado pela SEMOB e só recua para a velocidade média quando a rota não tem esse dado; (5) linha sem horário publicado informa que não há horário disponível.
+- Notas: sem migration nem nova ingestão, usa `rota.horarios_por_dia` e `tempo_percurso_min`; feriados não são considerados.
+
 ### 3.3 Viagem e alertas de proximidade
 
 **RF-15 — Pegar o ônibus (embarcar, acompanhar e encerrar a viagem)** · US #171 · Alta · @Kelvin963 (atribuída), entregue por @Vitoria-Albuquerque
@@ -222,7 +226,7 @@ Classificação ISO/IEC 25010.
 
 ## 6. Casos de uso
 
-Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](diagramas/sequencia/). Os UC10 a UC30, UC115, UC171, UC172, UC173, UC190, UC195 e UC199 usam o número da US como identificador.
+Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](diagramas/sequencia/). Os UC10 a UC30, UC115, UC118, UC171, UC172, UC173, UC190, UC195 e UC199 usam o número da US como identificador.
 
 | Caso de uso | US / RF | Diagrama |
 | :--- | :--- | :--- |
@@ -248,6 +252,7 @@ Os diagramas de sequência (PlantUML) ficam em [`docs/diagramas/sequencia/`](dia
 | UC29 Gerenciar preferências de notificação | #29 / RF-24 | [`UC29`](diagramas/sequencia/UC29-gerenciar-preferencias-notificacao.puml) |
 | UC30 Visualizar tutorial no primeiro acesso | #30 / RF-25 | [`UC30`](diagramas/sequencia/UC30-visualizar-tutorial-primeiro-acesso.puml) |
 | UC115 Planejar viagem por horário | #115 / RF-29 | [`UC115`](diagramas/sequencia/UC115-planejar-viagem-por-horario.puml) |
+| UC118 Ver horários da linha | #118 / RF-31 | [`UC118`](diagramas/sequencia/UC118-ver-horarios-da-linha.puml) |
 | UC171 Pegar o ônibus | #171 / RF-15 | [`UC171`](diagramas/sequencia/UC171-pegar-onibus.puml) |
 | UC172 Alerta de proximidade da parada | #172 / RF-16 | [`UC172`](diagramas/sequencia/UC172-alerta-proximidade-parada.puml) |
 | UC173 ETA: mapeamento entre paradas | #173 / RF-11 | [`UC173`](diagramas/sequencia/UC173-corrigir-eta-mapeamento-paradas.puml) |
@@ -293,6 +298,7 @@ RF → US → caso de uso. A rastreabilidade completa, com PRs, casos de teste e
 | RF-28 | #28 | UC28 |
 | RF-29 | #115 | UC115 |
 | RF-30 | #199 | UC199 |
+| RF-31 | #118 | UC118 |
 
 ## 8. Restrições e premissas
 
@@ -326,3 +332,4 @@ O projeto adota um fluxo de trabalho com agentes de IA generativa no desenvolvim
 | :--- | :--- | :--- |
 | 1.0 | 30/10/2026 | Versão entregue, criada a partir das issues `[US]`, dos PRs mergeados, do código de `homolog` e da documentação de testes |
 | 1.1 | 31/10/2026 | Inclusão de RF-28 (alerta de cancelamento, #28), RF-29 (planejamento por horário, #115) e RF-30 (posição colaborativa, #199), com RN-023 a RN-028 |
+| 1.2 | 06/11/2026 | Inclusão de RF-31 (quadro de horários da linha, #118) |
