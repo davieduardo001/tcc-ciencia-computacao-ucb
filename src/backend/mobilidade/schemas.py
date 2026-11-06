@@ -9,6 +9,28 @@ class ParadaResponse(BaseModel):
     lng: float
 
 
+class GrupoDeDiasResponse(BaseModel):
+    rotulo: str
+    dias: list[int]
+    horarios: list[str]
+    hoje: bool
+
+
+class ProximaPartidaResponse(BaseModel):
+    horario: str
+    quando: str
+    em_minutos: int
+
+
+class QuadroHorariosResponse(BaseModel):
+    """US #118 — quadro de horários da linha, agrupado por dias da semana."""
+
+    estado: Literal["operando", "fora_do_horario", "nao_opera_hoje", "sem_horario"]
+    tempo_percurso_min: int | None = None
+    proxima_partida: ProximaPartidaResponse | None = None
+    grupos: list[GrupoDeDiasResponse] = []
+
+
 class LinhaResponse(BaseModel):
     numero: str
     nome: str
@@ -16,6 +38,7 @@ class LinhaResponse(BaseModel):
     paradas: list[ParadaResponse]
     trajeto: list[tuple[float, float]]
     horarios_previstos: list[str]
+    quadro_horarios: QuadroHorariosResponse | None = None
 
 
 class LinhaNaoEncontrada(BaseModel):
