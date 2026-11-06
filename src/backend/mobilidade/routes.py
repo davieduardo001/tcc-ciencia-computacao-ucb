@@ -25,6 +25,9 @@ from mobilidade.geocode_service import GeocodeService
 from mobilidade.geometria import TrajetoMedido
 from mobilidade.linha_service import LinhaService
 from mobilidade.models.linha import Linha
+from mobilidade.models.rota import Rota
+from mobilidade.quadro_horarios import montar_quadro
+from mobilidade.semob_source import escolher_sentido_principal
 from mobilidade.parada_service import ParadaService
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from mobilidade.providers.linha_google_maps import LinhaGoogleMapsProvider
@@ -44,6 +47,7 @@ from mobilidade.schemas import (
     ChegadasDaRotaResponse,
     ChegadasParadaResponse,
     LinhaResponse,
+    QuadroHorariosResponse,
     LinhaResumoResponse,
     LugarResponse,
     OpcaoPlanejadaResponse,
@@ -465,6 +469,25 @@ async def chegadas_na_parada(codigo: str, db: Session = Depends(get_db)):
     )
 
 
+def _quadro_da_linha(db: Session, numero: str) -> QuadroHorariosResponse:
+    """
+    US #118 — quadro de horários do sentido principal (o mesmo que o painel
+    da linha desenha). Lê só as colunas de horário: o `trajeto` da rota tem
+    centenas de pontos e não entra nessa conta.
+    """
+    linhas = (
+        db.query(Rota.sentido, Rota.horarios_por_dia, Rota.tempo_percurso_min)
+        .filter(Rota.numero == numero)
+        .all()
+    )
+    rota = None
+    if linhas:
+        principal = escolher_sentido_principal([l.sentido for l in linhas])
+        rota = next(l for l in linhas if l.sentido == principal)
+    quadro = montar_quadro(rota, datetime.now(FUSO_SEMOB))
+    return QuadroHorariosResponse(**asdict(quadro))
+
+
 @router.get("/linhas/{numero_linha}", response_model=LinhaResponse)
 async def buscar_linha(numero_linha: str, db: Session = Depends(get_db)):
     """
@@ -490,6 +513,7 @@ async def buscar_linha(numero_linha: str, db: Session = Depends(get_db)):
         ],
         trajeto=resultado.trajeto,
         horarios_previstos=resultado.horarios_previstos,
+        quadro_horarios=_quadro_da_linha(db, resultado.numero),
     )
 
 

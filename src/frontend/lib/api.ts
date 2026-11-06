@@ -480,6 +480,14 @@ export interface ParadaLinha {
   lng: number;
 }
 
+/** US #118 — quadro de horários publicado pelo SEMOB, por dias da semana. */
+export interface QuadroHorarios {
+  estado: "operando" | "fora_do_horario" | "nao_opera_hoje" | "sem_horario";
+  tempoPercursoMin: number | null;
+  proximaPartida: { horario: string; quando: string; emMinutos: number } | null;
+  grupos: { rotulo: string; horarios: string[]; hoje: boolean }[];
+}
+
 export interface LinhaDetalhada {
   numero: string;
   nome: string;
@@ -487,6 +495,8 @@ export interface LinhaDetalhada {
   paradas: ParadaLinha[];
   trajeto: [number, number][];
   horariosPrevistos: string[];
+  /** Ausente em backend antigo. */
+  quadroHorarios?: QuadroHorarios | null;
 }
 
 export class BuscarLinhaError extends Error {}
@@ -761,6 +771,20 @@ export async function buscarLinha(
     paradas: data.paradas,
     trajeto: data.trajeto,
     horariosPrevistos: data.horarios_previstos,
+    quadroHorarios: data.quadro_horarios
+      ? {
+          estado: data.quadro_horarios.estado,
+          tempoPercursoMin: data.quadro_horarios.tempo_percurso_min ?? null,
+          proximaPartida: data.quadro_horarios.proxima_partida
+            ? {
+                horario: data.quadro_horarios.proxima_partida.horario,
+                quando: data.quadro_horarios.proxima_partida.quando,
+                emMinutos: data.quadro_horarios.proxima_partida.em_minutos,
+              }
+            : null,
+          grupos: data.quadro_horarios.grupos,
+        }
+      : null,
   };
 }
 

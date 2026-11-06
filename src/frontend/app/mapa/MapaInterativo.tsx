@@ -1,5 +1,6 @@
 "use client";
 
+import QuadroDeHorarios from "./QuadroDeHorarios";
 import { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
@@ -1201,6 +1202,8 @@ export default function MapaInterativo({
                 Reportar ocorrência nesta linha
               </Link>
             </div>
+
+            <QuadroDeHorarios quadro={linha.quadroHorarios} />
 
             <div className="mapa-painel-titulo">Trajeto e paradas</div>
             <div className="mapa-timeline">
