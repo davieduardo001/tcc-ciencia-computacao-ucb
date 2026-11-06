@@ -49,6 +49,7 @@ Liga cada User Story (ou card) entregue aos seus cenários BDD, aos [casos de te
 | #217 | Folha única com 3 alturas (celular) | **aberta** · Homolog | ver a issue | sem caso; conferir em celular real (pendente) | #220 | `app/mapa/__tests__/FolhaInferior.test.tsx`, `PlanejadorViagem.test.tsx`, `MapaInterativo.test.tsx` |
 | #28 | Alerta de cancelamento de viagem | **aberta** · Homolog | ver a issue | sem caso manual (não executado) | #258 | `mobilidade/tests/test_servico_cancelamento.py`, `test_linhas_alternativas.py` |
 | #115 | Planejar viagem por horário de partida ou chegada | **aberta** · Homolog | 5 | sem caso manual (não executado) | #265 | `mobilidade/tests/test_planejamento_horario.py`, `test_planejar_route.py`, `app/mapa/__tests__/PlanoPorHorario.test.tsx` |
+| #118 | Quadro de horários da linha | **fechada** · Main | 5 | sem caso manual (não executado) | #274 | `mobilidade/tests/test_quadro_horarios.py`, `app/mapa/__tests__/QuadroDeHorarios.test.tsx` |
 | #199 | Fallback colaborativo da posição do ônibus | **aberta** · Homolog | ver a issue | sem caso manual (não executado) | #263 | `mobilidade/tests/test_posicoes_colaborativas.py`, `test_viagem_colaborativo.py`, `app/mapa/__tests__/usePosicaoColaborativa.test.tsx`, `SeloFonte.test.tsx` |
 
 ## 2. Notas
