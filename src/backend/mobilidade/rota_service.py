@@ -70,9 +70,9 @@ POOL_BALDEACOES = 10
 # lista de virar variações da mesma viagem.
 MAX_REPETICAO_DE_LINHA = 2
 
-# Velocidade média usada para estimar duração. É um ônibus urbano em
-# trânsito misto do DF: não é promessa de horário, é ordem de grandeza.
-# Planejamento por horário real é a US #115.
+# Velocidade média usada para estimar duração quando a rota não tem
+# `tempo_percurso` do SEMOB (US #118: com ele, a estimativa é proporcional
+# ao trecho). É ordem de grandeza, não promessa de horário.
 VELOCIDADE_MEDIA_KMH = 22.0
 
 
@@ -107,6 +107,10 @@ class Perna:
     distancia_km: float
     paradas_no_trecho: int
     trajeto: list[tuple[float, float]]
+    # US #118 — tempo de percurso oficial do SEMOB, proporcional ao trecho
+    # (tempo da viagem completa × fração do traçado percorrida). `None`
+    # quando a rota não tem o dado: aí vale a velocidade média.
+    tempo_oficial_min: float | None = None
 
 
 @dataclass(frozen=True)
@@ -133,7 +137,12 @@ class OpcaoViagem:
 
     @property
     def duracao_estimada_min(self) -> int:
-        minutos = self.distancia_km / VELOCIDADE_MEDIA_KMH * 60
+        minutos = sum(
+            p.tempo_oficial_min
+            if p.tempo_oficial_min is not None
+            else p.distancia_km / VELOCIDADE_MEDIA_KMH * 60
+            for p in self.pernas
+        )
         minutos += self.caminhada_metros / 1000 / 5.0 * 60  # 5 km/h a pé
         minutos += 6 * self.baldeacoes  # espera média no ponto de troca
         return max(1, round(minutos))
@@ -540,6 +549,15 @@ class RotaService:
         # qualquer abrigo cadastrado.
         paradas_no_trecho = max(0, i_parada_desembarque - i_parada_embarque)
 
+        tempo_oficial = None
+        if rota.tempo_percurso_min:
+            total_m = sum(
+                _distancia_metros(*trajeto[i], *trajeto[i + 1])
+                for i in range(len(trajeto) - 1)
+            )
+            if total_m > 0:
+                tempo_oficial = rota.tempo_percurso_min * min(percorrido / total_m, 1.0)
+
         return Perna(
             numero=rota.numero,
             sentido=rota.sentido,
@@ -549,6 +567,7 @@ class RotaService:
             distancia_km=round(percorrido / 1000, 1),
             paradas_no_trecho=paradas_no_trecho,
             trajeto=trajeto[i_origem : i_destino + 1],
+            tempo_oficial_min=tempo_oficial,
         )
 
     @staticmethod

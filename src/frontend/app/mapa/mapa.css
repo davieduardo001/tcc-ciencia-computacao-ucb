@@ -654,6 +654,47 @@
   color: #fff;
 }
 
+/* US #118 — quadro de horários da linha */
+.mapa-horarios {
+  margin-bottom: 16px;
+}
+
+.mapa-horarios-estado {
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.mapa-horarios-proxima {
+  margin: 0 0 6px;
+}
+
+.mapa-horarios-grupo {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.mapa-horarios-lista {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mapa-horario {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #d0d5dd);
+}
+
+.mapa-horario.proximo {
+  font-weight: 700;
+  border-color: currentColor;
+  background: var(--accent-soft, #e0f2fe);
+}
+
 .mapa-painel-titulo {
   font-size: 12px;
   font-weight: 700;

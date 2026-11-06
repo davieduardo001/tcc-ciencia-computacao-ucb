@@ -107,11 +107,22 @@ describe("api.ts — buscarLinha (US #17)", () => {
         paradas: [{ nome: "Parada A", lat: -15.8, lng: -48.0 }],
         trajeto: [[-15.8, -48.0], [-15.79, -47.9]],
         horarios_previstos: ["06:00"],
+        quadro_horarios: {
+          estado: "operando",
+          tempo_percurso_min: 75,
+          proxima_partida: { horario: "12:00", quando: "hoje", em_minutos: 30 },
+          grupos: [{ rotulo: "Segunda a sexta", dias: [0, 1, 2, 3, 4], horarios: ["12:00"], hoje: true }],
+        },
       }),
     }) as jest.Mock;
 
     const resultado = await buscarLinha("0.110");
 
+    expect(resultado?.quadroHorarios).toMatchObject({
+      estado: "operando",
+      tempoPercursoMin: 75,
+      proximaPartida: { horario: "12:00", emMinutos: 30 },
+    });
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toMatch(/\/api\/mobilidade\/linhas\/0\.110$/);
     expect(options.credentials).toBe("include");

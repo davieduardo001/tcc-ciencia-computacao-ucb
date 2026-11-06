@@ -50,7 +50,7 @@ def _paradas_padrao(trajeto) -> list[dict]:
     ]
 
 
-def _semear(db, numero: str, sentido: str, trajeto, paradas=None) -> None:
+def _semear(db, numero: str, sentido: str, trajeto, paradas=None, tempo_percurso_min=None) -> None:
     db.add(
         Rota(
             numero=numero,
@@ -58,6 +58,7 @@ def _semear(db, numero: str, sentido: str, trajeto, paradas=None) -> None:
             nome=f"{numero} — rota de teste",
             trajeto=[[lat, lng] for lat, lng in trajeto],
             paradas=paradas if paradas is not None else _paradas_padrao(trajeto),
+            tempo_percurso_min=tempo_percurso_min,
         )
     )
     for (cel_lat, cel_lng), (minimo, maximo) in _celulas_do_trajeto(trajeto).items():
@@ -132,6 +133,29 @@ def test_sentido_volta_atende_o_caminho_inverso(db, servico):
 
     assert [p.sentido for o in ida for p in o.pernas] == ["IDA"]
     assert [p.sentido for o in volta for p in o.pernas] == ["VOLTA"]
+
+
+def test_duracao_usa_tempo_de_percurso_do_semob_proporcional_ao_trecho(db, servico):
+    """US #118, Cenário 4: dado oficial em vez da velocidade média."""
+    _semear(db, f"{PREFIXO}004", "IDA", _trajeto(), tempo_percurso_min=100)
+    db.commit()
+
+    # Primeira metade do traçado: ~metade do percurso oficial (50 min).
+    opcao = servico.calcular(db, OESTE, MEIO)[0]
+    perna = opcao.pernas[0]
+
+    assert perna.tempo_oficial_min == pytest.approx(50, abs=3)
+    caminhada_min = opcao.caminhada_metros / 1000 / 5.0 * 60
+    assert opcao.duracao_estimada_min == round(perna.tempo_oficial_min + caminhada_min)
+
+
+def test_duracao_cai_na_velocidade_media_sem_tempo_de_percurso(db, servico):
+    _semear(db, f"{PREFIXO}005", "IDA", _trajeto())
+    db.commit()
+
+    perna = servico.calcular(db, OESTE, LESTE)[0].pernas[0]
+
+    assert perna.tempo_oficial_min is None
 
 
 # --------------------------------------------------------------------------
