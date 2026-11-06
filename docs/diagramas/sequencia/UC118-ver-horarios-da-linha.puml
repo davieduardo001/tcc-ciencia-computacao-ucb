@@ -1,0 +1,59 @@
+@startuml UC118_VerHorariosDaLinha
+hide footbox
+title Diagrama de Sequencia - Ver Horarios de Operacao da Linha (US #118)
+
+actor "Passageiro" as Passageiro
+
+participant ":PainelDaLinha" as View <<interface usuario>>
+participant ":GatewayAPI" as Gateway <<servico gateway>>
+participant ":ServicoMobilidade" as Service <<servico mobilidade>>
+participant ":ModeloRota" as Model <<modelo>>
+
+Passageiro -> View : abrirLinha(numero)
+activate View
+
+View -> Gateway : GET /api/mobilidade/linhas/{numero}
+activate Gateway
+
+Gateway -> Gateway : verificarAssinaturaToken(token)
+
+alt token valido
+  Gateway -> Service : encaminharRequisicao(req, identidadeUsuario)
+  activate Service
+
+  Service -> Model : consultarHorarios(numero) (sentido principal)
+  activate Model
+  Model --> Service : saidasPorDiaDaSemana, tempoDePercurso
+  deactivate Model
+
+  alt linha sem tabela publicada (Cenario 5)
+    Service --> Gateway : quadro(estado: sem_horario)
+  else linha com tabela
+    Service -> Service : agruparDiasComMesmaTabela() (Cenario 1)
+    Service -> Service : proximaPartida(agora, diaDaSemana) (Cenario 2)
+    Service -> Service : classificarEstado(agora) (Cenario 3)
+    note right
+      operando | fora_do_horario | nao_opera_hoje
+    end note
+    Service --> Gateway : quadro(estado, proximaPartida, grupos, tempoPercurso)
+  end
+  deactivate Service
+
+  Gateway --> View : retornarResposta(linha + quadro)
+  View -> View : exibirEstadoProximaPartidaEQuadroPorDia()
+
+else token invalido
+  Gateway --> View : 401
+  View -> View : redirecionarParaLogin()
+end
+
+deactivate Gateway
+
+note over Service, Model
+  Cenario 4 (US #20): ao calcular a rota, a duracao de cada perna usa
+  tempo_percurso do SEMOB x fracao do tracado percorrida; sem o dado,
+  cai na velocidade media.
+end note
+
+deactivate View
+@enduml
