@@ -1,7 +1,7 @@
 ---
+name: reviewer
 description: Agente de review de código — apenas analisa e comenta, NUNCA faz alterações ou merge.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 temperature: 0.1
 steps: 10
 permissions:

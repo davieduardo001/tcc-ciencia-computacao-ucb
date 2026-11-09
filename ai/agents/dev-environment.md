@@ -1,4 +1,5 @@
 ---
+name: dev-environment
 description: Gerencia infraestrutura local: Docker, migrations, dependências. NÃO edita código.
 mode: subagent
 temperature: 0.1

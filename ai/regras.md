@@ -13,6 +13,32 @@ Todo o conteúdo em **Português (PT-BR)**. Commits podem ser em inglês ou PT-B
 - Mudanças em `docs/` e `src/` devem ser commits separados, salvo interdependência estrita.
 - Regras completas de como a IA deve operar no workflow (bypass de branch protection, o que conta como aprovação de PR, verificação antes de declarar algo pronto): `docs/boas-praticas-ia.md`.
 
+## Delegação por agente
+
+Toda tarefa que mexe no repositório ou na plataforma (criar issue, implementar, testar, revisar, documentar) é executada por um **agente** de [`ai/agents/`](agents/). A conversa principal só **orquestra**: entende o pedido, escolhe o agente, delega e reporta o resultado.
+
+| Tipo de tarefa | Agente |
+|---|---|
+| Escrever US, critérios de aceite, escopo; abrir e consultar issues e sprint | `analista` |
+| Implementar uma issue de ponta a ponta, corrigir bug, branch, commits e PR | `dev` |
+| Trabalho só no backend (FastAPI, modelos, migrations) | `backend` |
+| Trabalho só no frontend (Next.js, mapa, telas) | `frontend` |
+| Escrever e rodar testes, validar o comando de `teste` do `projeto.md` | `tester` |
+| Revisar código e PR, validar o DoD (somente leitura) | `reviewer` |
+| Documentação: DRS, arquitetura, QA, diagramas, PRD e SPEC | `redator` |
+| Docker, migrations e dependências locais (não edita código) | `dev-environment` |
+
+- **Uma tarefa, um agente.** Se cruza papéis (implementar e testar), divida em etapas na ordem `issue → PR → review → DoD`.
+- **Passe o contexto completo:** o pedido original, o [`projeto.md`](../projeto.md), a issue e os arquivos relevantes. O agente não herda a conversa.
+- **Exceção:** perguntas, explicações e ajustes triviais (ler um arquivo, corrigir uma linha) não precisam de agente.
+- Em ferramenta sem subagentes, assuma o papel carregando `ai/agents/<nome>.md` e siga as regras dele na própria conversa.
+
+### Precedência das regras
+
+1. [`projeto.md`](../projeto.md): o contrato do projeto, o mais específico.
+2. Este arquivo (`ai/regras.md`): vale sobre qualquer skill.
+3. A skill ou o agente em uso.
+
 ## Vinculação de PRs a Issues
 
 - **Toda PR** deve estar vinculada a uma Issue
