@@ -127,6 +127,39 @@ describe("AppShell", () => {
     expect(within(topbar).queryByRole("button", { name: /perfil/i })).not.toBeInTheDocument();
   });
 
+  it("'Perfil' da barra inferior é link para /configuracoes e não abre 'Em breve' (#279)", () => {
+    render(
+      <AppShell active="mapa">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    const perfil = within(inferior).getByRole("link", { name: "Perfil" });
+    expect(perfil).toHaveAttribute("href", "/configuracoes");
+    expect(within(inferior).queryByRole("button", { name: "Perfil" })).not.toBeInTheDocument();
+
+    fireEvent.click(perfil);
+    expect(screen.queryByText(/ainda está sendo construída/i)).not.toBeInTheDocument();
+  });
+
+  it("'Perfil' fica ativo na tela de Configurações (#279)", () => {
+    render(
+      <AppShell active="configuracoes">
+        <div>conteúdo</div>
+      </AppShell>
+    );
+
+    const inferior = document.querySelector(".ms-bottomnav") as HTMLElement;
+    expect(within(inferior).getByRole("link", { name: "Perfil" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(within(inferior).getByRole("link", { name: "Mapa" })).not.toHaveAttribute(
+      "aria-current"
+    );
+  });
+
   it("bloco do usuário do menu lateral mantém Sair e Rever o guia", async () => {
     buscarUsuarioAtualMock.mockResolvedValue({
       id: "1",
