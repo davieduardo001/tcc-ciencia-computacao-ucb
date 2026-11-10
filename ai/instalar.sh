@@ -14,6 +14,7 @@ cd "$raiz"
 # destino na raiz | alvo do link (relativo à pasta do destino)
 LINKS=(
   ".claude/skills|../ai/skills"
+  ".claude/agents|../ai/agents"
   ".claude/launch.json|../ai/claude/launch.json"
   ".opencode/skills|../ai/skills"
   ".opencode/agents|../ai/agents"

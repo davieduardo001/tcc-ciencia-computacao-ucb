@@ -4,10 +4,10 @@ Esta pasta é a **fonte única** de tudo que configura agentes de IA no projeto:
 
 ```
 CLAUDE.md  ──►  AGENT.md  ──►  ai/
-(Claude Code)   (entrada       regras.md     regras de operação (branches, commits, PRs, diagramas, Gateway)
+(Claude Code)   (entrada       regras.md     regras de operação (agentes, branches, commits, PRs, diagramas, Gateway)
                  comum)        workflow.md   ciclo de sprint, DoR e DoD
                                skills/       15 skills, um SKILL.md por pasta
-                               agents/       5 agentes especializados (formato OpenCode)
+                               agents/       8 agentes (analista, dev, redator, backend, frontend, tester, reviewer, dev-environment)
                                claude/       launch.json (servidor de desenvolvimento do frontend)
                                gemini/       settings.json.example (servidor MCP do GitHub)
                                opencode/     opencode.json (agentes, permissões e modos)
@@ -25,11 +25,13 @@ Os links ficam no `.gitignore`. Cada ferramenta lê a mesma pasta `ai/skills/`:
 
 | Ferramenta | O que lê | Como |
 |---|---|---|
-| **Claude Code** | `CLAUDE.md` → `AGENT.md` → `ai/regras.md`; skills como comandos `/nome` | `.claude/skills` aponta para `ai/skills` |
+| **Claude Code** | `CLAUDE.md` → `AGENT.md` → `ai/regras.md`; skills como comandos `/nome`; agentes como subagentes | `.claude/skills` e `.claude/agents` apontam para `ai/` |
 | **OpenCode** | `opencode.json`, skills e agentes | `opencode.json`, `.opencode/skills` e `.opencode/agents` apontam para `ai/` |
 | **Gemini CLI** | skills; configuração do servidor MCP | `.gemini/skills` aponta para `ai/skills`; copie `ai/gemini/settings.json.example` para `.gemini/settings.json` e coloque o seu token (o arquivo real fica fora do Git) |
 
-Os **agentes** (`ai/agents/`) estão no formato do OpenCode (`mode: subagent`) e por isso só o OpenCode os usa; o formato de subagente do Claude Code é outro.
+Os **agentes** (`ai/agents/`) usam um cabeçalho que as duas ferramentas leem: `name` e `description` (Claude Code) mais `mode: subagent` (OpenCode). Nenhum fixa modelo, então cada ferramenta usa o que tem configurado. As permissões detalhadas de alguns agentes só valem no OpenCode; no Claude Code, a restrição (por exemplo, `reviewer` somente leitura) é regra de texto do próprio agente.
+
+O contrato do projeto (plataforma, repositório, fluxo de branches, sprint e comandos de teste) fica no [`projeto.md`](../projeto.md) da raiz. A base desta organização vem do repositório [friday](https://github.com/davieduardo001/friday).
 
 ## Skills
 
@@ -53,13 +55,18 @@ Os **agentes** (`ai/agents/`) estão no formato do OpenCode (`mode: subagent`) e
 
 ## Agentes
 
+A conversa principal só orquestra; a tarefa é delegada ao agente certo (tabela completa em [`regras.md`](regras.md#delegação-por-agente)).
+
 | Agente | Papel |
 |---|---|
-| [`backend`](agents/backend.md) | Agente especializado em desenvolvimento backend com FastAPI para o projeto Movecity. |
-| [`dev-environment`](agents/dev-environment.md) | Gerencia infraestrutura local: Docker, migrations, dependências. NÃO edita código. |
-| [`frontend`](agents/frontend.md) | Agente especializado em desenvolvimento frontend com Next.js para o projeto Movecity. |
-| [`reviewer`](agents/reviewer.md) | Agente de review de código — apenas analisa e comenta, NUNCA faz alterações ou merge. |
-| [`tester`](agents/tester.md) | Agente especializado em criar e rodar testes unitários para o projeto Movecity. |
+| [`analista`](agents/analista.md) | Escreve US em BDD, define critérios de aceite e escopo, cria e consulta issues e sprint. Não escreve código. |
+| [`dev`](agents/dev.md) | Implementa uma issue de ponta a ponta (branch, código, testes, commits e PR). |
+| [`backend`](agents/backend.md) | Versão do `dev` para o backend FastAPI do Movecity. |
+| [`frontend`](agents/frontend.md) | Versão do `dev` para o frontend Next.js do Movecity. |
+| [`tester`](agents/tester.md) | Cria e roda testes unitários (pytest e Jest). |
+| [`reviewer`](agents/reviewer.md) | Revisa código e PR, somente leitura. Nunca altera nem faz merge. |
+| [`redator`](agents/redator.md) | Escreve e mantém a documentação (DRS, arquitetura, QA, diagramas, PRD e SPEC). |
+| [`dev-environment`](agents/dev-environment.md) | Infraestrutura local: Docker, migrations, dependências. Não edita código. |
 
 ## Como criar ou alterar uma skill
 

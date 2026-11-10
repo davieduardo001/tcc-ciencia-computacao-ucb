@@ -1,7 +1,7 @@
 ---
+name: tester
 description: Agente especializado em criar e rodar testes unitários para o projeto Movecity.
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 temperature: 0.1
 steps: 12
 permissions:
