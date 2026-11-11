@@ -54,11 +54,11 @@ app.include_router(push_router, prefix="/mobilidade", tags=["push"])
 def _notificador_web_push(app: FastAPI):
     """
     Web Push quando as três variáveis VAPID existem e são coerentes; senão o
-    no-op de sempre (o aviso continua chegando DENTRO do app). O alerta de
-    atraso (#27) não passa por aqui.
+    no-op de sempre (o aviso continua chegando DENTRO do app).
 
-    Uma única instância serve os alertas de proximidade (#172) e de
-    cancelamento (#28): os dois compartilham o mesmo executor de threads.
+    Uma única instância serve os alertas de proximidade (#172), de
+    cancelamento (#28) e de atraso (#27/#207): mesmo executor de threads,
+    mesmas inscrições.
     """
     config = configuracao_vapid_do_ambiente()
     if not config.disponivel:
@@ -67,17 +67,23 @@ def _notificador_web_push(app: FastAPI):
 
     executor = ThreadPoolExecutor(max_workers=MAX_THREADS_WEB_PUSH, thread_name_prefix="web-push")
     app.state.executor_push = executor
-    logger.info("Web Push ligado para os alertas de proximidade e cancelamento.")
+    logger.info("Web Push ligado para os alertas de proximidade, cancelamento e atraso.")
     return NotificadorWebPush(config, SessionLocal, executor=executor)
 
 
 @app.on_event("startup")
 def startup():
-    servico = ServicoRastreamento(FornecedorGTFSMock(), NotificadorNulo())
-
-    # Web Push compartilhado pelos alertas de proximidade (#172) e de
-    # cancelamento (#28): mesmo executor, mesmas inscrições.
+    # Web Push compartilhado pelos alertas de proximidade (#172), de
+    # cancelamento (#28) e de atraso (#27/#207): mesmo executor, mesmas
+    # inscrições.
     notificador = _notificador_web_push(app)
+
+    # US #27 — alerta de atraso da linha acompanhada; a #207 leva o aviso
+    # ao push e respeita o interruptor geral da #29. A fonte de atraso ainda
+    # é o mock (sem atrasos): até existir a real, nada dispara.
+    servico = ServicoRastreamento(
+        FornecedorGTFSMock(), notificador, preferencias=PreferenciasDoBanco()
+    )
 
     # US #172 — alerta de proximidade da parada, agora sobre as viagens
     # reais da US #171 (o provider provisório devolvia sempre []).

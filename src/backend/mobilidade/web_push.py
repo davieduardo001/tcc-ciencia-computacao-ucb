@@ -17,7 +17,7 @@
 #       logada faria o backend chamar um endereço interno. Só aceitamos os
 #       serviços de push dos navegadores.
 #
-#   montar_carga
+#   montar_carga / montar_carga_cancelamento / montar_carga_atraso
 #       o que viaja no push. Sem coordenadas, sem identificador de usuário
 #       ou de viagem (LGPD): só o texto que a pessoa vai ler.
 #
@@ -25,14 +25,14 @@
 #       persistência, compartilhada pelas rotas e pelo notificador.
 #
 #   NotificadorWebPush
-#       implementa o contrato de notificador do alerta de proximidade. Roda
-#       na thread do worker, depois do commit do alerta: nunca levanta
+#       implementa o contrato de notificador de todos os alertas que saem
+#       do app: proximidade (#172), cancelamento (#28) e atraso (#27/#207).
+#       Cada alerta só monta a sua carga; o envio, a busca dos aparelhos e
+#       a limpeza de inscrições expiradas são um caminho só (`_despachar`).
+#       Roda na thread do worker, depois do commit do alerta: nunca levanta
 #       exceção (um erro aqui não pode desfazer nem repetir o alerta, que já
 #       está registrado) e envia em threads próprias, para um serviço de
 #       push lento não atrasar o ciclo dos demais usuários.
-#
-# O alerta de ATRASO (#27) usa outro notificador e NÃO é tocado: herdamos de
-# NotificadorNulo só para ter os métodos que esta US não usa como no-op.
 
 from __future__ import annotations
 
@@ -48,6 +48,7 @@ from concurrent.futures import Executor
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
+from urllib.parse import quote
 
 from cryptography.hazmat.primitives import serialization
 from py_vapid import Vapid
@@ -56,7 +57,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mobilidade.models.inscricao_push import InscricaoPush
-from mobilidade.services.servico_notificacoes import NotificadorNulo
+from mobilidade.services.servico_notificacoes import Notificador
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +285,46 @@ def montar_carga_cancelamento(
     }
 
 
+def url_da_linha(numero_linha: str) -> str:
+    """Abre o mapa já na linha do aviso (US #207, Cenário 7)."""
+    return f"{URL_AO_CLICAR}?linha={quote(numero_linha, safe='')}"
+
+
+def montar_carga_atraso(numero_linha: str, atraso_minutos: float, aumentou: bool) -> dict:
+    """
+    Carga do alerta de atraso da linha acompanhada — US #27, levada ao
+    push pela #207.
+
+    `aumentou` distingue o primeiro aviso ("está atrasada") do aviso de
+    que o atraso cresceu. O `tag` é por linha: o aviso novo substitui o
+    anterior da mesma linha em vez de empilhar, e o "voltou ao horário"
+    (`montar_carga_atraso_normalizado`) apaga o de atraso.
+    """
+    minutos = max(1, round(atraso_minutos))
+    if aumentou:
+        titulo = "Atraso aumentou"
+        corpo = f"O atraso da linha {numero_linha} subiu para {minutos} min."
+    else:
+        titulo = "Linha atrasada"
+        corpo = f"A linha {numero_linha} está com {minutos} min de atraso."
+    return {
+        "titulo": titulo,
+        "corpo": corpo,
+        "url": url_da_linha(numero_linha),
+        "tag": f"atraso:{numero_linha}",
+    }
+
+
+def montar_carga_atraso_normalizado(numero_linha: str) -> dict:
+    """Fim do atraso: mesma `tag` da `montar_carga_atraso`, para substituí-la."""
+    return {
+        "titulo": "Linha voltou ao horário",
+        "corpo": f"A linha {numero_linha} não está mais atrasada.",
+        "url": url_da_linha(numero_linha),
+        "tag": f"atraso:{numero_linha}",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Persistência
 # ---------------------------------------------------------------------------
@@ -393,12 +434,15 @@ class _Destino:
     auth: str
 
 
-class NotificadorWebPush(NotificadorNulo):
+class NotificadorWebPush(Notificador):
     """
-    Notificador do alerta de proximidade que entrega por Web Push.
+    Notificador que entrega por Web Push os alertas de proximidade (#172),
+    cancelamento (#28) e atraso (#27/#207).
 
-    Sem chaves VAPID válidas é um no-op. Com `executor`, cada envio roda em
-    thread própria; sem ele (testes) roda na hora, na mesma thread.
+    Sem chaves VAPID válidas é um no-op: o alerta continua só dentro do
+    app, e nada é tentado de novo depois (quem decide repetir é o serviço
+    do alerta, que já registrou o envio). Com `executor`, cada envio roda
+    em thread própria; sem ele (testes) roda na hora, na mesma thread.
     """
 
     def __init__(
@@ -422,23 +466,11 @@ class NotificadorWebPush(NotificadorNulo):
         parada_destino: str,
         eta_minutos: float,
     ) -> None:
-        if not self.config.disponivel:
-            return
-        try:
-            carga = json.dumps(
-                montar_carga(numero_linha, parada_destino, eta_minutos), ensure_ascii=False
-            )
-            destinos = self._destinos_do_usuario(uuid.UUID(str(usuario_id)))
-            for destino in destinos:
-                if self._executor is not None:
-                    self._executor.submit(self._enviar_para, destino, carga)
-                else:
-                    self._enviar_para(destino, carga)
-        except Exception:
-            # O alerta já foi registrado (o serviço notifica DEPOIS do
-            # commit). Se levantássemos, ele cairia no tratamento de erro
-            # do ciclo e seria contado como falha, sem desfazer nada.
-            logger.warning("Falha ao despachar o Web Push do alerta de proximidade", exc_info=True)
+        self._despachar(
+            usuario_id,
+            lambda: montar_carga(numero_linha, parada_destino, eta_minutos),
+            "proximidade",
+        )
 
     def alerta_cancelamento_viagem(
         self,
@@ -450,17 +482,43 @@ class NotificadorWebPush(NotificadorNulo):
         """
         US #28 — partida prevista sem veículo, com sugestão de alternativa.
 
-        Mesmo caminho do alerta de proximidade: carga própria (tag própria
-        para não brigar com o outro aviso), destinos do aparelho da
-        pessoa, e nunca levanta exceção — o alerta já está no banco.
+        Carga própria (tag própria para não brigar com o aviso de
+        proximidade); o resto é o caminho comum de `_despachar`.
+        """
+        self._despachar(
+            usuario_id,
+            lambda: montar_carga_cancelamento(numero_linha, horario, alternativa),
+            "cancelamento",
+        )
+
+    # US #27/#207 — atraso da linha acompanhada. Quem decide QUANDO avisar
+    # (limite, "só se aumentou", preferências) é o ServicoRastreamento; aqui
+    # só se escolhe o texto.
+
+    def alerta_disparado(self, usuario_id: str, linha_id: str, atraso: float) -> None:
+        self._despachar(
+            usuario_id, lambda: montar_carga_atraso(linha_id, atraso, aumentou=False), "atraso"
+        )
+
+    def alerta_atualizado(self, usuario_id: str, linha_id: str, atraso: float) -> None:
+        self._despachar(
+            usuario_id, lambda: montar_carga_atraso(linha_id, atraso, aumentou=True), "atraso"
+        )
+
+    def alerta_cancelado(self, usuario_id: str, linha_id: str) -> None:
+        self._despachar(usuario_id, lambda: montar_carga_atraso_normalizado(linha_id), "atraso")
+
+    # ------------------------------------------------------------------
+
+    def _despachar(self, usuario_id: str, montar: Callable[[], dict], alerta: str) -> None:
+        """
+        Caminho único de envio (US #207, Cenário 8): monta a carga, busca os
+        aparelhos da pessoa e envia a cada um. Nunca levanta exceção.
         """
         if not self.config.disponivel:
             return
         try:
-            carga = json.dumps(
-                montar_carga_cancelamento(numero_linha, horario, alternativa),
-                ensure_ascii=False,
-            )
+            carga = json.dumps(montar(), ensure_ascii=False)
             destinos = self._destinos_do_usuario(uuid.UUID(str(usuario_id)))
             for destino in destinos:
                 if self._executor is not None:
@@ -468,11 +526,10 @@ class NotificadorWebPush(NotificadorNulo):
                 else:
                     self._enviar_para(destino, carga)
         except Exception:
-            logger.warning(
-                "Falha ao despachar o Web Push do alerta de cancelamento", exc_info=True
-            )
-
-    # ------------------------------------------------------------------
+            # O alerta já foi registrado (o serviço notifica DEPOIS do
+            # commit). Se levantássemos, ele cairia no tratamento de erro
+            # do ciclo e seria contado como falha, sem desfazer nada.
+            logger.warning("Falha ao despachar o Web Push do alerta de %s", alerta, exc_info=True)
 
     def _destinos_do_usuario(self, usuario_id: uuid.UUID) -> list[_Destino]:
         db = self._session_factory()

@@ -10,6 +10,7 @@ from mobilidade.models.alerta import AlertaAtraso
 from mobilidade.providers.gtfs_base import FornecedorGTFS
 from mobilidade.services.servico_notificacoes import Notificador
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
+from mobilidade.providers.contratos_proximidade import PreferenciasProvider
 
 
 class ServicoRastreamento:
@@ -17,9 +18,22 @@ class ServicoRastreamento:
         self,
         fornecedor_gtfs: FornecedorGTFS,
         notificador: Notificador,
+        preferencias: Optional[PreferenciasProvider] = None,
     ):
+        """
+        `preferencias` (US #207, Cenário 3): com as notificações desligadas
+        na #29, o alerta continua sendo registrado (é o que aparece dentro
+        do app), mas o notificador não é chamado. Sem provider, notifica
+        sempre — o comportamento de antes.
+        """
         self.fornecedor = fornecedor_gtfs
         self.notificador = notificador
+        self.preferencias = preferencias
+
+    def _pode_notificar(self, usuario_id: uuid.UUID, db: Session) -> bool:
+        if self.preferencias is None:
+            return True
+        return self.preferencias.obter(usuario_id, db).notificacoes_ativas
 
     def listar_linhas_acompanhadas(self, usuario_id: uuid.UUID, db: Session) -> list[LinhaAcompanhada]:
         return (
@@ -74,7 +88,8 @@ class ServicoRastreamento:
                     db.add(novo)
                     db.commit()
                     db.refresh(novo)
-                    self.notificador.alerta_disparado(str(usuario_id), linha_id, atraso)
+                    if self._pode_notificar(usuario_id, db):
+                        self.notificador.alerta_disparado(str(usuario_id), linha_id, atraso)
                     eventos.append("criado")
                 except IntegrityError:
                     db.rollback()
@@ -98,7 +113,8 @@ class ServicoRastreamento:
                 alerta.status = "cancelado"
                 alerta.cancelado_em = datetime.utcnow()
                 db.commit()
-                self.notificador.alerta_cancelado(str(usuario_id), linha_id)
+                if self._pode_notificar(usuario_id, db):
+                    self.notificador.alerta_cancelado(str(usuario_id), linha_id)
                 eventos.append("cancelado")
 
         return eventos
@@ -109,9 +125,15 @@ class ServicoRastreamento:
         else:
             variacao = abs(atraso - alerta.ultimo_atraso_notificado)
             if variacao >= 5:
+                # US #207, Cenário 2: o registro acompanha a variação nos
+                # dois sentidos (regra da #27), mas só se avisa quando o
+                # atraso AUMENTA — "diminuiu um pouco" não é motivo para
+                # tirar o celular do bolso; o fim do atraso tem aviso próprio.
+                aumentou = atraso > alerta.ultimo_atraso_notificado
                 alerta.ultimo_atraso_notificado = atraso
                 alerta.ultimo_alerta_enviado_em = datetime.utcnow()
                 db.commit()
-                self.notificador.alerta_atualizado(str(alerta.usuario_id), alerta.linha_id, atraso)
+                if aumentou and self._pode_notificar(alerta.usuario_id, db):
+                    self.notificador.alerta_atualizado(str(alerta.usuario_id), alerta.linha_id, atraso)
                 return ["atualizado"]
         return []
