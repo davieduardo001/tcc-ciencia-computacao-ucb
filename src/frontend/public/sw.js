@@ -158,7 +158,12 @@ self.addEventListener("notificationclick", (evento) => {
         if (new URL(janela.url).origin !== self.location.origin) continue;
         try {
           await janela.focus();
-          if (new URL(janela.url).pathname !== alvo.pathname && "navigate" in janela) {
+          // Compara também a query: o push de atraso (#207) leva a
+          // /mapa?linha=X, e quem já está no /mapa precisa ir para a linha.
+          const atual = new URL(janela.url);
+          const mesmoDestino =
+            atual.pathname === alvo.pathname && atual.search === alvo.search;
+          if (!mesmoDestino && "navigate" in janela) {
             await janela.navigate(alvo.href);
           }
         } catch (erro) {

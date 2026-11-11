@@ -112,6 +112,9 @@ function MapaConteudo() {
   // cá com origem/destino já preenchidos.
   const searchParams = useSearchParams();
   const painel = searchParams.get("painel");
+  // US #207 — `?linha=<número>` abre o mapa já na linha. É o destino do
+  // toque no push de atraso.
+  const linhaDaUrl = searchParams.get("linha");
 
   useEffect(() => {
     if (painel === "rotas") {
@@ -158,6 +161,10 @@ function MapaConteudo() {
       setBuscandoLinha(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (linhaDaUrl) handleBuscarLinha(linhaDaUrl);
+  }, [linhaDaUrl, handleBuscarLinha]);
 
   // US #17 (autocomplete) — sugere enquanto digita, com debounce pra não
   // disparar uma chamada a cada tecla. Nunca mostra erro: sugestão é
