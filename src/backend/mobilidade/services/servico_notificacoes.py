@@ -41,6 +41,21 @@ class Notificador(ABC):
         """
         ...
 
+    @abstractmethod
+    def alerta_rota_favorita(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        eta_minutos: float,
+        proximo: bool,
+    ) -> None:
+        """
+        US #22/#207 — ônibus da linha de uma rota favorita a caminho da
+        parada de embarque. `proximo` = aviso de ônibus próximo (5 min, ao
+        vivo); senão, aviso de antecedência.
+        """
+        ...
+
 
 class NotificadorNulo(Notificador):
     def alerta_disparado(self, usuario_id: str, linha_id: str, atraso: float) -> None:
@@ -67,6 +82,15 @@ class NotificadorNulo(Notificador):
         numero_linha: str,
         horario: str,
         alternativa: str | None,
+    ) -> None:
+        pass
+
+    def alerta_rota_favorita(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        eta_minutos: float,
+        proximo: bool,
     ) -> None:
         pass
 
@@ -104,4 +128,15 @@ class NotificadorMock(Notificador):
     ) -> None:
         self.chamadas.append(
             ("cancelamento_viagem", usuario_id, numero_linha, horario, alternativa)
+        )
+
+    def alerta_rota_favorita(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        eta_minutos: float,
+        proximo: bool,
+    ) -> None:
+        self.chamadas.append(
+            ("rota_favorita", usuario_id, numero_linha, eta_minutos, proximo)
         )

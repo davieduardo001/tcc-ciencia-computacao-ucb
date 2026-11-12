@@ -145,3 +145,51 @@ def test_job_de_cancelamento_usa_o_mesmo_intervalo_do_de_atrasos():
         for chamada in scheduler.add_job.call_args_list
     }
     assert chamadas["monitoramento-cancelamento"] == chamadas["monitoramento-atrasos"]
+
+
+# ---------------------------------------------------------------------------
+# US #22/#207 — job das rotas favoritas
+# ---------------------------------------------------------------------------
+
+
+def _criar_com_favoritas(servico_rotas_favoritas, intervalo_proximidade_segundos=None):
+    with patch("mobilidade.workers.monitoramento.BackgroundScheduler") as classe:
+        criar_worker(
+            MagicMock(),
+            intervalo_minutos=5,
+            intervalo_proximidade_segundos=intervalo_proximidade_segundos,
+            servico_rotas_favoritas=servico_rotas_favoritas,
+        )
+    return classe.return_value
+
+
+def test_criar_worker_com_rotas_favoritas_cria_o_job():
+    scheduler = _criar_com_favoritas(MagicMock())
+
+    assert _ids_dos_jobs(scheduler) == [
+        "monitoramento-atrasos",
+        "monitoramento-rotas-favoritas",
+    ]
+
+
+def test_job_de_rotas_favoritas_chama_o_servico_e_nao_propaga_excecao():
+    servico = MagicMock()
+    servico.verificar_ciclo.side_effect = RuntimeError("boom")
+    scheduler = _criar_com_favoritas(servico)
+    job = scheduler.add_job.call_args_list[1].kwargs["func"]
+
+    sessao = MagicMock()
+    with patch("mobilidade.workers.monitoramento.SessionLocal", return_value=sessao):
+        job()
+
+    servico.verificar_ciclo.assert_called_once_with(sessao)
+    sessao.rollback.assert_called_once()
+    sessao.close.assert_called_once()
+
+
+def test_job_de_rotas_favoritas_segue_o_intervalo_do_de_proximidade():
+    padrao = _criar_com_favoritas(MagicMock())
+    curto = _criar_com_favoritas(MagicMock(), intervalo_proximidade_segundos=30)
+
+    assert padrao.add_job.call_args_list[1].kwargs["minutes"] == 5
+    assert curto.add_job.call_args_list[1].kwargs["seconds"] == 30

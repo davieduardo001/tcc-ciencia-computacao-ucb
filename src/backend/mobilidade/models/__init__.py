@@ -8,6 +8,7 @@ from .alerta_proximidade import AlertaProximidade
 from .alerta_cancelamento import AlertaCancelamento
 from .viagem import Viagem
 from .inscricao_push import InscricaoPush
+from .aviso_rota_favorita import AvisoRotaFavorita
 
 __all__ = [
     "TestLinha",
@@ -22,4 +23,5 @@ __all__ = [
     "AlertaCancelamento",
     "Viagem",
     "InscricaoPush",
+    "AvisoRotaFavorita",
 ]

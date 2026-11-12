@@ -812,6 +812,29 @@ def test_inscricao_expirada_no_aviso_de_atraso_e_removida(db, status):
     assert _restantes(db) == {viva.endpoint}
 
 
+def test_notificador_envia_o_aviso_de_rota_favorita_aos_aparelhos_do_usuario(db):
+    a, b = _inscrever(db), _inscrever(db)
+    _inscrever(db, OUTRO)
+    envios = _Envios()
+
+    _notificador(envios).alerta_rota_favorita(str(USUARIO), "0.110", 3.0, proximo=True)
+
+    assert {c["inscricao"]["endpoint"] for c in envios.chamadas} == {a.endpoint, b.endpoint}
+    assert envios.chamadas[0]["carga"]["titulo"] == "Ônibus próximo"
+
+
+def test_notificador_de_rota_favorita_sem_configuracao_vapid_nao_faz_nada(db):
+    _inscrever(db)
+    envios = _Envios()
+    notificador = web_push.NotificadorWebPush(
+        web_push.ConfiguracaoVapid(), SessionLocal, enviar=envios
+    )
+
+    notificador.alerta_rota_favorita(str(USUARIO), "0.110", 3.0, proximo=True)
+
+    assert envios.chamadas == []
+
+
 # --------------------------------------------------------------------------
 # US #28 — carga e envio do alerta de cancelamento de viagem
 # --------------------------------------------------------------------------
