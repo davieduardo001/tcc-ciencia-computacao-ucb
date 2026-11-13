@@ -246,21 +246,6 @@ def _chegada_da_perna(
     )
 
 
-def chegada_da_perna(
-    db: Session,
-    pedido: PedidoDePerna,
-    veiculos: list[PosicaoVeiculo],
-    rota_service: RotaService,
-    agora: datetime,
-) -> ChegadasDaPerna:
-    """
-    Chegadas de UM trecho, com os veículos já lidos. Para quem roda fora do
-    loop de eventos e já leu o feed do ciclo (o worker das rotas favoritas,
-    US #207); a rota HTTP usa `chegadas_das_pernas`.
-    """
-    return _chegada_da_perna(db, pedido, veiculos, rota_service, agora)
-
-
 async def chegadas_das_pernas(
     db: Session,
     pedidos: list[PedidoDePerna],
