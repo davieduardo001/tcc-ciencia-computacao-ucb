@@ -38,7 +38,8 @@ function iniciais(nome: string): string {
 //
 // "Perfil" saiu daqui: o bloco do usuário (avatar, nome, e-mail, "Rever o
 // guia" e "Sair") já fica no rodapé deste menu, e a barra de cima não tem
-// botão de perfil. No celular, "Perfil" mora na barra de baixo.
+// botão de perfil. No celular, "Perfil" mora na barra de baixo e leva a
+// Configurações, onde fica a seção "Perfil".
 const NAV_ITEMS = [
   { id: "mapa", href: "/mapa", label: "Mapa Interativo", Icone: MapIcon, disponivel: true },
   { id: "favoritos", href: "/favoritos", label: "Rotas Salvas", Icone: Star, disponivel: true },
@@ -66,7 +67,9 @@ const NAV_ITEMS = [
 // busca do topo e do planejador do mapa.
 const NAV_INFERIOR = [
   { id: "mapa", href: "/mapa", label: "Mapa", Icone: MapIcon, disponivel: true },
-  { id: "perfil", href: "/perfil", label: "Perfil", Icone: User, disponivel: false },
+  // O perfil do usuário é a primeira seção de Configurações (não existe
+  // página /perfil). O id é o da tela, para o item ficar ativo nela.
+  { id: "configuracoes", href: "/configuracoes", label: "Perfil", Icone: User, disponivel: true },
 ] as const;
 
 // O arco que abre no botão central: as seções que não cabem na barra
