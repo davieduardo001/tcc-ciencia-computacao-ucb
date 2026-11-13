@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from mobilidade.services.servico_rastreamento import ServicoRastreamento
 from mobilidade.services.servico_proximidade import ServicoProximidade
 from mobilidade.services.servico_cancelamento import ServicoCancelamento
+from mobilidade.services.servico_rotas_favoritas import ServicoRotasFavoritas
 from mobilidade.services.servico_notificacoes import NotificadorNulo
 from mobilidade.providers.gtfs_mock import FornecedorGTFSMock
 from shared.database import SessionLocal
@@ -55,6 +56,7 @@ def criar_worker(
     servico_proximidade: Optional[ServicoProximidade] = None,
     intervalo_proximidade_segundos: Optional[int] = None,
     servico_cancelamento: Optional[ServicoCancelamento] = None,
+    servico_rotas_favoritas: Optional[ServicoRotasFavoritas] = None,
 ) -> BackgroundScheduler:
     """
     Cria o scheduler com os jobs de monitoramento.
@@ -69,6 +71,10 @@ def criar_worker(
       (US #28) — criado só quando `servico_cancelamento` é informado;
       mesmo intervalo do de atrasos, porque a janela de detecção é de
       minutos e um ciclo curto não muda nada.
+    - "monitoramento-rotas-favoritas": aviso das rotas favoritas por push
+      (US #22/#207) — criado só quando `servico_rotas_favoritas` é
+      informado; no intervalo do de proximidade, porque o aviso de ônibus
+      próximo (5 min) se perde num ciclo longo.
 
     Os jobs abrem a própria sessão e isolam falha por iteração:
     um ciclo quebrado não derruba o scheduler nem os demais jobs.
@@ -146,6 +152,29 @@ def criar_worker(
             id="monitoramento-cancelamento",
             replace_existing=True,
             minutes=intervalo_minutos,
+        )
+
+    if servico_rotas_favoritas is not None:
+        def job_rotas_favoritas():
+            db = SessionLocal()
+            try:
+                servico_rotas_favoritas.verificar_ciclo(db)
+            except Exception:
+                db.rollback()
+            finally:
+                db.close()
+
+        if intervalo_proximidade_segundos is not None:
+            intervalo_favoritas = {"seconds": intervalo_proximidade_segundos}
+        else:
+            intervalo_favoritas = {"minutes": intervalo_minutos}
+
+        scheduler.add_job(
+            func=job_rotas_favoritas,
+            trigger="interval",
+            id="monitoramento-rotas-favoritas",
+            replace_existing=True,
+            **intervalo_favoritas,
         )
 
     return scheduler

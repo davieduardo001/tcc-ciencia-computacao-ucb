@@ -22,6 +22,9 @@ from mobilidade.providers.preferencias_banco import PreferenciasDoBanco
 from mobilidade.providers.destinatarios_banco import DestinatariosDoBanco
 from mobilidade.providers.veiculos_ao_vivo import VeiculosAoVivo
 from mobilidade.providers.eta_destino_trajeto import EtaDoDestinoPorTrajeto
+from mobilidade.providers.eta_embarque_trajeto import EtaDoEmbarquePorTrajeto
+from mobilidade.providers.favoritas_banco import FavoritasDoBanco
+from mobilidade.services.servico_rotas_favoritas import ServicoRotasFavoritas
 from mobilidade.rota_service import RotaService
 
 instalar_redator_de_acesso()
@@ -57,8 +60,8 @@ def _notificador_web_push(app: FastAPI):
     no-op de sempre (o aviso continua chegando DENTRO do app).
 
     Uma única instância serve os alertas de proximidade (#172), de
-    cancelamento (#28) e de atraso (#27/#207): mesmo executor de threads,
-    mesmas inscrições.
+    cancelamento (#28), de atraso (#27/#207) e das rotas favoritas
+    (#22/#207): mesmo executor de threads, mesmas inscrições.
     """
     config = configuracao_vapid_do_ambiente()
     if not config.disponivel:
@@ -67,15 +70,15 @@ def _notificador_web_push(app: FastAPI):
 
     executor = ThreadPoolExecutor(max_workers=MAX_THREADS_WEB_PUSH, thread_name_prefix="web-push")
     app.state.executor_push = executor
-    logger.info("Web Push ligado para os alertas de proximidade, cancelamento e atraso.")
+    logger.info("Web Push ligado para proximidade, cancelamento, atraso e rotas favoritas.")
     return NotificadorWebPush(config, SessionLocal, executor=executor)
 
 
 @app.on_event("startup")
 def startup():
     # Web Push compartilhado pelos alertas de proximidade (#172), de
-    # cancelamento (#28) e de atraso (#27/#207): mesmo executor, mesmas
-    # inscrições.
+    # cancelamento (#28), de atraso (#27/#207) e das rotas favoritas
+    # (#22/#207): mesmo executor, mesmas inscrições.
     notificador = _notificador_web_push(app)
 
     # US #27 — alerta de atraso da linha acompanhada; a #207 leva o aviso
@@ -109,6 +112,17 @@ def startup():
         destinatarios=DestinatariosDoBanco(),
     )
 
+    # US #22/#207 — aviso das rotas favoritas por push, sobre o feed ao vivo
+    # e o trajeto da linha até a parada de embarque. RotaService próprio,
+    # como o do alerta de proximidade.
+    servico_rotas_favoritas = ServicoRotasFavoritas(
+        favoritas=FavoritasDoBanco(),
+        veiculos=VeiculosAoVivo(),
+        preferencias=PreferenciasDoBanco(),
+        notificador=notificador,
+        eta=EtaDoEmbarquePorTrajeto(RotaService()),
+    )
+
     intervalo = int(getattr(settings, "WORKER_INTERVAL_MINUTES", 5))
     scheduler = criar_worker(
         servico,
@@ -117,6 +131,7 @@ def startup():
         # None (padrão) mantém o intervalo geral; ver monitoramento.py.
         intervalo_proximidade_segundos=intervalo_proximidade_do_ambiente(),
         servico_cancelamento=servico_cancelamento,
+        servico_rotas_favoritas=servico_rotas_favoritas,
     )
     scheduler.start()
     app.state.scheduler = scheduler

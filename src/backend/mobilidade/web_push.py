@@ -17,7 +17,8 @@
 #       logada faria o backend chamar um endereço interno. Só aceitamos os
 #       serviços de push dos navegadores.
 #
-#   montar_carga / montar_carga_cancelamento / montar_carga_atraso
+#   montar_carga / montar_carga_cancelamento / montar_carga_atraso /
+#   montar_carga_rota_favorita
 #       o que viaja no push. Sem coordenadas, sem identificador de usuário
 #       ou de viagem (LGPD): só o texto que a pessoa vai ler.
 #
@@ -26,7 +27,8 @@
 #
 #   NotificadorWebPush
 #       implementa o contrato de notificador de todos os alertas que saem
-#       do app: proximidade (#172), cancelamento (#28) e atraso (#27/#207).
+#       do app: proximidade (#172), cancelamento (#28), atraso (#27/#207) e
+#       rotas preferidas (#22/#207).
 #       Cada alerta só monta a sua carga; o envio, a busca dos aparelhos e
 #       a limpeza de inscrições expiradas são um caminho só (`_despachar`).
 #       Roda na thread do worker, depois do commit do alerta: nunca levanta
@@ -315,6 +317,25 @@ def montar_carga_atraso(numero_linha: str, atraso_minutos: float, aumentou: bool
     }
 
 
+def montar_carga_rota_favorita(numero_linha: str, eta_minutos: float, proximo: bool) -> dict:
+    """
+    Carga do aviso de rota favorita — US #22, levada ao push pela #207.
+
+    Mesmos textos do PushService da #22. O rótulo que a pessoa deu à rota
+    ("Casa → Trabalho") NÃO entra: diz onde ela mora e trabalha, e a carga
+    passa pelo serviço de push do navegador (LGPD, Cenário 6). O `tag` é
+    por linha: o aviso de ônibus próximo substitui o de antecedência.
+    """
+    minutos = max(1, round(eta_minutos))
+    unidade = "minuto" if minutos == 1 else "minutos"
+    return {
+        "titulo": "Ônibus próximo" if proximo else "Lembrete de rota",
+        "corpo": f"O ônibus da linha {numero_linha} chega em aproximadamente {minutos} {unidade}.",
+        "url": url_da_linha(numero_linha),
+        "tag": f"rota:{numero_linha}",
+    }
+
+
 def montar_carga_atraso_normalizado(numero_linha: str) -> dict:
     """Fim do atraso: mesma `tag` da `montar_carga_atraso`, para substituí-la."""
     return {
@@ -437,7 +458,7 @@ class _Destino:
 class NotificadorWebPush(Notificador):
     """
     Notificador que entrega por Web Push os alertas de proximidade (#172),
-    cancelamento (#28) e atraso (#27/#207).
+    cancelamento (#28), atraso (#27/#207) e rotas preferidas (#22/#207).
 
     Sem chaves VAPID válidas é um no-op: o alerta continua só dentro do
     app, e nada é tentado de novo depois (quem decide repetir é o serviço
@@ -507,6 +528,20 @@ class NotificadorWebPush(Notificador):
 
     def alerta_cancelado(self, usuario_id: str, linha_id: str) -> None:
         self._despachar(usuario_id, lambda: montar_carga_atraso_normalizado(linha_id), "atraso")
+
+    def alerta_rota_favorita(
+        self,
+        usuario_id: str,
+        numero_linha: str,
+        eta_minutos: float,
+        proximo: bool,
+    ) -> None:
+        """US #22/#207 — quando avisar é decisão do ServicoRotasFavoritas."""
+        self._despachar(
+            usuario_id,
+            lambda: montar_carga_rota_favorita(numero_linha, eta_minutos, proximo),
+            "rota favorita",
+        )
 
     # ------------------------------------------------------------------
 
