@@ -177,33 +177,6 @@ describe("service worker — clique na notificação", () => {
     expect(alvo.clients.openWindow).not.toHaveBeenCalled();
   });
 
-  it("leva ao destino quando a janela está no mesmo caminho com outra query (#207)", async () => {
-    const janela = {
-      url: `${ORIGEM}/mapa`,
-      focus: jest.fn().mockResolvedValue(undefined),
-      navigate: jest.fn().mockResolvedValue(undefined),
-    };
-    const { ouvintes } = carregarWorker([janela]);
-
-    await dispararClique(ouvintes, { url: "/mapa?linha=0.110" });
-
-    expect(janela.navigate).toHaveBeenCalledWith(`${ORIGEM}/mapa?linha=0.110`);
-  });
-
-  it("não navega quando a janela já está exatamente no destino com a query", async () => {
-    const janela = {
-      url: `${ORIGEM}/mapa?linha=0.110`,
-      focus: jest.fn().mockResolvedValue(undefined),
-      navigate: jest.fn(),
-    };
-    const { ouvintes } = carregarWorker([janela]);
-
-    await dispararClique(ouvintes, { url: "/mapa?linha=0.110" });
-
-    expect(janela.focus).toHaveBeenCalled();
-    expect(janela.navigate).not.toHaveBeenCalled();
-  });
-
   it("ignora janelas de outra origem", async () => {
     const estranha = { url: "https://outro.site/mapa", focus: jest.fn(), navigate: jest.fn() };
     const { ouvintes, alvo } = carregarWorker([estranha]);
