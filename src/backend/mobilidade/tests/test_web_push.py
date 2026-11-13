@@ -698,16 +698,118 @@ def test_enviar_com_pywebpush_usa_ttl_curto_urgencia_alta_e_nao_altera_os_claims
     assert claims == {"sub": ASSUNTO}  # a cópia é que foi alterada
 
 
-def test_o_alerta_de_atraso_continua_sem_efeito_neste_notificador(db):
-    _inscrever(db)
+# --------------------------------------------------------------------------
+# US #207 — alerta de atraso (#27) pelo mesmo canal
+# --------------------------------------------------------------------------
+
+
+def test_carga_do_atraso_tem_a_linha_e_o_atraso():
+    carga = web_push.montar_carga_atraso("0.110", 15.4, aumentou=False)
+
+    assert carga["titulo"] == "Linha atrasada"
+    assert carga["corpo"] == "A linha 0.110 está com 15 min de atraso."
+    assert carga["tag"] == "atraso:0.110"
+
+
+def test_carga_do_atraso_que_aumentou_diz_que_subiu():
+    carga = web_push.montar_carga_atraso("0.110", 21.0, aumentou=True)
+
+    assert carga["titulo"] == "Atraso aumentou"
+    assert "21 min" in carga["corpo"]
+
+
+def test_carga_de_volta_ao_horario_substitui_o_aviso_de_atraso():
+    atraso = web_push.montar_carga_atraso("0.110", 15.0, aumentou=False)
+    normal = web_push.montar_carga_atraso_normalizado("0.110")
+
+    assert normal["titulo"] == "Linha voltou ao horário"
+    assert normal["tag"] == atraso["tag"]
+
+
+def test_tag_do_atraso_e_por_linha_e_distinta_das_outras():
+    tags = {
+        web_push.montar_carga_atraso("0.110", 15.0, aumentou=False)["tag"],
+        web_push.montar_carga_atraso("0.900", 15.0, aumentou=False)["tag"],
+        web_push.montar_carga("0.110", "W3 Sul 502", 3.0)["tag"],
+        web_push.montar_carga_cancelamento("0.110", "06:00", None)["tag"],
+    }
+
+    assert len(tags) == 4
+
+
+@pytest.mark.parametrize(
+    "linha, url",
+    [("0.110", "/mapa?linha=0.110"), ("110/2", "/mapa?linha=110%2F2"), ("a b&c", "/mapa?linha=a%20b%26c")],
+)
+def test_tocar_no_aviso_de_atraso_abre_o_mapa_na_linha(linha, url):
+    assert web_push.montar_carga_atraso(linha, 15.0, aumentou=False)["url"] == url
+    assert web_push.montar_carga_atraso_normalizado(linha)["url"] == url
+
+
+def test_carga_do_atraso_nao_carrega_coordenada_nem_identificador():
+    texto = json.dumps(
+        [
+            web_push.montar_carga_atraso("0.110", 15.0, aumentou=True),
+            web_push.montar_carga_atraso_normalizado("0.110"),
+        ]
+    )
+
+    assert str(USUARIO) not in texto
+    assert "lat" not in texto and "lng" not in texto
+
+
+def test_notificador_envia_os_tres_avisos_de_atraso_aos_aparelhos_do_usuario(db):
+    a, b = _inscrever(db), _inscrever(db)
     envios = _Envios()
     notificador = _notificador(envios)
 
-    notificador.alerta_disparado(str(USUARIO), "0.110", 5.0)
-    notificador.alerta_atualizado(str(USUARIO), "0.110", 5.0)
+    notificador.alerta_disparado(str(USUARIO), "0.110", 15.0)
+    notificador.alerta_atualizado(str(USUARIO), "0.110", 21.0)
+    notificador.alerta_cancelado(str(USUARIO), "0.110")
+
+    assert {c["inscricao"]["endpoint"] for c in envios.chamadas} == {a.endpoint, b.endpoint}
+    titulos = [c["carga"]["titulo"] for c in envios.chamadas]
+    assert titulos == [
+        "Linha atrasada",
+        "Linha atrasada",
+        "Atraso aumentou",
+        "Atraso aumentou",
+        "Linha voltou ao horário",
+        "Linha voltou ao horário",
+    ]
+
+
+def test_notificador_de_atraso_nao_envia_para_aparelhos_de_outro_usuario(db):
+    _inscrever(db, OUTRO)
+    envios = _Envios()
+
+    _notificador(envios).alerta_disparado(str(USUARIO), "0.110", 15.0)
+
+    assert envios.chamadas == []
+
+
+def test_notificador_de_atraso_sem_configuracao_vapid_nao_faz_nada(db):
+    _inscrever(db)
+    envios = _Envios()
+    notificador = web_push.NotificadorWebPush(
+        web_push.ConfiguracaoVapid(), SessionLocal, enviar=envios
+    )
+
+    notificador.alerta_disparado(str(USUARIO), "0.110", 15.0)
+    notificador.alerta_atualizado(str(USUARIO), "0.110", 21.0)
     notificador.alerta_cancelado(str(USUARIO), "0.110")
 
     assert envios.chamadas == []
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_inscricao_expirada_no_aviso_de_atraso_e_removida(db, status):
+    expirada, viva = _inscrever(db), _inscrever(db)
+    envios = _Envios(falhas={expirada.endpoint: _erro_http(status)})
+
+    _notificador(envios).alerta_disparado(str(USUARIO), "0.110", 15.0)
+
+    assert _restantes(db) == {viva.endpoint}
 
 
 # --------------------------------------------------------------------------

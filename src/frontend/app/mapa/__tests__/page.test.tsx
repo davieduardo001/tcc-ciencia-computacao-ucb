@@ -535,6 +535,22 @@ describe("MapaPage — rotas favoritas (US #25)", () => {
     });
   });
 
+  it("abre direto na linha que vem em ?linha= (toque no push de atraso, #207)", async () => {
+    parametrosDaUrl = "linha=0.110";
+    render(<MapaPage />);
+
+    await waitFor(() => {
+      expect(buscarLinha).toHaveBeenCalledWith("0.110");
+    });
+  });
+
+  it("sem ?linha= não busca linha nenhuma ao abrir", async () => {
+    render(<MapaPage />);
+    await act(async () => {});
+
+    expect(buscarLinha).not.toHaveBeenCalled();
+  });
+
   it("'Rota' abre o planejador e calcula a rota salva", async () => {
     (listarFavoritos as jest.Mock).mockResolvedValue([FAVORITA]);
     render(<MapaPage />);
